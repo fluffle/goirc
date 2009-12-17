@@ -41,8 +41,8 @@ func (conn *Conn) dispatchEvent(line *Line) {
 	// So, I think CTCP and (in particular) CTCP ACTION are better handled as
 	// separate events as opposed to forcing people to have gargantuan PRIVMSG
 	// handlers to cope with the possibilities.
-	if line.Cmd == "PRIVMSG" && len(line.Text) > 2
-		&& line.Text[0] == '\001' && line.Text[len(line.Text)-1] == '\001' {
+	if line.Cmd == "PRIVMSG" && len(line.Text) > 2 &&
+		line.Text[0] == '\001' && line.Text[len(line.Text)-1] == '\001' {
 		// WOO, it's a CTCP message
 		t := strings.Split(line.Text[1:len(line.Text)-1], " ", 2);
 		if c := strings.ToUpper(t[0]); c == "ACTION" {

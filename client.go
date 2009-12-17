@@ -13,12 +13,12 @@ func main() {
 	c := irc.New("GoTest", "gotest", "GoBot");
 	c.AddHandler("connected",
 		func(conn *irc.Conn, line *irc.Line) {
-			conn.Join("#");
+			conn.Join("#go-lang");
 		}
 	);
 
 	// connect to server
-	if err := c.Connect("irc.pl0rt.org", ""); err != nil {
+	if err := c.Connect("irc.freenode.net", ""); err != nil {
 		fmt.Printf("Connection error: %s\n", err);
 		return;
 	}
@@ -77,7 +77,7 @@ func main() {
 			// if we don't really want to quit, reconnect!
 			if !reallyquit {
 				fmt.Println("Reconnecting...");
-				if err := c.Connect("irc.pl0rt.org", ""); err != nil {
+				if err := c.Connect("irc.freenode.net", ""); err != nil {
 					fmt.Printf("Connection error: %s\n", err);
 					break;
 				}

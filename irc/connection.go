@@ -83,7 +83,7 @@ func (conn *Conn) Connect(host, pass string) os.Error {
 
 	conn.io = bufio.NewReadWriter(
 		bufio.NewReader(conn.sock),
-		bufio.NewWriter(conn.sock)
+		bufio.NewWriter(conn.sock),
 	);
 	go conn.send();
 	go conn.recv();
