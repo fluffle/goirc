@@ -1,7 +1,7 @@
 package main
 
 import (
-	"./irc/_obj/irc"
+	"irc"
 	"fmt"
 	"os"
 	"bufio"

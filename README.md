@@ -13,9 +13,28 @@ You can build the test client also with:
 	make
 	./gobot
 
-This will connect to freenode and join `#go-lang` by default, so be careful ;-)
+This will connect to freenode and join `#go-nuts` by default, so be careful ;-)
 
 ### Using the framework
+
+Synopsis:
+
+    import "irc"
+    func main() {
+        c := irc.New("nick", "ident", "real name")
+        // add handlers to do things here!
+	    if err := c.Connect("irc.freenode.net", ""); err != nil {
+		    fmt.Printf("Connection error: %s\n", err.String())
+	    }
+        for {
+            if closed(c.Err) {
+                break
+            }
+            if err := <-c.Err; err != nil {
+                fmt.Printf("goirc error: %s", err.String())
+            }
+        }
+    }
 
 The test client provides a good (if basic) example of how to use the framework.
 Reading `irc/handlers.go` gives a more in-depth look at how handlers can be
@@ -25,8 +44,8 @@ possible IRC commands are implemented yet). Events are produced directly from
 the messages from the IRC server, so you have to handle e.g. "332" for
 `RPL_TOPIC` to get the topic for a channel.
 
-The vast majority of handlers implemented within the framework implement state
-tracking of all nicks in channels that the client is also present in. It's
+The vast majority of handlers implemented within the framework deal with state
+tracking of all nicks in any channels that the client is also present in. It's
 likely that this state tracking will become optional in the near future.
 
 ### Misc.
