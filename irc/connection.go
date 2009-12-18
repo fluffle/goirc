@@ -58,7 +58,6 @@ func New(nick, user, name string) *Conn {
 
 func (conn *Conn) initialise() {
 	// allocate meh some memoraaaahh
-	fmt.Println("irc.initialise(): initialising...")
 	conn.nicks = make(map[string]*Nick)
 	conn.chans = make(map[string]*Channel)
 	conn.in = make(chan *Line, 32)
@@ -84,7 +83,6 @@ func (conn *Conn) Connect(host string, pass ...) os.Error {
 	} else if conn.sock, err = net.DialTCP("tcp", nil, addr); err != nil {
 		return err
 	}
-	fmt.Println("irc.Connect(): connected happily...")
 	conn.Host = host
 
 	conn.io = bufio.NewReadWriter(
@@ -101,7 +99,6 @@ func (conn *Conn) Connect(host string, pass ...) os.Error {
 	conn.User(conn.Me.Ident, conn.Me.Name)
 
 	go conn.runLoop()
-	fmt.Println("irc.Connect(): launched runLoop() goroutine.")
 	return nil
 }
 
@@ -188,7 +185,6 @@ func (conn *Conn) runLoop() {
 			conn.dispatchEvent(line)
 		}
 	}
-	fmt.Println("irc.runLoop(): Exited runloop...")
 	// if we fall off the end here due to shutdown,
 	// reinit everything once the runloop is done
 	// so that Connect() can be called again.
@@ -201,7 +197,6 @@ func (conn *Conn) shutdown() {
 	close(conn.Err)
 	conn.connected = false
 	conn.sock.Close()
-	fmt.Println("irc.shutdown(): shut down sockets and channels!")
 }
 
 // Dumps a load of information about the current state of the connection to a

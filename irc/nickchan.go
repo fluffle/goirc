@@ -120,7 +120,6 @@ func (ch *Channel) AddNick(n *Nick) {
 // n.DelChannel(ch) to remove the association from the perspective of *irc.Nick.
 func (ch *Channel) DelNick(n *Nick) {
 	if _, ok := ch.Nicks[n]; ok {
-		fmt.Printf("irc.Channel.DelNick(): deleting %s from %s\n", n.Nick, ch.Name)
 		if n == n.conn.Me {
 			// we're leaving the channel, so remove all state we have about it
 			ch.Delete()
@@ -136,7 +135,6 @@ func (ch *Channel) DelNick(n *Nick) {
 // Stops the channel from being tracked by state tracking handlers. Also calls
 // n.DelChannel(ch) for all nicks that are associated with the channel.
 func (ch *Channel) Delete() {
-	fmt.Printf("irc.Channel.Delete(): deleting %s\n", ch.Name)
 	for n, _ := range ch.Nicks {
 		n.DelChannel(ch)
 	}
@@ -170,7 +168,6 @@ func (n *Nick) AddChannel(ch *Channel) {
 // ch.DelNick(n) to remove the association from the perspective of *irc.Channel.
 func (n *Nick) DelChannel(ch *Channel) {
 	if _, ok := n.Channels[ch]; ok {
-		fmt.Printf("irc.Nick.DelChannel(): deleting %s from %s\n", n.Nick, ch.Name)
 		n.Channels[ch] = nil, false
 		ch.DelNick(n)
 		if len(n.Channels) == 0 {
@@ -193,7 +190,6 @@ func (n *Nick) ReNick(neu string) {
 func (n *Nick) Delete() {
 	// we don't ever want to remove *our* nick from conn.nicks...
 	if n != n.conn.Me {
-		fmt.Printf("irc.Nick.Delete(): deleting %s\n", n.Nick)
 		for ch, _ := range n.Channels {
 			ch.DelNick(n)
 		}
