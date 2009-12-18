@@ -7,8 +7,8 @@ include $(GOROOT)/src/Make.$(GOARCH)
 TARG=irc
 GOFILES=\
 	connection.go\
-    commands.go\
-    handlers.go\
-    nickchan.go
+	commands.go\
+	handlers.go\
+	nickchan.go
 
 include $(GOROOT)/src/Make.pkg

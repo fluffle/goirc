@@ -1,6 +1,7 @@
 /gobot
 *.[568]
 _obj/
+_test/
 *.swp
 *~
 *.out
