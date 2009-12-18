@@ -12,8 +12,8 @@ import (
 type Channel struct {
 	Name, Topic string
 	Modes       *ChanMode
-	Nicks map[*Nick]*ChanPrivs
-	conn  *Conn
+	Nicks       map[*Nick]*ChanPrivs
+	conn        *Conn
 }
 
 // A struct representing an IRC nick
@@ -25,21 +25,26 @@ type Nick struct {
 }
 
 // A struct representing the modes of an IRC Channel
-// (the ones we care about, at least)
-// see the MODE handler in setupEvents() for details
+// (the ones we care about, at least).
+//
+// See the MODE handler in setupEvents() for details of how this is maintained.
 type ChanMode struct {
 	// MODE +p, +s, +t, +n, +m
 	Private, Secret, ProtectedTopic, NoExternalMsg, Moderated bool
+
 	// MODE +i, +O, +z
 	InviteOnly, OperOnly, SSLOnly bool
+
 	// MODE +k
 	Key string
+
 	// MODE +l
 	Limit int
 }
 
 // A struct representing the modes of an IRC Nick (User Modes)
 // (again, only the ones we care about)
+//
 // This is only really useful for conn.Me, as we can't see other people's modes
 // without IRC operator privileges (and even then only on some IRCd's).
 type NickMode struct {
@@ -56,6 +61,9 @@ type ChanPrivs struct {
 /******************************************************************************\
  * Conn methods to create/look up nicks/channels
 \******************************************************************************/
+
+// Creates a new *irc.Nick, initialises it, and stores it in *irc.Conn so it
+// can be properly tracked for state management purposes.
 func (conn *Conn) NewNick(nick, ident, name, host string) *Nick {
 	n := &Nick{Nick: nick, Ident: ident, Name: name, Host: host, conn: conn}
 	n.initialise()
@@ -63,6 +71,7 @@ func (conn *Conn) NewNick(nick, ident, name, host string) *Nick {
 	return n
 }
 
+// Returns an *irc.Nick for the nick n, if we're tracking it.
 func (conn *Conn) GetNick(n string) *Nick {
 	if nick, ok := conn.nicks[n]; ok {
 		return nick
@@ -70,6 +79,8 @@ func (conn *Conn) GetNick(n string) *Nick {
 	return nil
 }
 
+// Creates a new *irc.Channel, initialises it, and stores it in *irc.Conn so it
+// can be properly tracked for state management purposes.
 func (conn *Conn) NewChannel(c string) *Channel {
 	ch := &Channel{Name: c, conn: conn}
 	ch.initialise()
@@ -77,6 +88,7 @@ func (conn *Conn) NewChannel(c string) *Channel {
 	return ch
 }
 
+// Returns an *irc.Channel for the channel c, if we're tracking it.
 func (conn *Conn) GetChannel(c string) *Channel {
 	if ch, ok := conn.chans[c]; ok {
 		return ch
@@ -87,11 +99,13 @@ func (conn *Conn) GetChannel(c string) *Channel {
 /******************************************************************************\
  * Channel methods for state management
 \******************************************************************************/
+
 func (ch *Channel) initialise() {
 	ch.Modes = new(ChanMode)
 	ch.Nicks = make(map[*Nick]*ChanPrivs)
 }
 
+// Associates an *irc.Nick with an *irc.Channel using a shared *irc.ChanPrivs
 func (ch *Channel) AddNick(n *Nick) {
 	if _, ok := ch.Nicks[n]; !ok {
 		ch.Nicks[n] = new(ChanPrivs)
@@ -101,6 +115,9 @@ func (ch *Channel) AddNick(n *Nick) {
 	}
 }
 
+// Disassociates an *irc.Nick from an *irc.Channel. Will call ch.Delete() if
+// the *irc.Nick being removed is the connection's nick. Will also call
+// n.DelChannel(ch) to remove the association from the perspective of *irc.Nick.
 func (ch *Channel) DelNick(n *Nick) {
 	if _, ok := ch.Nicks[n]; ok {
 		fmt.Printf("irc.Channel.DelNick(): deleting %s from %s\n", n.Nick, ch.Name)
@@ -116,6 +133,8 @@ func (ch *Channel) DelNick(n *Nick) {
 	// consistency, and this would mean spewing an error message every delete
 }
 
+// Stops the channel from being tracked by state tracking handlers. Also calls
+// n.DelChannel(ch) for all nicks that are associated with the channel.
 func (ch *Channel) Delete() {
 	fmt.Printf("irc.Channel.Delete(): deleting %s\n", ch.Name)
 	for n, _ := range ch.Nicks {
@@ -132,7 +151,11 @@ func (n *Nick) initialise() {
 	n.Channels = make(map[*Channel]*ChanPrivs)
 }
 
-// very slightly different to Channel.AddNick() ...
+// Associates an *irc.Channel with an *irc.Nick using a shared *irc.ChanPrivs
+//
+// Very slightly different to irc.Channel.AddNick() in that it tests for a
+// pre-existing association within the *irc.Nick object rather than the
+// *irc.Channel object before associating the two. 
 func (n *Nick) AddChannel(ch *Channel) {
 	if _, ok := n.Channels[ch]; !ok {
 		ch.Nicks[n] = new(ChanPrivs)
@@ -142,6 +165,9 @@ func (n *Nick) AddChannel(ch *Channel) {
 	}
 }
 
+// Disassociates an *irc.Channel from an *irc.Nick. Will call n.Delete() if
+// the *irc.Nick is no longer on any channels we are tracking. Will also call
+// ch.DelNick(n) to remove the association from the perspective of *irc.Channel.
 func (n *Nick) DelChannel(ch *Channel) {
 	if _, ok := n.Channels[ch]; ok {
 		fmt.Printf("irc.Nick.DelChannel(): deleting %s from %s\n", n.Nick, ch.Name)
@@ -154,12 +180,16 @@ func (n *Nick) DelChannel(ch *Channel) {
 	}
 }
 
+// Signals to the tracking code that the *irc.Nick object should be tracked
+// under a "neu" nick rather than the old one.
 func (n *Nick) ReNick(neu string) {
 	n.conn.nicks[n.Nick] = nil, false
 	n.Nick = neu
 	n.conn.nicks[n.Nick] = n
 }
 
+// Stops the nick from being tracked by state tracking handlers. Also calls
+// ch.DelNick(n) for all nicks that are associated with the channel.
 func (n *Nick) Delete() {
 	// we don't ever want to remove *our* nick from conn.nicks...
 	if n != n.conn.Me {
@@ -174,6 +204,8 @@ func (n *Nick) Delete() {
 /******************************************************************************\
  * String() methods for all structs in this file for ease of debugging.
 \******************************************************************************/
+
+// Map *irc.ChanMode fields to IRC mode characters
 var ChanModeToString = map[string]string{
 	"Private": "p",
 	"Secret": "s",
@@ -186,6 +218,8 @@ var ChanModeToString = map[string]string{
 	"Key": "k",
 	"Limit": "l",
 }
+
+// Map *irc.NickMode fields to IRC mode characters
 var NickModeToString = map[string]string{
 	"Invisible": "i",
 	"Oper": "o",
@@ -193,6 +227,8 @@ var NickModeToString = map[string]string{
 	"HiddenHost": "x",
 	"SSL": "z",
 }
+
+// Map *irc.ChanPrivs fields to IRC mode characters
 var ChanPrivToString = map[string]string{
 	"Owner": "q",
 	"Admin": "a",
@@ -200,6 +236,9 @@ var ChanPrivToString = map[string]string{
 	"HalfOp": "h",
 	"Voice": "v",
 }
+
+// Map *irc.ChanPrivs fields to the symbols used to represent these modes
+// in NAMES and WHOIS responses
 var ChanPrivToModeChar = map[string]byte{
 	"Owner": '~',
 	"Admin": '&',
@@ -207,6 +246,8 @@ var ChanPrivToModeChar = map[string]byte{
 	"HalfOp": '%',
 	"Voice": '+',
 }
+
+// Reverse mappings of the above datastructures
 var StringToChanMode, StringToNickMode, StringToChanPriv map[string]string
 var ModeCharToChanPriv map[byte]string
 
@@ -230,6 +271,13 @@ func init() {
 	}
 }
 
+// Returns a string representing the channel. Looks like:
+//	Channel: <channel name> e.g. #moo
+//	Topic: <channel topic> e.g. Discussing the merits of cows!
+//	Mode: <channel modes> e.g. +nsti
+//	Nicks:
+//		<nick>: <privs> e.g. CowMaster: +o
+//		...
 func (ch *Channel) String() string {
 	str := "Channel: " + ch.Name + "\n\t"
 	str += "Topic: " + ch.Topic + "\n\t"
@@ -241,6 +289,14 @@ func (ch *Channel) String() string {
 	return str
 }
 
+// Returns a string representing the nick. Looks like:
+//	Nick: <nick name> e.g. CowMaster
+//	Hostmask: <ident@host> e.g. moo@cows.org
+//	Real Name: <real name> e.g. Steve "CowMaster" Bush
+//	Modes: <nick modes> e.g. +z
+//	Channels:
+//		<channel>: <privs> e.g. #moo: +o
+//		...
 func (n *Nick) String() string {
 	str := "Nick: " + n.Nick + "\n\t"
 	str += "Hostmask: " + n.Ident + "@" + n.Host + "\n\t"
@@ -253,6 +309,8 @@ func (n *Nick) String() string {
 	return str
 }
 
+// Returns a string representing the channel modes. Looks like:
+//	+npk key
 func (cm *ChanMode) String() string {
 	str := "+"
 	a := make([]string, 2)
@@ -287,6 +345,8 @@ func (cm *ChanMode) String() string {
 	return str
 }
 
+// Returns a string representing the nick modes. Looks like:
+//	+iwx
 func (nm *NickMode) String() string {
 	str := "+"
 	v := reflect.Indirect(reflect.NewValue(nm)).(*reflect.StructValue)
@@ -306,6 +366,8 @@ func (nm *NickMode) String() string {
 	return str
 }
 
+// Returns a string representing the channel privileges. Looks like:
+//	+o
 func (p *ChanPrivs) String() string {
 	str := "+"
 	v := reflect.Indirect(reflect.NewValue(p)).(*reflect.StructValue)

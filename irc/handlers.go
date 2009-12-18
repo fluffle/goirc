@@ -8,7 +8,19 @@ import (
 	"strconv"
 )
 
-// Add an event handler for a specific IRC command
+// AddHandler() adds an event handler for a specific IRC command.
+//
+// Handlers take the form of an anonymous function (currently):
+//	func(conn *irc.Conn, line *irc.Line) {
+//		// handler code here
+//	}
+//
+// Handlers are triggered on incoming Lines from the server, with the handler
+// "name" being equivalent to Line.Cmd. Read the RFCs for details on what
+// replies could come from the server. They'll generally be things like
+// "PRIVMSG", "JOIN", etc. but all the numeric replies are left as ascii
+// strings of digits like "332" (mainly because I really didn't feel like 
+// putting massive constant tables in).
 func (conn *Conn) AddHandler(name string, f func(*Conn, *Line)) {
 	n := strings.ToUpper(name)
 	if e, ok := conn.events[n]; ok {

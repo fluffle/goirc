@@ -52,5 +52,11 @@ likely that this state tracking will become optional in the near future.
 
 Sorry the documentation is crap. Use the source, Luke.
 
+[Feedback](mailto:a.bramley@gmail.com) on design decisions is welcome. I am
+indebted to Matt Gruen for his work on
+[go-bot](http://code.google.com/p/go-bot/source/browse/irc.go) which inspired
+the re-organisation and channel-based communication structure of `*Conn.send()`
+and `*Conn.recv()`. I'm sure things could be more asynchronous, still.
+
 This code is (c) 2009 Alex Bramley, and released under the same licence terms
 as Go itself.

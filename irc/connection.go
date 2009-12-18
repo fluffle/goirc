@@ -8,9 +8,10 @@ import (
 	"strings"
 )
 
-// the IRC connection object
+// An IRC connection is represented by this struct. Once connected, any errors
+// encountered are piped down *Conn.Err; this channel is closed on disconnect.
 type Conn struct {
-	// Hostname, Nickname, etc.
+	// Connection Hostname and Nickname
 	Host string
 	Me   *Nick
 
@@ -34,16 +35,19 @@ type Conn struct {
 	nicks map[string]*Nick
 }
 
-// We'll parse an incoming line into this struct
-// raw =~ ":nick!user@host cmd args[] :text"
-// src == "nick!user@host"
+// We parse an incoming line into this struct. Line.Cmd is used as the trigger
+// name for incoming event handlers, see *Conn.recv() for details.
+//   Raw =~ ":nick!user@host cmd args[] :text"
+//   Src == "nick!user@host"
+//   Cmd == e.g. PRIVMSG, 332
 type Line struct {
 	Nick, Ident, Host, Src string
 	Cmd, Text, Raw         string
 	Args                   []string
 }
 
-// construct a new IRC Connection object
+// Creates a new IRC connection object, but doesn't connect to anything so
+// that you can add event handlers to it. See AddHandler() for details.
 func New(nick, user, name string) *Conn {
 	conn := new(Conn)
 	conn.initialise()
@@ -64,8 +68,10 @@ func (conn *Conn) initialise() {
 	conn.sock = nil
 }
 
-// connect the IRC connection object to a host
-func (conn *Conn) Connect(host, pass string) os.Error {
+// Connect the IRC connection object to "host[:port]" which should be either
+// a hostname or an IP address, with an optional port defaulting to 6667.
+// You can also provide an optional connect password.
+func (conn *Conn) Connect(host string, pass ...) os.Error {
 	if conn.connected {
 		return os.NewError(fmt.Sprintf("irc.Connect(): already connected to %s, cannot connect to %s", conn.Host, host))
 	}
@@ -87,8 +93,9 @@ func (conn *Conn) Connect(host, pass string) os.Error {
 	go conn.send()
 	go conn.recv()
 
-	if pass != "" {
-		conn.Pass(pass)
+	// see getStringMsg() in commands.go for what this does
+	if p := getStringMsg(pass); p != "" {
+		conn.Pass(p)
 	}
 	conn.Nick(conn.Me.Nick)
 	conn.User(conn.Me.Ident, conn.Me.Name)
@@ -197,6 +204,8 @@ func (conn *Conn) shutdown() {
 	fmt.Println("irc.shutdown(): shut down sockets and channels!")
 }
 
+// Dumps a load of information about the current state of the connection to a
+// string for debugging state tracking and other such things. 
 func (conn *Conn) String() string {
 	str := "GoIRC Connection\n"
 	str += "----------------\n\n"
