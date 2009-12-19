@@ -163,12 +163,15 @@ func (conn *Conn) setupEvents() {
 			// we get the channel users automatically in 353 and the channel
 			// topic in 332 on join, so we just need to get the modes
 			conn.Mode(ch.Name)
+			// sending a WHO for the channel is MUCH more efficient than
+			// triggering a WHOIS on every nick from the 353 handler
+			conn.Who(ch.Name)
 		}
 		if n == nil {
 			// this is the first we've seen of this nick
 			n = conn.NewNick(line.Nick, line.Ident, "", line.Host)
 			// since we don't know much about this nick, ask server for info
-			conn.Whois(n.Nick)
+			conn.Who(n.Nick)
 		}
 		// this takes care of both nick and channel linking \o/
 		ch.AddNick(n)
@@ -387,6 +390,20 @@ func (conn *Conn) setupEvents() {
 		}
 	})
 
+	// Handle 352 who reply
+	conn.AddHandler("352", func(conn *Conn, line *Line) {
+		if n := conn.GetNick(line.Args[5]); n != nil {
+			n.Ident = line.Args[2]
+			n.Host = line.Args[3]
+			// XXX: do we care about the actual server the nick is on?
+			// line.Text contains "<hop count> <real name>"
+			a := strings.Split(line.Text, " ", 2)
+			n.Name = a[1]
+		} else {
+			conn.error("irc.352(): buh? got WHO reply for unknown nick %s", line.Args[5])
+		}
+	})
+
 	// Handle 353 names reply
 	conn.AddHandler("353", func(conn *Conn, line *Line) {
 		if ch := conn.GetChannel(line.Args[2]); ch != nil {
@@ -405,7 +422,6 @@ func (conn *Conn) setupEvents() {
 					if n == nil {
 						// we don't know this nick yet!
 						n = conn.NewNick(nick, "", "", "")
-						conn.Whois(nick)
 					}
 					if n != conn.Me {
 						// we will be in the names list, but should also be in
