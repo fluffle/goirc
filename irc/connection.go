@@ -26,7 +26,7 @@ type Conn struct {
 	// Error channel to transmit any fail back to the user
 	Err chan os.Error
 
-	// Set this to true before connect to disable throttling
+	// Set this to true to disable flood protection and false to re-enable
 	Flood bool;
 
 	// Event handler mapping
@@ -115,7 +115,27 @@ func hasPort(s string) bool { return strings.LastIndex(s, ":") > strings.LastInd
 // dispatch input from channel as \r\n terminated line to peer
 // flood controlled using hybrid's algorithm if conn.Flood is true
 func (conn *Conn) send() {
+	lastsent := time.Nanoseconds()
+	var badness, linetime, second int64 = 0, 0, 1000000000;
 	for line := range conn.out {
+		// Hybrid's algorithm allows for 2 seconds per line and an additional
+		// 1/120 of a second per character on that line.
+		linetime = 2*second + int64(len(line))*second/120
+		if !conn.Flood && conn.connected {
+			// No point in tallying up flood protection stuff until connected
+			if badness += linetime + lastsent - time.Nanoseconds(); badness < 0 {
+				// negative badness times are badness...
+				badness = int64(0)
+			}
+		}
+		lastsent = time.Nanoseconds()
+
+		// If we've sent more than 10 second's worth of lines according to the
+		// calculation above, then we're at risk of "Excess Flood".
+		if badness > 10*second && !conn.Flood {
+			// so sleep for the current line's time value before sending it
+			time.Sleep(linetime)
+		}
 		if err := conn.io.WriteString(line + "\r\n"); err != nil {
 			conn.error("irc.send(): %s", err.String())
 			conn.shutdown()
@@ -123,16 +143,6 @@ func (conn *Conn) send() {
 		}
 		conn.io.Flush()
 		fmt.Println("-> " + line)
-
-		// Current flood-control implementation is naive and may lead to
-		// much frustration. Hybrid's flooding algorithm allows one line every
-		// two seconds, and a 120-character-per-second penalty on top of this.
-		// We currently just sleep for the correct delay after sending the line
-		// but if there's a *lot* of flood, conn.out may fill it's buffers and
-		// cause other things to hang within runloop :-(
-		if !conn.Flood {
-			time.Sleep(int64(2*1000000000 + len(line)*8333333))
-		}
 	}
 }
 
