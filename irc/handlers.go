@@ -126,6 +126,12 @@ func (conn *Conn) setupEvents() {
 	conn.AddHandler("433", func(conn *Conn, line *Line) {
 		// Args[1] is the new nick we were attempting to acquire
 		conn.Nick(line.Args[1] + "_")
+		// if this is happening before we're properly connected (i.e. the nick
+		// we sent in the initial NICK command is in use) we will not receive
+		// a NICK message to confirm our change of nick, so ReNick here...
+		if !conn.connected && line.Args[1] == conn.Me.Nick {
+			conn.Me.ReNick(line.Args[1] + "_")
+		}
 	})
 
 	// Handler NICK messages to inform us about nick changes
@@ -283,7 +289,7 @@ func (conn *Conn) setupEvents() {
 		} else if n := conn.GetNick(line.Args[0]); n != nil {
 			// nick mode change, should be us
 			if n != conn.Me {
-				conn.error("irc.MODE(): buh? recieved MODE %s for (non-me) nick %s", line.Args[1], n.Nick)
+				conn.error("irc.MODE(): buh? recieved MODE %s for (non-me) nick %s", line.Text, n.Nick)
 				return
 			}
 			var modeop bool // true => add mode, false => remove mode
@@ -306,7 +312,11 @@ func (conn *Conn) setupEvents() {
 				}
 			}
 		} else {
-			conn.error("irc.MODE(): buh? not sure what to do with MODE %s %s", line.Args[0], line.Args[1])
+			if line.Text != "" {
+				conn.error("irc.MODE(): buh? not sure what to do with nick MODE %s %s", line.Args[0], line.Text)
+			} else {
+				conn.error("irc.MODE(): buh? not sure what to do with chan MODE %s", strings.Join(line.Args, " "))
+			}
 		}
 	})
 
