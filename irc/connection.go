@@ -69,6 +69,12 @@ func (conn *Conn) initialise() {
 	conn.Err = make(chan os.Error, 4)
 	conn.io = nil
 	conn.sock = nil
+
+	// if this is being called because we are reconnecting, conn.Me
+	// will still have all the old channels referenced -- nuke them!
+	if conn.Me != nil {
+		conn.Me = conn.NewNick(conn.Me.Nick, conn.Me.Ident, conn.Me.Name, "")
+	}
 }
 
 // Connect the IRC connection object to "host[:port]" which should be either
@@ -200,10 +206,6 @@ func (conn *Conn) runLoop() {
 	for line := range conn.in {
 			conn.dispatchEvent(line)
 	}
-	// if we fall off the end here due to shutdown,
-	// reinit everything once the runloop is done
-	// so that Connect() can be called again.
-	conn.initialise()
 }
 
 func (conn *Conn) shutdown() {
@@ -212,6 +214,9 @@ func (conn *Conn) shutdown() {
 	close(conn.Err)
 	conn.connected = false
 	conn.sock.Close()
+	// reinit datastructures ready for next connection
+	// do this here rather than after runLoop()'s for due to race
+	conn.initialise()
 }
 
 // Dumps a load of information about the current state of the connection to a
