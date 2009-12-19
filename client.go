@@ -44,6 +44,19 @@ func main() {
 		for cmd := range in {
 			if cmd[0] == ':' {
 				switch idx := strings.Index(cmd, " "); {
+				case cmd[1] == 'd':
+					fmt.Printf(c.String())
+				case cmd[1] == 'f':
+					if len(cmd) > 2 && cmd[2] == 'e' {
+						// enable flooding
+						c.Flood = true
+					} else if len(cmd) > 2 && cmd[2] == 'd' {
+						// disable flooding
+						c.Flood = false
+					}
+					for i := 0; i < 20; i++ {
+						c.Privmsg("#", "flood test!")
+					}
 				case idx == -1:
 					continue
 				case cmd[1] == 'q':
@@ -53,8 +66,6 @@ func main() {
 					c.Join(cmd[idx+1 : len(cmd)])
 				case cmd[1] == 'p':
 					c.Part(cmd[idx+1 : len(cmd)])
-				case cmd[1] == 'd':
-					fmt.Printf(c.String())
 				}
 			} else {
 				c.Raw(cmd)
