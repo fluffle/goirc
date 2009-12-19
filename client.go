@@ -41,11 +41,7 @@ func main() {
 
 	// set up a goroutine to do parsey things with the stuff from stdin
 	go func() {
-		for {
-			if closed(in) {
-				break
-			}
-			cmd := <-in
+		for cmd := range in {
 			if cmd[0] == ':' {
 				switch idx := strings.Index(cmd, " "); {
 				case idx == -1:
@@ -68,22 +64,16 @@ func main() {
 
 	// stall here waiting for asplode on error channel
 	for {
-		if closed(c.Err) {
-			// c.Err being closed indicates we've been disconnected from the
-			// server for some reason (e.g. quit, kill or ping timeout)
-			// if we don't really want to quit, reconnect!
-			if !reallyquit {
-				fmt.Println("Reconnecting...")
-				if err := c.Connect("irc.freenode.net", ""); err != nil {
-					fmt.Printf("Connection error: %s\n", err)
-					break
-				}
-				continue
-			}
+		for err := range c.Err {
+			fmt.Printf("goirc error: %s\n", err)
+		}
+		if reallyquit {
 			break
 		}
-		if err := <-c.Err; err != nil {
-			fmt.Printf("goirc error: %s\n", err)
+		fmt.Println("Reconnecting...")
+		if err := c.Connect("irc.freenode.net", ""); err != nil {
+			fmt.Printf("Connection error: %s\n", err)
+			break
 		}
 	}
 }

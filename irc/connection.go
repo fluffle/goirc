@@ -115,11 +115,7 @@ func hasPort(s string) bool { return strings.LastIndex(s, ":") > strings.LastInd
 // dispatch input from channel as \r\n terminated line to peer
 // flood controlled using hybrid's algorithm if conn.Flood is true
 func (conn *Conn) send() {
-	for {
-		if closed(conn.out) {
-			break
-		}
-		line := <-conn.out
+	for line := range conn.out {
 		if err := conn.io.WriteString(line + "\r\n"); err != nil {
 			conn.error("irc.send(): %s", err.String())
 			conn.shutdown()
@@ -191,14 +187,8 @@ func (conn *Conn) recv() {
 }
 
 func (conn *Conn) runLoop() {
-	for {
-		if closed(conn.in) {
-			break
-		}
-		select {
-		case line := <-conn.in:
+	for line := range conn.in {
 			conn.dispatchEvent(line)
-		}
 	}
 	// if we fall off the end here due to shutdown,
 	// reinit everything once the runloop is done
