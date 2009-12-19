@@ -116,10 +116,10 @@ func hasPort(s string) bool { return strings.LastIndex(s, ":") > strings.LastInd
 // flood controlled using hybrid's algorithm if conn.Flood is true
 func (conn *Conn) send() {
 	for {
-		line := <-conn.out
 		if closed(conn.out) {
 			break
 		}
+		line := <-conn.out
 		if err := conn.io.WriteString(line + "\r\n"); err != nil {
 			conn.error("irc.send(): %s", err.String())
 			conn.shutdown()
