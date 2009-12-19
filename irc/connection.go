@@ -6,6 +6,7 @@ import (
 	"net"
 	"fmt"
 	"strings"
+	"time"
 )
 
 // An IRC connection is represented by this struct. Once connected, any errors
@@ -24,6 +25,9 @@ type Conn struct {
 
 	// Error channel to transmit any fail back to the user
 	Err chan os.Error
+
+	// Set this to true before connect to disable throttling
+	Flood bool;
 
 	// Event handler mapping
 	events map[string][]func(*Conn, *Line)
@@ -109,6 +113,7 @@ func (conn *Conn) error(s string, a ...) { conn.Err <- os.NewError(fmt.Sprintf(s
 func hasPort(s string) bool { return strings.LastIndex(s, ":") > strings.LastIndex(s, "]") }
 
 // dispatch input from channel as \r\n terminated line to peer
+// flood controlled using hybrid's algorithm if conn.Flood is true
 func (conn *Conn) send() {
 	for {
 		line := <-conn.out
@@ -122,6 +127,16 @@ func (conn *Conn) send() {
 		}
 		conn.io.Flush()
 		fmt.Println("-> " + line)
+
+		// Current flood-control implementation is naive and may lead to
+		// much frustration. Hybrid's flooding algorithm allows one line every
+		// two seconds, and a 120-character-per-second penalty on top of this.
+		// We currently just sleep for the correct delay after sending the line
+		// but if there's a *lot* of flood, conn.out may fill it's buffers and
+		// cause other things to hang within runloop :-(
+		if !conn.Flood {
+			time.Sleep(2*1000000000 + len(line)*8333333)
+		}
 	}
 }
 
