@@ -135,7 +135,7 @@ func (conn *Conn) send() {
 		// but if there's a *lot* of flood, conn.out may fill it's buffers and
 		// cause other things to hang within runloop :-(
 		if !conn.Flood {
-			time.Sleep(2*1000000000 + len(line)*8333333)
+			time.Sleep(int64(2*1000000000 + len(line)*8333333))
 		}
 	}
 }
