@@ -396,9 +396,16 @@ func (conn *Conn) setupEvents() {
 			n.Ident = line.Args[2]
 			n.Host = line.Args[3]
 			// XXX: do we care about the actual server the nick is on?
+			//      or the hop count to this server?
 			// line.Text contains "<hop count> <real name>"
 			a := strings.Split(line.Text, " ", 2)
 			n.Name = a[1]
+			if idx := strings.Index(line.Args[6], "*"); idx != -1 {
+				n.Modes.Oper = true
+			}
+			if idx := strings.Index(line.Args[6], "H"); idx != -1 {
+				n.Modes.Invisible = true
+			}
 		} else {
 			conn.error("irc.352(): buh? got WHO reply for unknown nick %s", line.Args[5])
 		}
