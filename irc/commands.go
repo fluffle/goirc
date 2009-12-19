@@ -38,6 +38,15 @@ func (conn *Conn) Part(channel string, message ...) {
 	conn.out <- "PART "+channel+msg
 }
 
+// Kick() sends a KICK command to remove a nick from a channel
+func (conn *Conn) Kick(channel, nick string, message ...) {
+	msg := getStringMsg(message)
+	if msg != "" {
+		msg = " :" + msg
+	}
+	conn.out <- "KICK "+channel+" "+nick+msg
+}
+
 // Quit() sends a QUIT command to the server with an optional quit message
 func (conn *Conn) Quit(message ...) {
 	msg := getStringMsg(message)
@@ -96,8 +105,8 @@ func (conn *Conn) Topic(channel string, topic ...) {
 	conn.out <- "TOPIC "+channel+t
 }
 
-// send a MODE command to the server. This one can get complicated if we try
-// to be too clever, so it's deliberately simple:
+// Mode() sends a MODE command to the server. This one can get complicated if
+// we try to be too clever, so it's deliberately simple:
 //   Mode(t) retrieves the user or channel modes for target t
 //   Mode(t, "modestring") sets user or channel modes for target t, where...
 //     modestring == e.g. "+o <nick>" or "+ntk <key>" or "-is"
@@ -109,6 +118,27 @@ func (conn *Conn) Mode(t string, modestring ...) {
 		mode = " " + mode
 	}
 	conn.out <- "MODE "+t+mode
+}
+
+// Away() sends an AWAY command to the server
+//   Away() resets away status
+//   Away(message) sets away with the given message
+func (conn *Conn) Away(message ...) {
+	msg := getStringMsg(message)
+	if msg != "" {
+		msg = " :"+msg
+	}
+	conn.out <- "AWAY"+msg
+}
+
+// Invite() sends an INVITE command to the server
+func (conn *Conn) Invite(nick, channel string) {
+	conn.out <- "INVITE "+nick+" "+channel
+}
+
+// Oper() sends an OPER command to the server
+func (conn *Conn) Oper(user, pass string) {
+	conn.out <- "OPER "+user+" "+pass
 }
 
 func getStringMsg(a ...) (msg string) {
