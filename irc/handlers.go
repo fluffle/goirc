@@ -424,7 +424,7 @@ func (conn *Conn) setupEvents() {
 	// Handle 353 names reply
 	conn.AddHandler("353", func(conn *Conn, line *Line) {
 		if ch := conn.GetChannel(line.Args[2]); ch != nil {
-			nicks := strings.Split(line.Text, " ", 0)
+			nicks := strings.Split(line.Text, " ", -1)
 			for _, nick := range nicks {
 				// UnrealIRCd's coders are lazy and leave a trailing space
 				if nick == "" {
