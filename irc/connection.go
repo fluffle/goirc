@@ -80,7 +80,7 @@ func (conn *Conn) initialise() {
 // Connect the IRC connection object to "host[:port]" which should be either
 // a hostname or an IP address, with an optional port defaulting to 6667.
 // You can also provide an optional connect password.
-func (conn *Conn) Connect(host string, pass ...) os.Error {
+func (conn *Conn) Connect(host string, pass string) os.Error {
 	if conn.connected {
 		return os.NewError(fmt.Sprintf("irc.Connect(): already connected to %s, cannot connect to %s", conn.Host, host))
 	}
@@ -102,8 +102,8 @@ func (conn *Conn) Connect(host string, pass ...) os.Error {
 	go conn.recv()
 
 	// see getStringMsg() in commands.go for what this does
-	if p := getStringMsg(pass); p != "" {
-		conn.Pass(p)
+	if pass != "" {
+		conn.Pass(pass)
 	}
 	conn.Nick(conn.Me.Nick)
 	conn.User(conn.Me.Ident, conn.Me.Name)
@@ -113,7 +113,7 @@ func (conn *Conn) Connect(host string, pass ...) os.Error {
 }
 
 // dispatch a nicely formatted os.Error to the error channel
-func (conn *Conn) error(s string, a ...) { conn.Err <- os.NewError(fmt.Sprintf(s, a)) }
+func (conn *Conn) error(s string, a ...interface{}) { conn.Err <- os.NewError(fmt.Sprintf(s, a)) }
 
 // copied from http.client for great justice
 func hasPort(s string) bool { return strings.LastIndex(s, ":") > strings.LastIndex(s, "]") }
@@ -142,7 +142,7 @@ func (conn *Conn) send() {
 			// so sleep for the current line's time value before sending it
 			time.Sleep(linetime)
 		}
-		if err := conn.io.WriteString(line + "\r\n"); err != nil {
+		if _,err := conn.io.WriteString(line + "\r\n"); err != nil {
 			conn.error("irc.send(): %s", err.String())
 			conn.shutdown()
 			break

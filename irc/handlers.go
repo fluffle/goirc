@@ -168,7 +168,7 @@ func (conn *Conn) setupEvents() {
 			// since we don't know much about this channel, ask server for info
 			// we get the channel users automatically in 353 and the channel
 			// topic in 332 on join, so we just need to get the modes
-			conn.Mode(ch.Name)
+			conn.Mode(ch.Name,"")
 			// sending a WHO for the channel is MUCH more efficient than
 			// triggering a WHOIS on every nick from the 353 handler
 			conn.Who(ch.Name)
