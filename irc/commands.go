@@ -3,10 +3,6 @@ package irc
 // this file contains the various commands you can
 // send to the server using an Conn connection
 
-import (
-	"reflect"
-)
-
 // This could be a lot less ugly with the ability to manipulate
 // the symbol table and add methods/functions on the fly
 // [ CMD, FMT, FMTARGS ] etc.
@@ -30,7 +26,7 @@ func (conn *Conn) User(ident, name string) {
 func (conn *Conn) Join(channel string) { conn.out <- "JOIN "+channel }
 
 // Part() sends a PART command to the server with an optional part message
-func (conn *Conn) Part(channel string, message ...) {
+func (conn *Conn) Part(channel string, message ...string) {
 	msg := getStringMsg(message)
 	if msg != "" {
 		msg = " :" + msg
@@ -39,7 +35,7 @@ func (conn *Conn) Part(channel string, message ...) {
 }
 
 // Kick() sends a KICK command to remove a nick from a channel
-func (conn *Conn) Kick(channel, nick string, message ...) {
+func (conn *Conn) Kick(channel, nick string, message ...string) {
 	msg := getStringMsg(message)
 	if msg != "" {
 		msg = " :" + msg
@@ -48,7 +44,7 @@ func (conn *Conn) Kick(channel, nick string, message ...) {
 }
 
 // Quit() sends a QUIT command to the server with an optional quit message
-func (conn *Conn) Quit(message ...) {
+func (conn *Conn) Quit(message ...string) {
 	msg := getStringMsg(message)
 	if msg == "" {
 		msg = "GoBye!"
@@ -70,7 +66,7 @@ func (conn *Conn) Notice(t, msg string) { conn.out <- "NOTICE "+t+" :"+msg }
 
 // Ctcp() sends a (generic) CTCP message to the target t
 // with an optional argument
-func (conn *Conn) Ctcp(t, ctcp string, arg ...) {
+func (conn *Conn) Ctcp(t, ctcp string, arg ...string) {
 	msg := getStringMsg(arg)
 	if msg != "" {
 		msg = " " + msg
@@ -80,7 +76,7 @@ func (conn *Conn) Ctcp(t, ctcp string, arg ...) {
 
 // CtcpReply() sends a generic CTCP reply to the target t
 // with an optional argument
-func (conn *Conn) CtcpReply(t, ctcp string, arg ...) {
+func (conn *Conn) CtcpReply(t, ctcp string, arg ...string) {
 	msg := getStringMsg(arg)
 	if msg != "" {
 		msg = " " + msg
@@ -97,7 +93,7 @@ func (conn *Conn) Action(t, msg string) { conn.Ctcp(t, "ACTION", msg) }
 // Topic() sends a TOPIC command to the channel
 //   Topic(channel) retrieves the current channel topic (see "332" handler)
 //   Topic(channel, topic) sets the topic for the channel
-func (conn *Conn) Topic(channel string, topic ...) {
+func (conn *Conn) Topic(channel string, topic ...string) {
 	t := getStringMsg(topic)
 	if t != "" {
 		t = " :" + t
@@ -112,7 +108,7 @@ func (conn *Conn) Topic(channel string, topic ...) {
 //     modestring == e.g. "+o <nick>" or "+ntk <key>" or "-is"
 // This means you'll need to do your own mode work. It may be linked in with
 // the state tracking and ChanMode/NickMode/ChanPrivs objects later...
-func (conn *Conn) Mode(t string, modestring ...) {
+func (conn *Conn) Mode(t string, modestring ...string) {
 	mode := getStringMsg(modestring)
 	if mode != "" {
 		mode = " " + mode
@@ -123,7 +119,7 @@ func (conn *Conn) Mode(t string, modestring ...) {
 // Away() sends an AWAY command to the server
 //   Away() resets away status
 //   Away(message) sets away with the given message
-func (conn *Conn) Away(message ...) {
+func (conn *Conn) Away(message ...string) {
 	msg := getStringMsg(message)
 	if msg != "" {
 		msg = " :"+msg
@@ -141,16 +137,9 @@ func (conn *Conn) Oper(user, pass string) {
 	conn.out <- "OPER "+user+" "+pass
 }
 
-func getStringMsg(a ...) (msg string) {
-	// dealing with functions with a variable parameter list is nasteeh :-(
-	// the below stolen and munged from fmt/print.go func getString()
-	if v := reflect.NewValue(a).(*reflect.StructValue); v.NumField() > 0 {
-		if s, ok := v.Field(0).(*reflect.StringValue); ok {
-			return s.Get()
-		}
-		if b, ok := v.Interface().([]byte); ok {
-			return string(b)
-		}
+func getStringMsg(a ...string) (msg string) {
+	if len(a) > 0 {
+		return a[0]
 	}
 	return ""
 }
