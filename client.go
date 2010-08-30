@@ -15,7 +15,7 @@ func main() {
 		func(conn *irc.Conn, line *irc.Line) { conn.Join("#go-nuts") })
 
 	// connect to server
-	if err := c.Connect("irc.freenode.net", ""); err != nil {
+	if err := c.Connect("irc.freenode.net", false); err != nil {
 		fmt.Printf("Connection error: %s\n", err)
 		return
 	}
@@ -82,7 +82,7 @@ func main() {
 			break
 		}
 		fmt.Println("Reconnecting...")
-		if err := c.Connect("irc.freenode.net", ""); err != nil {
+		if err := c.Connect("irc.freenode.net", false); err != nil {
 			fmt.Printf("Connection error: %s\n", err)
 			break
 		}
