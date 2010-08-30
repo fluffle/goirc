@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"os"
 	"net"
+	"crypto/tls"
 	"fmt"
 	"strings"
 	"time"
@@ -17,11 +18,14 @@ type Conn struct {
 	Me   *Nick
 
 	// I/O stuff to server
-	sock      *net.TCPConn
+	sock      net.Conn
 	io        *bufio.ReadWriter
 	in        chan *Line
 	out       chan string
 	connected bool
+
+    // Are we connecting via SSL?
+	SSL bool
 
 	// Error channel to transmit any fail back to the user
 	Err chan os.Error
@@ -80,22 +84,36 @@ func (conn *Conn) initialise() {
 }
 
 // Connect the IRC connection object to "host[:port]" which should be either
-// a hostname or an IP address, with an optional port defaulting to 6667.
-// You can also provide an optional connect password.
-func (conn *Conn) Connect(host string, pass string) os.Error {
+// a hostname or an IP address, with an optional port. To enable explicit SSL
+// on the connection to the IRC server, set ssl to true. The port will default
+// to 6697 if ssl is enabled, and 6667 otherwise. You can also provide an
+// optional connect password.
+func (conn *Conn) Connect(host string, ssl bool, pass string) os.Error {
 	if conn.connected {
 		return os.NewError(fmt.Sprintf("irc.Connect(): already connected to %s, cannot connect to %s", conn.Host, host))
 	}
 	if !hasPort(host) {
-		host += ":6667"
+		if ssl {
+			host += ":6697"
+		} else {
+			host += ":6667"
+		}
 	}
 
-	if addr, err := net.ResolveTCPAddr(host); err != nil {
-		return err
-	} else if conn.sock, err = net.DialTCP("tcp", nil, addr); err != nil {
+	var sock net.Conn;
+	var err os.Error;
+	if ssl {
+		sock, err = tls.Dial("tcp", "", host)
+	} else {
+		sock, err = net.Dial("tcp", "", host)
+	}
+	if err != nil {
 		return err
 	}
+
 	conn.Host = host
+	conn.SSL = ssl
+	conn.sock = sock
 
 	conn.io = bufio.NewReadWriter(
 		bufio.NewReader(conn.sock),
