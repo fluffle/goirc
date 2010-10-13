@@ -3,17 +3,15 @@ GoIRC Client Framework
 
 ### Acquiring and Building
 
-Pretty simple, really:
-
-	git clone git://github.com/fluffle/goirc.git
+	git clone git://github.com/raylu/rbot.git
 	make -C irc install
 
-You can build the test client also with:
+You can build the bot with:
 
 	make
 	./gobot
 
-This will connect to freenode and join `#go-nuts` by default, so be careful ;-)
+This will connect to rizon and join `#vn-meta` by default, so be careful ;-)
 
 ### Using the framework
 
@@ -50,13 +48,6 @@ likely that this state tracking will become optional in the near future.
 
 ### Misc.
 
-Sorry the documentation is crap. Use the source, Luke.
-
-[Feedback](mailto:a.bramley@gmail.com) on design decisions is welcome. I am
-indebted to Matt Gruen for his work on
-[go-bot](http://code.google.com/p/go-bot/source/browse/irc.go) which inspired
-the re-organisation and channel-based communication structure of `*Conn.send()`
-and `*Conn.recv()`. I'm sure things could be more asynchronous, still.
-
-This code is (c) 2009 Alex Bramley, and released under the same licence terms
-as Go itself.
+This project was forked from jessta/goirc which is in turn forked from
+fluffle/goirc. Both of those projects are focused on developing the goirc
+framework whereas this is focused on developing a bot.
