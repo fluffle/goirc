@@ -27,7 +27,9 @@ type Conn struct {
 	Err chan os.Error
 
 	// Set this to true to disable flood protection and false to re-enable
-	Flood bool;
+	Flood bool
+
+	debug bool
 
 	// Event handler mapping
 	events map[string][]func(*Conn, *Line)
@@ -150,7 +152,9 @@ func (conn *Conn) send() {
 			break
 		}
 		conn.io.Flush()
-		fmt.Println("-> " + line)
+		if conn.debug {
+			fmt.Println("-> " + line)
+		}
 	}
 }
 
@@ -165,7 +169,9 @@ func (conn *Conn) recv() {
 		}
 		// chop off \r\n
 		s = s[0 : len(s)-2]
-		fmt.Println("<- " + s)
+		if conn.debug {
+			fmt.Println("<- " + s)
+		}
 
 		line := &Line{Raw: s}
 		if s[0] == ':' {
