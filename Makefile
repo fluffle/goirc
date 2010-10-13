@@ -4,9 +4,9 @@
 
 include $(GOROOT)/src/Make.inc
 
-TARG=gobot
+TARG=rbot
 GOFILES=\
-	client.go\
+	rbot.go\
 
 include $(GOROOT)/src/Make.cmd
 
