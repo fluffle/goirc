@@ -7,6 +7,7 @@ include $(GOROOT)/src/Make.inc
 TARG=rbot
 GOFILES=\
 	rbot.go\
+	handler.go\
 
 include $(GOROOT)/src/Make.cmd
 

@@ -7,7 +7,7 @@ import (
 	"github.com/kless/goconfig/config"
 )
 
-var nick, server, user string
+var nick, server, user, trigger string
 var ssl bool
 var channels []string
 
@@ -22,6 +22,7 @@ func main() {
 				conn.Join(c)
 			}
 		})
+	c.AddHandler("privmsg", handlePrivmsg)
 
 	for {
 		fmt.Printf("Connecting to %s...\n", server)
@@ -62,4 +63,7 @@ func parseConfig(confFile string) {
 			i++
 		}
 	}
+
+	trigger, err = conf.String("DEFAULT", "trigger")
+	if err != nil { fmt.Printf("Config error: %s\n", err); os.Exit(1) }
 }
