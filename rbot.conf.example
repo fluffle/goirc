@@ -2,7 +2,7 @@
 server: irc.rizon.net
 nick: rbot
 user: rbot
-ssl: false
+ssl: true
 trigger: !
 
 [#raylu]
