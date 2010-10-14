@@ -1,0 +1,7 @@
+[DEFAULT]
+server: irc.rizon.net
+nick: rbot
+user: rbot
+ssl: false
+
+[#raylu]

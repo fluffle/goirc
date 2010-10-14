@@ -10,3 +10,12 @@ GOFILES=\
 
 include $(GOROOT)/src/Make.cmd
 
+all: rbot.conf
+
+rbot.conf: rbot.conf.example
+	@if [ -f $@ ] ; then \
+		echo "rbot.conf exists, but rbot.conf.example is newer." ; \
+	else \
+		echo cp $< $@ ; \
+		cp $< $@ ; \
+	fi
