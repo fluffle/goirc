@@ -34,6 +34,7 @@ func (conn *Conn) AddHandler(name string, f func(*Conn, *Line)) {
 		}
 		e = e[0 : len(e)+1]
 		e[len(e)-1] = f
+		conn.events[n] = e
 	} else {
 		e := make([]func(*Conn, *Line), 1, 10)
 		e[0] = f
