@@ -1,1 +1,0 @@
-find . -name \*.go | xargs gvim -p README.md
