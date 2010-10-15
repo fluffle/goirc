@@ -4,22 +4,55 @@ import (
 	"irc"
 	"fmt"
 	"os"
+	"strings"
 	"github.com/kless/goconfig/config"
 )
 
-var nick, server, user, trigger string
-var ssl bool
-var channels []string
+var trigger string
+var sections []string
 
 func main() {
-	parseConfig("rbot.conf")
+	conf, err := config.ReadDefault("rbot.conf")
+	if (err != nil) {
+		fmt.Printf("Config error: %s\n", err)
+		os.Exit(1)
+	}
+
+	trigger = readConfString(conf, "DEFAULT", "trigger")
+
+	sections = conf.Sections()
+	for _, s := range sections {
+		if strings.Index(s, " ") == -1 && s != "DEFAULT" {
+			// found a network
+			go connect(conf, s)
+		}
+	}
+
+	<- make(chan bool)
+}
+
+func connect(conf *config.Config, network string) {
+	if !readConfBool(conf, network, "autoconnect") {
+		return
+	}
+	server := readConfString(conf, network, "server")
+	nick := readConfString(conf, network, "nick")
+	user := readConfString(conf, network, "user")
+	ssl := readConfBool(conf, network, "ssl")
 
 	c := irc.New(nick, user, user)
 	c.AddHandler("connected",
 		func(conn *irc.Conn, line *irc.Line) {
-			fmt.Println("Connected!")
-			for _, c := range channels {
-				conn.Join(c)
+			fmt.Printf("Connected to %s!\n", conn.Host)
+			for _, s := range sections {
+				split := strings.Split(s, " ", 2)
+				if len(split) == 2 && split[0] == network {
+					// found a channel
+					if readConfBool(conf, s, "autojoin") {
+						fmt.Printf("Joining %s on %s\n", split[1], network)
+						conn.Join(split[1])
+					}
+				}
 			}
 		})
 	c.AddHandler("privmsg", handlePrivmsg)
@@ -36,34 +69,17 @@ func main() {
 	}
 }
 
-func parseConfig(confFile string) {
-	conf, err := config.ReadDefault(confFile)
-	if (err != nil) {
-		fmt.Printf("Config error: %s\n", err); os.Exit(1)
+func readConfString(conf *config.Config, section, option string) string {
+	value, err := conf.String(section, option)
+	if err != nil {
+		panic(fmt.Sprintf("Config error: %s", err));
 	}
-
-	server, err = conf.String("DEFAULT", "server")
-	if err != nil { fmt.Printf("Config error: %s\n", err); os.Exit(1) }
-
-	nick, err = conf.String("DEFAULT", "nick")
-	if err != nil { fmt.Printf("Config error: %s\n", err); os.Exit(1) }
-
-	user, err = conf.String("DEFAULT", "user")
-	if err != nil { fmt.Printf("Config error: %s\n", err); os.Exit(1) }
-
-	ssl, err = conf.Bool("DEFAULT", "ssl")
-	if err != nil { fmt.Printf("Config error: %s\n", err); os.Exit(1) }
-
-	sections := conf.Sections()
-	channels = make([]string, len(sections)-1)
-	i := 0
-	for _, s := range sections {
-		if (s != "DEFAULT") {
-			channels[i] = s
-			i++
-		}
+	return value
+}
+func readConfBool(conf *config.Config, section, option string) bool {
+	value, err := conf.Bool(section, option)
+	if err != nil {
+		panic(fmt.Sprintf("Config error: %s", err));
 	}
-
-	trigger, err = conf.String("DEFAULT", "trigger")
-	if err != nil { fmt.Printf("Config error: %s\n", err); os.Exit(1) }
+	return value
 }

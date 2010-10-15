@@ -1,8 +1,15 @@
 [DEFAULT]
+trigger: !
+
+[Rizon]
 server: irc.rizon.net
 nick: rbot
 user: rbot
 ssl: true
-trigger: !
+autoconnect: true
 
-[#raylu]
+[Rizon #raylu]
+autojoin: true
+
+[Rizon #vn-meta]
+autojoin: false

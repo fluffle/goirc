@@ -22,9 +22,9 @@ func handlePrivmsg(conn *irc.Conn, line *irc.Line) {
 	if target[0] == '#' || target[0] == '&' {
 		// message to a channel
 		command(conn, line.Nick, line.Text, target)
-	} else if target == nick {
+	} else if target == conn.Me.Nick {
 		// message to us
-		command(conn, line.Nick, line.Text, target)
+		command(conn, line.Nick, line.Text, line.Nick)
 	}
 }
 
