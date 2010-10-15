@@ -28,6 +28,12 @@ func handlePrivmsg(conn *irc.Conn, line *irc.Line) {
 	}
 }
 
+func handleMode(conn *irc.Conn, line *irc.Line) {
+	if line.Args[0] == conn.Me.Nick && line.Text == "+r" {
+		autojoin(conn)
+	}
+}
+
 func command(conn *irc.Conn, nick, text, target string) {
 	if !strings.HasPrefix(text, trigger) {
 		return

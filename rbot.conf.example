@@ -6,6 +6,7 @@ server: irc.rizon.net
 nick: rbot
 user: rbot
 ssl: true
+nickserv: identify_password
 autoconnect: true
 
 [Rizon #raylu]
