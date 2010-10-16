@@ -20,6 +20,7 @@ var commands = map [string]func(*irc.Conn, string, string, string) {
 	"remove": remove,
 	"topic": topic,
 	"appendtopic": appendtopic,
+	"say": csay,
 }
 
 const googleAPIKey = "ABQIAAAA6-N_jl4ETgtMf2M52JJ_WRQjQjNunkAJHIhTdFoxe8Di7fkkYhRRcys7ZxNbH3MIy_MKKcEO4-9_Ag"
@@ -295,4 +296,10 @@ func appendtopic(conn *irc.Conn, nick, args, channel string) {
 		updateConf(section, "basetopic", basetopic)
 	}
 	conn.Topic(channel, basetopic + args)
+}
+
+func csay(conn *irc.Conn, nick, args, target string) {
+	if isChannel(target) && hasAccess(conn, target, nick, "t") {
+		say(conn, target, args)
+	}
 }
