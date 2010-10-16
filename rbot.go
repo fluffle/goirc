@@ -21,6 +21,7 @@ func main() {
 	}
 
 	trigger = readConfString("DEFAULT", "trigger")
+	readAuth()
 
 	sections = conf.Sections()
 	for _, s := range sections {

@@ -8,14 +8,23 @@ TARG=rbot
 GOFILES=\
 	rbot.go\
 	handler.go\
+	auth.go
 
 include $(GOROOT)/src/Make.cmd
 
-all: rbot.conf
+all: rbot.conf auth.conf
 
 rbot.conf: rbot.conf.example
 	@if [ -f $@ ] ; then \
 		echo "rbot.conf exists, but rbot.conf.example is newer." ; \
+	else \
+		echo cp $< $@ ; \
+		cp $< $@ ; \
+	fi
+
+auth.conf: auth.conf.example
+	@if [ -f $@ ] ; then \
+		echo "auth.conf exists, but auth.conf.example is newer." ; \
 	else \
 		echo cp $< $@ ; \
 		cp $< $@ ; \

@@ -15,13 +15,16 @@ import (
 
 var commands = map [string]func(*irc.Conn, string, string, string) {
 	"tr": translate,
+	"flags": flags,
+	"add": add,
+	"topic": topic,
 }
 
 const googleAPIKey = "ABQIAAAA6-N_jl4ETgtMf2M52JJ_WRQjQjNunkAJHIhTdFoxe8Di7fkkYhRRcys7ZxNbH3MIy_MKKcEO4-9_Ag"
 
 func handlePrivmsg(conn *irc.Conn, line *irc.Line) {
 	target := line.Args[0]
-	if target[0] == '#' || target[0] == '&' {
+	if isChannel(target) {
 		// message to a channel
 		var video string
 		if strings.HasPrefix(line.Text, "http://www.youtube.com/watch?v=") {
@@ -50,6 +53,10 @@ func handleMode(conn *irc.Conn, line *irc.Line) {
 	}
 }
 
+func isChannel(target string) bool {
+	return target[0] == '#' || target[0] == '&'
+}
+
 func command(conn *irc.Conn, nick, text, target string) {
 	if !strings.HasPrefix(text, trigger) {
 		return
@@ -69,7 +76,8 @@ func command(conn *irc.Conn, nick, text, target string) {
 }
 
 func say(conn *irc.Conn, target, message string, a ...interface{}) {
-	conn.Privmsg(target, fmt.Sprintf(message, a...))
+	text := strings.Replace(fmt.Sprintf(message, a...), "\n", " ", -1)
+	conn.Privmsg(target, text)
 }
 
 func youtube(conn *irc.Conn, nick, video, channel string) {
@@ -179,5 +187,63 @@ func sayTr(conn *irc.Conn, target string, data interface{}) {
 	case map[string]interface{}:
 		trText := data.(map[string]interface{})["translatedText"].(string)
 		say(conn, target, html.UnescapeString(trText))
+	}
+}
+
+func add(conn *irc.Conn, nick, args, channel string) {
+	if !isChannel(channel) {
+		return
+	}
+	if hasAccess(conn, channel, nick, "a") {
+		split := strings.Fields(args)
+		if len(split) != 2 {
+			return
+		}
+		host, nflags := addAccess(conn, channel, split[0], split[1])
+		if host == "" {
+			say(conn, channel, "Could not find nick %s", split[0])
+		} else {
+			say(conn, channel, "%s now has flags %s", host, nflags)
+		}
+	}
+}
+
+func flags(conn *irc.Conn, nick, args, channel string) {
+	if !isChannel(channel) || !hasAccess(conn, channel, nick, "") {
+		return
+	}
+
+	query := args
+	if query == "" {
+		query = nick
+	}
+	n := conn.GetNick(query)
+	if n == nil {
+		say(conn, channel, "Could not find nick %s", query)
+		return
+	}
+
+	if owner, _ := auth.String(conn.Network, "owner"); owner == n.Host {
+		say(conn, channel, "%s is the owner", query)
+		return
+	}
+
+	flags, err := auth.String(conn.Network + " " + channel, n.Host)
+	if err != nil {
+		say(conn, channel, "Error while retrieving flags for %s: %s", n.Host, err)
+		return
+	}
+	say(conn, channel, "%s: %s", n.Host, flags)
+}
+
+func topic(conn *irc.Conn, nick, args, channel string) {
+	if !isChannel(channel) {
+		return
+	}
+	if hasAccess(conn, channel, nick, "t") {
+		if args != "" {
+			conn.Topic(channel, args)
+		}
+		// TODO: appendtopic, query for topic with blank args
 	}
 }
