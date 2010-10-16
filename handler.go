@@ -18,6 +18,7 @@ var commands = map [string]func(*irc.Conn, string, string, string) {
 	"flags": flags,
 	"add": add,
 	"topic": topic,
+	"appendtopic": appendtopic,
 }
 
 const googleAPIKey = "ABQIAAAA6-N_jl4ETgtMf2M52JJ_WRQjQjNunkAJHIhTdFoxe8Di7fkkYhRRcys7ZxNbH3MIy_MKKcEO4-9_Ag"
@@ -77,7 +78,11 @@ func command(conn *irc.Conn, nick, text, target string) {
 
 func say(conn *irc.Conn, target, message string, a ...interface{}) {
 	text := strings.Replace(fmt.Sprintf(message, a...), "\n", " ", -1)
-	conn.Privmsg(target, text)
+	if isChannel(target) {
+		conn.Privmsg(target, text)
+	} else {
+		conn.Notice(target, text)
+	}
 }
 
 func youtube(conn *irc.Conn, nick, video, channel string) {
@@ -237,13 +242,34 @@ func flags(conn *irc.Conn, nick, args, channel string) {
 }
 
 func topic(conn *irc.Conn, nick, args, channel string) {
-	if !isChannel(channel) {
+	if !isChannel(channel) || !hasAccess(conn, channel, nick, "t") {
 		return
 	}
-	if hasAccess(conn, channel, nick, "t") {
-		if args != "" {
-			conn.Topic(channel, args)
-		}
-		// TODO: appendtopic, query for topic with blank args
+	section := conn.Network + " " + channel
+	if args != "" {
+		updateConf(section, "basetopic", args)
+		conn.Topic(channel, args)
+	} else {
+		basetopic, _ := conf.String(section, "basetopic")
+		say(conn, nick, "Basetopic: %s", basetopic)
 	}
+}
+func appendtopic(conn *irc.Conn, nick, args, channel string) {
+	if !isChannel(channel) || !hasAccess(conn, channel, nick, "t") {
+		return
+	}
+	c := conn.GetChannel(channel)
+	if c == nil {
+		say(conn, channel, "Error while getting channel information for %s", channel)
+		return
+	}
+
+	section := conn.Network + " " + channel
+	basetopic, _ := conf.String(section, "basetopic")
+	if !strings.HasPrefix(c.Topic, basetopic) {
+		basetopic = c.Topic
+		say(conn, nick, "New basetopic: %s", basetopic)
+		updateConf(section, "basetopic", basetopic)
+	}
+	conn.Topic(channel, basetopic + args)
 }

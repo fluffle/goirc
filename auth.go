@@ -8,8 +8,8 @@ import (
 	"github.com/kless/goconfig/config"
 )
 
-var auth *config.Config
 const authFile = "auth.conf"
+var auth *config.Config
 
 func readAuth() {
 	var err os.Error;
@@ -38,8 +38,7 @@ func addAccess(conn *irc.Conn, channel, nick, flags string) (string, string) {
 	}
 
 	auth.AddOption(section, n.Host, nflags)
-	err := auth.WriteFile(authFile, 0644, "")
-	if err != nil {
+	if err := auth.WriteFile(authFile, 0644, ""); err != nil {
 		say(conn, channel, "Error while writing to %s", authFile)
 	}
 	// config.WriteFile destroys the config, so

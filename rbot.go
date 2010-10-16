@@ -8,18 +8,13 @@ import (
 	"github.com/kless/goconfig/config"
 )
 
+const confFile = "rbot.conf"
 var trigger string
 var sections []string
 var conf *config.Config
 
 func main() {
-	var err os.Error;
-	conf, err = config.ReadDefault("rbot.conf")
-	if (err != nil) {
-		fmt.Printf("Config error: %s\n", err)
-		os.Exit(1)
-	}
-
+	readConf()
 	trigger = readConfString("DEFAULT", "trigger")
 	readAuth()
 
@@ -84,6 +79,14 @@ func autojoin(conn *irc.Conn) {
 	}
 }
 
+func readConf() {
+	var err os.Error;
+	conf, err = config.ReadDefault("rbot.conf")
+	if (err != nil) {
+		fmt.Printf("Config error: %s\n", err)
+		os.Exit(1)
+	}
+}
 func readConfString(section, option string) string {
 	value, err := conf.String(section, option)
 	if err != nil {
@@ -97,4 +100,12 @@ func readConfBool(section, option string) bool {
 		panic(fmt.Sprintf("Config error: %s", err));
 	}
 	return value
+}
+func updateConf(section, option, value string) {
+	conf.AddOption(section, option, value)
+	if err := conf.WriteFile(confFile, 0644, ""); err != nil {
+		panic("Error while writing to " + confFile)
+	}
+	// config.WriteFile destroys the config, so
+	readConf()
 }
