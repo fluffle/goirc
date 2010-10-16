@@ -3,19 +3,18 @@ rbot
 
 ### Getting started
 
-Assuming you have go set up (http://golang.org/), first clone http://github.com/kless/goconfig/ and in that directory, run
+Assuming you have go set up (http://golang.org/),
 
+	git clone git://github.com/kless/goconfig.git
+	cd goconfig
 	make -C config install
-
-Then build the goirc framework in the rbot directory with
-
+	cd ..
+	git clone git://github.com/raylu/rbot.git
+	cd rbot
 	make -C irc install
-
-Finally, build the bot with:
-
 	make
 
-rbot.conf will be copied. Configure that and then run the bot:
+rbot.conf and auth.conf will be copied. Configure those and then run the bot:
 
 	./rbot
 
