@@ -289,7 +289,7 @@ func appendtopic(conn *irc.Conn, nick, args, channel string) {
 
 	section := conn.Network + " " + channel
 	basetopic, _ := conf.String(section, "basetopic")
-	if !strings.HasPrefix(c.Topic, basetopic) {
+	if basetopic == "" || !strings.HasPrefix(c.Topic, basetopic) {
 		basetopic = c.Topic
 		say(conn, nick, "New basetopic: %s", basetopic)
 		updateConf(section, "basetopic", basetopic)
