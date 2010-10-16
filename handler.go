@@ -17,6 +17,7 @@ var commands = map [string]func(*irc.Conn, string, string, string) {
 	"tr": translate,
 	"flags": flags,
 	"add": add,
+	"remove": remove,
 	"topic": topic,
 	"appendtopic": appendtopic,
 }
@@ -196,19 +197,41 @@ func sayTr(conn *irc.Conn, target string, data interface{}) {
 }
 
 func add(conn *irc.Conn, nick, args, channel string) {
-	if !isChannel(channel) {
+	if !isChannel(channel) || !hasAccess(conn, channel, nick, "a") {
 		return
 	}
-	if hasAccess(conn, channel, nick, "a") {
-		split := strings.Fields(args)
-		if len(split) != 2 {
-			return
-		}
-		host, nflags := addAccess(conn, channel, split[0], split[1])
+	split := strings.Fields(args)
+	if len(split) != 2 {
+		return
+	}
+	host, nflags := addAccess(conn, channel, split[0], strings.TrimSpace(split[1]))
+	if host == "" {
+		say(conn, channel, "Could not find nick %s", split[0])
+	} else {
+		say(conn, channel, "%s now has flags %s", host, nflags)
+	}
+}
+func remove(conn *irc.Conn, nick, args, channel string) {
+	if !isChannel(channel) || !hasAccess(conn, channel, nick, "a") {
+		return
+	}
+	split := strings.Fields(args)
+
+	if len(split) == 2 {
+		host, nflags := removeAccess(conn, channel, split[0], strings.TrimSpace(split[1]))
 		if host == "" {
 			say(conn, channel, "Could not find nick %s", split[0])
 		} else {
 			say(conn, channel, "%s now has flags %s", host, nflags)
+		}
+	} else if len(split) == 1 {
+		host, removed := removeUser(conn, channel, split[0])
+		if host == "" {
+			say(conn, channel, "Could not find nick %s", split[0])
+		} else if removed {
+			say(conn, channel, "Removed %s", host)
+		} else {
+			say(conn, channel, "%s did not have any flags", host)
 		}
 	}
 }
@@ -218,7 +241,7 @@ func flags(conn *irc.Conn, nick, args, channel string) {
 		return
 	}
 
-	query := args
+	query := strings.TrimSpace(args)
 	if query == "" {
 		query = nick
 	}
@@ -233,12 +256,12 @@ func flags(conn *irc.Conn, nick, args, channel string) {
 		return
 	}
 
-	flags, err := auth.String(conn.Network + " " + channel, n.Host)
-	if err != nil {
-		say(conn, channel, "Error while retrieving flags for %s: %s", n.Host, err)
-		return
+	flags, _ := auth.String(conn.Network + " " + channel, n.Host)
+	if flags == "" {
+		say(conn, channel, "%s has no flags", n.Host)
+	} else {
+		say(conn, channel, "%s: %s", n.Host, flags)
 	}
-	say(conn, channel, "%s: %s", n.Host, flags)
 }
 
 func topic(conn *irc.Conn, nick, args, channel string) {
