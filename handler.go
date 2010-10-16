@@ -9,6 +9,8 @@ import (
 	"json"
 	"container/vector"
 	"html"
+	"xml"
+	"strconv"
 )
 
 var commands = map [string]func(*irc.Conn, string, string, string) {
@@ -21,6 +23,20 @@ func handlePrivmsg(conn *irc.Conn, line *irc.Line) {
 	target := line.Args[0]
 	if target[0] == '#' || target[0] == '&' {
 		// message to a channel
+		var video string
+		if strings.HasPrefix(line.Text, "http://www.youtube.com/watch?v=") {
+			video = line.Text[31:]
+		} else if strings.HasPrefix(line.Text, "http://www.youtube.com/watch?v=") {
+			video = line.Text[27:]
+		}
+		if video != "" {
+			amp := strings.Index(video, "&")
+			if amp > -1 {
+				video = video[0:amp]
+			}
+			youtube(conn, line.Nick, video, target)
+		}
+
 		command(conn, line.Nick, line.Text, target)
 	} else if target == conn.Me.Nick {
 		// message to us
@@ -54,6 +70,49 @@ func command(conn *irc.Conn, nick, text, target string) {
 
 func say(conn *irc.Conn, target, message string, a ...interface{}) {
 	conn.Privmsg(target, fmt.Sprintf(message, a...))
+}
+
+func youtube(conn *irc.Conn, nick, video, channel string) {
+	url := fmt.Sprintf("http://gdata.youtube.com/feeds/api/videos/%s?v=2", video)
+	response, _, err := http.Get(url)
+	defer response.Body.Close()
+	if err != nil {
+		return
+	}
+
+	type duration struct {
+		Seconds string "attr"
+	}
+	type group struct {
+		Duration duration
+	}
+	type entry struct {
+		Title string
+		Group group
+	}
+	var yte = entry{"", group{duration{""}}}
+
+	err = xml.Unmarshal(response.Body, &yte)
+	if (err != nil) {
+		return
+	}
+
+	seconds, err := strconv.Atoui(yte.Group.Duration.Seconds)
+	if err != nil {
+		return
+	}
+	minutes := seconds / 60
+	seconds = seconds % 60
+	hours := minutes / 60
+	minutes = minutes % 60
+	var durationStr string
+	if hours > 0 {
+		durationStr = fmt.Sprintf("%d:%02d:%02d", hours, minutes, seconds)
+	} else {
+		durationStr = fmt.Sprintf("%02d:%02d", minutes, seconds)
+	}
+
+	say(conn, channel, "%s's video: %s, %s", nick, yte.Title, durationStr)
 }
 
 func translate(conn *irc.Conn, nick, args, target string) {
