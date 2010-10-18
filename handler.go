@@ -36,9 +36,11 @@ func handlePrivmsg(conn *irc.Conn, line *irc.Line) {
 			video = line.Text[27:]
 		}
 		if video != "" {
-			amp := strings.Index(video, "&")
-			if amp > -1 {
+			if amp := strings.Index(video, "&"); amp > -1 {
 				video = video[0:amp]
+			}
+			if pound := strings.Index(video, "#"); pound > -1 {
+				video = video[0:pound]
 			}
 			youtube(conn, line.Nick, video, target)
 		}
