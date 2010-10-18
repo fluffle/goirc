@@ -199,8 +199,9 @@ func sayTr(conn *irc.Conn, target string, data interface{}) {
 	}
 }
 
-func add(conn *irc.Conn, nick, args, channel string) {
-	if !isChannel(channel) || !hasAccess(conn, channel, nick, "a") {
+func add(conn *irc.Conn, nick, args, target string) {
+	channel, args := hasAccess(conn, nick, target, args, "a")
+	if channel == "" {
 		return
 	}
 	split := strings.Fields(args)
@@ -209,13 +210,14 @@ func add(conn *irc.Conn, nick, args, channel string) {
 	}
 	host, nflags := addAccess(conn, channel, split[0], strings.TrimSpace(split[1]))
 	if host == "" {
-		say(conn, channel, "Could not find nick %s", split[0])
+		say(conn, target, "Could not find nick %s", split[0])
 	} else {
-		say(conn, channel, "%s now has flags %s", host, nflags)
+		say(conn, target, "%s now has flags %s", host, nflags)
 	}
 }
-func remove(conn *irc.Conn, nick, args, channel string) {
-	if !isChannel(channel) || !hasAccess(conn, channel, nick, "a") {
+func remove(conn *irc.Conn, nick, args, target string) {
+	channel, args := hasAccess(conn, nick, target, args, "a")
+	if channel == "" {
 		return
 	}
 	split := strings.Fields(args)
@@ -223,24 +225,25 @@ func remove(conn *irc.Conn, nick, args, channel string) {
 	if len(split) == 2 {
 		host, nflags := removeAccess(conn, channel, split[0], strings.TrimSpace(split[1]))
 		if host == "" {
-			say(conn, channel, "Could not find nick %s", split[0])
+			say(conn, target, "Could not find nick %s", split[0])
 		} else {
-			say(conn, channel, "%s now has flags %s", host, nflags)
+			say(conn, target, "%s now has flags %s", host, nflags)
 		}
 	} else if len(split) == 1 {
 		host, removed := removeUser(conn, channel, split[0])
 		if host == "" {
-			say(conn, channel, "Could not find nick %s", split[0])
+			say(conn, target, "Could not find nick %s", split[0])
 		} else if removed {
-			say(conn, channel, "Removed %s", host)
+			say(conn, target, "Removed %s", host)
 		} else {
-			say(conn, channel, "%s did not have any flags", host)
+			say(conn, target, "%s did not have any flags", host)
 		}
 	}
 }
 
-func flags(conn *irc.Conn, nick, args, channel string) {
-	if !isChannel(channel) || !hasAccess(conn, channel, nick, "") {
+func flags(conn *irc.Conn, nick, args, target string) {
+	channel, args := hasAccess(conn, nick, target, args, "")
+	if channel == "" {
 		return
 	}
 
@@ -250,25 +253,26 @@ func flags(conn *irc.Conn, nick, args, channel string) {
 	}
 	n := conn.GetNick(query)
 	if n == nil {
-		say(conn, channel, "Could not find nick %s", query)
+		say(conn, target, "Could not find nick %s", query)
 		return
 	}
 
 	if owner, _ := auth.String(conn.Network, "owner"); owner == n.Host {
-		say(conn, channel, "%s is the owner", query)
+		say(conn, target, "%s is the owner", query)
 		return
 	}
 
 	flags, _ := auth.String(conn.Network + " " + channel, n.Host)
 	if flags == "" {
-		say(conn, channel, "%s has no flags", n.Host)
+		say(conn, target, "%s has no flags", n.Host)
 	} else {
-		say(conn, channel, "%s: %s", n.Host, flags)
+		say(conn, target, "%s: %s", n.Host, flags)
 	}
 }
 
-func topic(conn *irc.Conn, nick, args, channel string) {
-	if !isChannel(channel) || !hasAccess(conn, channel, nick, "t") {
+func topic(conn *irc.Conn, nick, args, target string) {
+	channel, args := hasAccess(conn, nick, target, args, "t")
+	if channel == "" {
 		return
 	}
 	section := conn.Network + " " + channel
@@ -280,13 +284,14 @@ func topic(conn *irc.Conn, nick, args, channel string) {
 		say(conn, nick, "Basetopic: %s", basetopic)
 	}
 }
-func appendtopic(conn *irc.Conn, nick, args, channel string) {
-	if !isChannel(channel) || !hasAccess(conn, channel, nick, "t") {
+func appendtopic(conn *irc.Conn, nick, args, target string) {
+	channel, args := hasAccess(conn, nick, target, args, "t")
+	if channel == "" {
 		return
 	}
 	c := conn.GetChannel(channel)
 	if c == nil {
-		say(conn, channel, "Error while getting channel information for %s", channel)
+		say(conn, target, "Error while getting channel information for %s", channel)
 		return
 	}
 
@@ -301,7 +306,8 @@ func appendtopic(conn *irc.Conn, nick, args, channel string) {
 }
 
 func csay(conn *irc.Conn, nick, args, target string) {
-	if isChannel(target) && hasAccess(conn, target, nick, "t") {
-		say(conn, target, args)
+	channel, args := hasAccess(conn, nick, target, args, "t")
+	if channel != "" {
+		say(conn, channel, args)
 	}
 }
