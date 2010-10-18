@@ -26,6 +26,10 @@ var commands = map [string]func(*irc.Conn, string, string, string) {
 const googleAPIKey = "ABQIAAAA6-N_jl4ETgtMf2M52JJ_WRQjQjNunkAJHIhTdFoxe8Di7fkkYhRRcys7ZxNbH3MIy_MKKcEO4-9_Ag"
 
 func handlePrivmsg(conn *irc.Conn, line *irc.Line) {
+	if n := conn.GetNick(line.Nick); n != nil {
+		n.Host = line.Host
+	}
+
 	target := line.Args[0]
 	if isChannel(target) {
 		// message to a channel
