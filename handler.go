@@ -261,16 +261,17 @@ func flags(conn *irc.Conn, nick, args, target string) {
 		return
 	}
 
-	if owner, _ := auth.String(conn.Network, "owner"); owner == n.Host {
-		say(conn, target, "%s is the owner", query)
+	user := user(n)
+	if owner, _ := auth.String(conn.Network, "owner"); owner == user {
+		say(conn, target, "%s is the owner", user)
 		return
 	}
 
-	flags, _ := auth.String(conn.Network + " " + channel, n.Host)
+	flags, _ := auth.String(conn.Network + " " + channel, user)
 	if flags == "" {
-		say(conn, target, "%s has no flags", n.Host)
+		say(conn, target, "%s has no flags", user)
 	} else {
-		say(conn, target, "%s: %s", n.Host, flags)
+		say(conn, target, "%s: %s", user, flags)
 	}
 }
 

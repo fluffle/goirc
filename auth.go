@@ -19,6 +19,13 @@ func readAuth() {
 	}
 }
 
+func user(nick *irc.Nick) string {
+	if nick.Ident[0] == '~' {
+		return nick.Ident[1:] + "@" + nick.Host
+	}
+	return nick.Ident + "@" + nick.Host
+}
+
 func addAccess(conn *irc.Conn, channel, nick, flags string) (string, string) {
 	n := conn.GetNick(nick)
 	if n == nil {
@@ -26,7 +33,8 @@ func addAccess(conn *irc.Conn, channel, nick, flags string) (string, string) {
 	}
 
 	section := conn.Network + " " + channel
-	cflags, _ := auth.String(section, n.Host)
+	user := user(n)
+	cflags, _ := auth.String(section, user)
 
 	nflags := cflags
 	for _, flag := range flags {
@@ -37,12 +45,12 @@ func addAccess(conn *irc.Conn, channel, nick, flags string) (string, string) {
 		nflags += string(flag)
 	}
 
-	auth.AddOption(section, n.Host, nflags)
+	auth.AddOption(section, user, nflags)
 	if updateAuth() != nil {
 		say(conn, channel, "Error while writing to %s", authFile)
 	}
 
-	return n.Host, nflags
+	return user, nflags
 }
 
 func removeAccess(conn *irc.Conn, channel, nick, flags string) (string, string) {
@@ -52,7 +60,8 @@ func removeAccess(conn *irc.Conn, channel, nick, flags string) (string, string) 
 	}
 
 	section := conn.Network + " " + channel
-	cflags, _ := auth.String(section, n.Host)
+	user := user(n)
+	cflags, _ := auth.String(section, user)
 
 	nflags := ""
 	for _, flag := range cflags {
@@ -62,12 +71,12 @@ func removeAccess(conn *irc.Conn, channel, nick, flags string) (string, string) 
 		}
 	}
 
-	auth.AddOption(section, n.Host, nflags)
+	auth.AddOption(section, user, nflags)
 	if updateAuth() != nil {
 		say(conn, channel, "Error while writing to %s", authFile)
 	}
 
-	return n.Host, nflags
+	return user, nflags
 }
 
 func removeUser(conn *irc.Conn, channel, nick string) (string, bool) {
@@ -77,15 +86,16 @@ func removeUser(conn *irc.Conn, channel, nick string) (string, bool) {
 	}
 
 	section := conn.Network + " " + channel
+	user := user(n)
 
-	if !auth.RemoveOption(section, n.Host) {
-		return n.Host, false
+	if !auth.RemoveOption(section, user) {
+		return user, false
 	}
 	if updateAuth() != nil {
 		say(conn, channel, "Error while writing to %s", authFile)
 	}
 
-	return n.Host, true
+	return user, true
 }
 
 // this allows target to be a channel or a privmsg in which the channel is the first argument
@@ -117,12 +127,12 @@ func hasAccess(conn *irc.Conn, nick, target, args, flag string) (string, string)
 	}
 
 	// actually check access
-	if owner, _ := auth.String(conn.Network, "owner"); owner == n.Host {
+	user := user(n)
+	if owner, _ := auth.String(conn.Network, "owner"); owner == user {
 		return channel, args
 	}
 
-
-	flags, err := auth.String(conn.Network + " " + channel, n.Host)
+	flags, err := auth.String(conn.Network + " " + channel, user)
 	if err != nil {
 		return "", args
 	}
