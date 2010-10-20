@@ -114,26 +114,26 @@ func youtube(conn *irc.Conn, nick, video, channel string) {
 	var yte = entry{"", group{duration{""}}}
 
 	err = xml.Unmarshal(response.Body, &yte)
-	if (err != nil) {
+	if err != nil {
 		return
 	}
 
 	seconds, err := strconv.Atoui(yte.Group.Duration.Seconds)
-	if err != nil {
-		return
-	}
-	minutes := seconds / 60
-	seconds = seconds % 60
-	hours := minutes / 60
-	minutes = minutes % 60
-	var durationStr string
-	if hours > 0 {
-		durationStr = fmt.Sprintf("%d:%02d:%02d", hours, minutes, seconds)
+	if err == nil {
+		minutes := seconds / 60
+		seconds = seconds % 60
+		hours := minutes / 60
+		minutes = minutes % 60
+		var durationStr string
+		if hours > 0 {
+			durationStr = fmt.Sprintf("%d:%02d:%02d", hours, minutes, seconds)
+		} else {
+			durationStr = fmt.Sprintf("%02d:%02d", minutes, seconds)
+		}
+		say(conn, channel, "%s's video: %s, %s", nick, yte.Title, durationStr)
 	} else {
-		durationStr = fmt.Sprintf("%02d:%02d", minutes, seconds)
+		say(conn, channel, "%s's video: %s", nick, yte.Title)
 	}
-
-	say(conn, channel, "%s's video: %s, %s", nick, yte.Title, durationStr)
 }
 
 func translate(conn *irc.Conn, nick, args, target string) {
