@@ -26,9 +26,9 @@ All commands are prefixed with the trigger configured in rbot.conf.
 - `tr en|ja en|es text`: translate text into Japanese and Spanish
 - `flags raylu`: get's raylu's flags
 - `flags`: get's the flags of the user executing the command
-- `add john t`: gives john the t flag
-- `remove john t`: removes the t flag from john
-- `remove john`: removes all of john's flags
+- `add raylu t`: gives raylu the t flag
+- `remove raylu t`: removes the t flag from raylu
+- `remove raylu`: removes all of raylu's flags
 - `topic text`: sets the topic and basetopic to text
 - `topic`: gets the current basetopic
 - `appendtopic text`: if the topic does not starts with basetopic, sets the basetopic to the current topic. Makes the topic basetopic+text.
@@ -46,7 +46,7 @@ The following is a description of the commands enabled by each flag:
 - `t`: topic appendtopic
 - `s`: say
 
-In addition, a user must have _some_ access to use `flags`.
+In addition, a user must have at least one flag to use `flags` (so users without access can't spam the bot).
 
 ### Miscellaneous
 
