@@ -117,8 +117,8 @@ func (conn *Conn) Connect(host string, ssl bool, pass ...string) os.Error {
 	go conn.send()
 	go conn.recv()
 
-	if pass != "" {
-		conn.Pass(pass)
+	if len(pass) > 0 {
+		conn.Pass(pass[0])
 	}
 	conn.Nick(conn.Me.Nick)
 	conn.User(conn.Me.Ident, conn.Me.Name)
