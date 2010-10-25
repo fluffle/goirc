@@ -64,6 +64,22 @@ func handleMode(conn *irc.Conn, line *irc.Line) {
 	}
 }
 
+func handleInvite(conn *irc.Conn, line *irc.Line) {
+	if line.Args[0] != conn.Me.Nick {
+		return
+	}
+
+	user := line.Src[strings.Index(line.Src, "!")+1:]
+	if user[0] == '~' {
+		user = user[1:]
+	}
+
+	owner, _ := auth.String(conn.Network, "owner")
+	if user == owner {
+		conn.Join(line.Text)
+	}
+}
+
 func isChannel(target string) bool {
 	return target[0] == '#' || target[0] == '&'
 }

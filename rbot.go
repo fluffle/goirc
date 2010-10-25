@@ -53,6 +53,7 @@ func connect(network string) {
 		})
 	c.AddHandler("privmsg", handlePrivmsg)
 	c.AddHandler("mode", handleMode)
+	c.AddHandler("invite", handleInvite)
 
 	for {
 		fmt.Printf("Connecting to %s...\n", server)
@@ -80,7 +81,7 @@ func autojoin(conn *irc.Conn) {
 }
 
 func readConf() {
-	var err os.Error;
+	var err os.Error
 	conf, err = config.ReadDefault("rbot.conf")
 	if (err != nil) {
 		fmt.Printf("Config error: %s\n", err)
@@ -90,14 +91,14 @@ func readConf() {
 func readConfString(section, option string) string {
 	value, err := conf.String(section, option)
 	if err != nil {
-		panic(fmt.Sprintf("Config error: %s", err));
+		panic(fmt.Sprintf("Config error: %s", err))
 	}
 	return value
 }
 func readConfBool(section, option string) bool {
 	value, err := conf.Bool(section, option)
 	if err != nil {
-		panic(fmt.Sprintf("Config error: %s", err));
+		panic(fmt.Sprintf("Config error: %s", err))
 	}
 	return value
 }
