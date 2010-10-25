@@ -13,7 +13,7 @@ import (
 	"strconv"
 )
 
-var commands = map [string]func(*irc.Conn, string, string, string) {
+var commands = map [string]func(*irc.Conn, *irc.Nick, string, string) {
 	"tr": translate,
 	"flags": flags,
 	"add": add,
@@ -26,9 +26,11 @@ var commands = map [string]func(*irc.Conn, string, string, string) {
 const googleAPIKey = "ABQIAAAA6-N_jl4ETgtMf2M52JJ_WRQjQjNunkAJHIhTdFoxe8Di7fkkYhRRcys7ZxNbH3MIy_MKKcEO4-9_Ag"
 
 func handlePrivmsg(conn *irc.Conn, line *irc.Line) {
-	if n := conn.GetNick(line.Nick); n != nil {
-		n.Host = line.Host
+	nick := conn.GetNick(line.Nick)
+	if nick == nil {
+		return
 	}
+	nick.Host = line.Host
 
 	target := line.Args[0]
 	if isChannel(target) {
@@ -46,13 +48,13 @@ func handlePrivmsg(conn *irc.Conn, line *irc.Line) {
 			if pound := strings.Index(video, "#"); pound > -1 {
 				video = video[0:pound]
 			}
-			youtube(conn, line.Nick, video, target)
+			youtube(conn, nick, video, target)
+		} else {
+			command(conn, nick, line.Text, target)
 		}
-
-		command(conn, line.Nick, line.Text, target)
 	} else if target == conn.Me.Nick {
 		// message to us
-		command(conn, line.Nick, line.Text, line.Nick)
+		command(conn, nick, line.Text, line.Nick)
 	}
 }
 
@@ -66,7 +68,7 @@ func isChannel(target string) bool {
 	return target[0] == '#' || target[0] == '&'
 }
 
-func command(conn *irc.Conn, nick, text, target string) {
+func command(conn *irc.Conn, nick *irc.Nick, text, target string) {
 	if !strings.HasPrefix(text, trigger) {
 		return
 	}
@@ -93,7 +95,7 @@ func say(conn *irc.Conn, target, message string, a ...interface{}) {
 	}
 }
 
-func youtube(conn *irc.Conn, nick, video, channel string) {
+func youtube(conn *irc.Conn, nick *irc.Nick, video, channel string) {
 	url := fmt.Sprintf("http://gdata.youtube.com/feeds/api/videos/%s?v=2", video)
 	response, _, err := http.Get(url)
 	defer response.Body.Close()
@@ -130,13 +132,13 @@ func youtube(conn *irc.Conn, nick, video, channel string) {
 		} else {
 			durationStr = fmt.Sprintf("%02d:%02d", minutes, seconds)
 		}
-		say(conn, channel, "%s's video: %s, %s", nick, yte.Title, durationStr)
+		say(conn, channel, "%s's video: %s, %s", nick.Nick, yte.Title, durationStr)
 	} else {
-		say(conn, channel, "%s's video: %s", nick, yte.Title)
+		say(conn, channel, "%s's video: %s", nick.Nick, yte.Title)
 	}
 }
 
-func translate(conn *irc.Conn, nick, args, target string) {
+func translate(conn *irc.Conn, nick *irc.Nick, args, target string) {
 	var langPairs vector.StringVector
 	for {
 		split := strings.Split(args, " ", 2)
@@ -163,20 +165,20 @@ func translate(conn *irc.Conn, nick, args, target string) {
 	response, _, err := http.Get(url)
 	defer response.Body.Close()
 	if err != nil {
-		say(conn, target, "%s: Error while requesting translation", nick); return
+		say(conn, target, "%s: Error while requesting translation", nick.Nick); return
 	}
 	b, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		say(conn, target, "%s: Error while downloading translation", nick); return
+		say(conn, target, "%s: Error while downloading translation", nick.Nick); return
 	}
 
 	var result map[string]interface{}
 	err = json.Unmarshal(b, &result)
 	if err != nil {
-		say(conn, target, "%s: Error while decoding translation", nick); return
+		say(conn, target, "%s: Error while decoding translation", nick.Nick); return
 	}
 	if result["responseStatus"] != float64(200) {
-		say(conn, target, "%s: %s", nick, result["responseDetails"]); return
+		say(conn, target, "%s: %s", nick.Nick, result["responseDetails"]); return
 	}
 
 	if langPairs.Len() > 0 {
@@ -203,7 +205,7 @@ func sayTr(conn *irc.Conn, target string, data interface{}) {
 	}
 }
 
-func add(conn *irc.Conn, nick, args, target string) {
+func add(conn *irc.Conn, nick *irc.Nick, args, target string) {
 	channel, args := hasAccess(conn, nick, target, args, "a")
 	if channel == "" {
 		return
@@ -219,7 +221,7 @@ func add(conn *irc.Conn, nick, args, target string) {
 		say(conn, target, "%s now has flags %s", host, nflags)
 	}
 }
-func remove(conn *irc.Conn, nick, args, target string) {
+func remove(conn *irc.Conn, nick *irc.Nick, args, target string) {
 	channel, args := hasAccess(conn, nick, target, args, "a")
 	if channel == "" {
 		return
@@ -245,7 +247,7 @@ func remove(conn *irc.Conn, nick, args, target string) {
 	}
 }
 
-func flags(conn *irc.Conn, nick, args, target string) {
+func flags(conn *irc.Conn, nick *irc.Nick, args, target string) {
 	channel, args := hasAccess(conn, nick, target, args, "")
 	if channel == "" {
 		return
@@ -253,7 +255,7 @@ func flags(conn *irc.Conn, nick, args, target string) {
 
 	query := strings.TrimSpace(args)
 	if query == "" {
-		query = nick
+		query = nick.Nick
 	}
 	n := conn.GetNick(query)
 	if n == nil {
@@ -275,7 +277,7 @@ func flags(conn *irc.Conn, nick, args, target string) {
 	}
 }
 
-func topic(conn *irc.Conn, nick, args, target string) {
+func topic(conn *irc.Conn, nick *irc.Nick, args, target string) {
 	channel, args := hasAccess(conn, nick, target, args, "t")
 	if channel == "" {
 		return
@@ -286,10 +288,10 @@ func topic(conn *irc.Conn, nick, args, target string) {
 		conn.Topic(channel, args)
 	} else {
 		basetopic, _ := conf.String(section, "basetopic")
-		say(conn, nick, "Basetopic: %s", basetopic)
+		say(conn, nick.Nick, "Basetopic: %s", basetopic)
 	}
 }
-func appendtopic(conn *irc.Conn, nick, args, target string) {
+func appendtopic(conn *irc.Conn, nick *irc.Nick, args, target string) {
 	channel, args := hasAccess(conn, nick, target, args, "t")
 	if channel == "" {
 		return
@@ -304,14 +306,14 @@ func appendtopic(conn *irc.Conn, nick, args, target string) {
 	basetopic, _ := conf.String(section, "basetopic")
 	if basetopic == "" || !strings.HasPrefix(c.Topic, basetopic) {
 		basetopic = c.Topic
-		say(conn, nick, "New basetopic: %s", basetopic)
+		say(conn, nick.Nick, "New basetopic: %s", basetopic)
 		updateConf(section, "basetopic", basetopic)
 	}
 	conn.Topic(channel, basetopic + args)
 }
 
-func csay(conn *irc.Conn, nick, args, target string) {
-	channel, args := hasAccess(conn, nick, target, args, "t")
+func csay(conn *irc.Conn, nick *irc.Nick, args, target string) {
+	channel, args := hasAccess(conn, nick, target, args, "s")
 	if channel != "" {
 		say(conn, channel, args)
 	}

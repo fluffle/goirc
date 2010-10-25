@@ -12,7 +12,7 @@ const authFile = "auth.conf"
 var auth *config.Config
 
 func readAuth() {
-	var err os.Error;
+	var err os.Error
 	auth, err = config.ReadDefault(authFile)
 	if (err != nil) {
 		panic(fmt.Sprintf("Auth config error: %s", err))
@@ -102,19 +102,14 @@ func removeUser(conn *irc.Conn, channel, nick string) (string, bool) {
 // passing a flag of "" will check if the user has any access
 // returns the channel the user has access on and remaining args
 // or a blank channel if the user doesn't have access on that channel
-func hasAccess(conn *irc.Conn, nick, target, args, flag string) (string, string) {
-	n := conn.GetNick(nick)
-	if n == nil {
-		return "", args
-	}
-
+func hasAccess(conn *irc.Conn, nick *irc.Nick, target, args, flag string) (string, string) {
 	// figure out what the channel and args are
 	var channel string
 	if isChannel(target) {
 		channel = target
 	} else {
 		split := strings.Split(args, " ", 2)
-		if isChannel(split[0]) {
+		if split[0] != "" && isChannel(split[0]) {
 			channel = split[0]
 			if len(split) == 2 {
 				args = split[1]
@@ -127,7 +122,7 @@ func hasAccess(conn *irc.Conn, nick, target, args, flag string) (string, string)
 	}
 
 	// actually check access
-	user := user(n)
+	user := user(nick)
 	if owner, _ := auth.String(conn.Network, "owner"); owner == user {
 		return channel, args
 	}
