@@ -30,6 +30,11 @@ var commands = map [string]func(*irc.Conn, *irc.Nick, string, string) {
 	"dehop": dehalfop,
 	"kick": kick,
 	"k": kick,
+	"b": ban,
+	"ban": ban,
+	"unban": unban,
+	"u": unban,
+	"kb": kickban,
 }
 
 const googleAPIKey = "ABQIAAAA6-N_jl4ETgtMf2M52JJ_WRQjQjNunkAJHIhTdFoxe8Di7fkkYhRRcys7ZxNbH3MIy_MKKcEO4-9_Ag"
@@ -457,6 +462,76 @@ func kick(conn *irc.Conn, nick *irc.Nick, args, target string) {
 	}
 
 	split := strings.Split(args, " ", 2)
+	reason := "(" + nick.Nick + ")"
+	if len(split) == 2 {
+		reason += " " + split[1]
+	}
+	conn.Kick(channel, split[0], reason)
+}
+
+func ban(conn *irc.Conn, nick *irc.Nick, args, target string) {
+	channel, args := parseAccess(conn, nick, target, args, "oh")
+	if channel == "" || args == "" {
+		return
+	}
+
+	bans := strings.TrimSpace(args)
+	split := strings.Fields(bans)
+	// turn nicks into *!*@host
+	for i, ban := range(split) {
+		if strings.Index(ban, "@") != -1 {
+			// already a host
+			continue
+		}
+		n := conn.GetNick(ban)
+		if n == nil {
+			//couldn't find the nick, so just cross our fingers
+			continue
+		}
+		split[i] = "*!*@" + n.Host
+	}
+	bans = strings.Join(split, " ")
+	modestring := "+" + strings.Repeat("b", len(bans)) + " " + bans
+	conn.Mode(channel, modestring)
+}
+
+func unban(conn *irc.Conn, nick *irc.Nick, args, target string) {
+	channel, args := parseAccess(conn, nick, target, args, "oh")
+	if channel == "" || args == "" {
+		return
+	}
+
+	bans := strings.TrimSpace(args)
+	split := strings.Fields(bans)
+	for i, ban := range(split) {
+		if strings.Index(ban, "@") != -1 {
+			continue
+		}
+		n := conn.GetNick(ban)
+		if n == nil {
+			continue
+		}
+		split[i] = "*!*@" + n.Host
+	}
+	bans = strings.Join(split, " ")
+	modestring := "-" + strings.Repeat("b", len(bans)) + " " + bans
+	conn.Mode(channel, modestring)
+}
+
+func kickban(conn *irc.Conn, nick *irc.Nick, args, target string) {
+	channel, args := parseAccess(conn, nick, target, args, "oh")
+	if channel == "" || args == "" {
+		return
+	}
+
+	split := strings.Split(args, " ", 2)
+
+	n := conn.GetNick(split[0])
+	if n == nil {
+		return
+	}
+	conn.Mode(channel, "+b *!*@" + n.Host)
+
 	reason := "(" + nick.Nick + ")"
 	if len(split) == 2 {
 		reason += " " + split[1]
