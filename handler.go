@@ -21,6 +21,15 @@ var commands = map [string]func(*irc.Conn, *irc.Nick, string, string) {
 	"topic": topic,
 	"appendtopic": appendtopic,
 	"say": csay,
+
+	"halfop": halfop,
+	"hop": halfop,
+	"op": op,
+	"deop": deop,
+	"dehalfop": dehalfop,
+	"dehop": dehalfop,
+	"kick": kick,
+	"k": kick,
 }
 
 const googleAPIKey = "ABQIAAAA6-N_jl4ETgtMf2M52JJ_WRQjQjNunkAJHIhTdFoxe8Di7fkkYhRRcys7ZxNbH3MIy_MKKcEO4-9_Ag"
@@ -333,4 +342,91 @@ func csay(conn *irc.Conn, nick *irc.Nick, args, target string) {
 	if channel != "" {
 		say(conn, channel, args)
 	}
+}
+
+func op(conn *irc.Conn, nick *irc.Nick, args, target string) {
+	channel, args := hasAccess(conn, nick, target, args, "o")
+	if channel == "" {
+		return
+	}
+
+	if args == "" {
+		conn.Mode(channel, "+o " + nick.Nick)
+	} else {
+		ops := strings.TrimSpace(args)
+		count := strings.Count(ops, " ") + 1
+		modestring := "+" + strings.Repeat("o", count) + " " + ops
+		conn.Mode(channel, modestring)
+	}
+}
+
+func deop(conn *irc.Conn, nick *irc.Nick, args, target string) {
+	channel, args := hasAccess(conn, nick, target, args, "o")
+	if channel == "" {
+		return
+	}
+
+	if args == "" {
+		conn.Mode(channel, "-o " + nick.Nick)
+	} else {
+		ops := strings.TrimSpace(args)
+		count := strings.Count(ops, " ") + 1
+		modestring := "-" + strings.Repeat("o", count) + " " + ops
+		conn.Mode(channel, modestring)
+	}
+}
+
+func halfop(conn *irc.Conn, nick *irc.Nick, args, target string) {
+	channel, args := hasAccess(conn, nick, target, args, "oh")
+	if channel == "" {
+		return
+	}
+
+	if args == "" {
+		conn.Mode(channel, "+h " + nick.Nick)
+	} else {
+		// giving others +h requires o
+		channel, args = hasAccess(conn, nick, channel, args, "o")
+		if channel == "" {
+			return
+		}
+		halfops := strings.TrimSpace(args)
+		count := strings.Count(halfops, " ") + 1
+		modestring := "+" + strings.Repeat("h", count) + " " + halfops
+		conn.Mode(channel, modestring)
+	}
+}
+
+func dehalfop(conn *irc.Conn, nick *irc.Nick, args, target string) {
+	channel, args := hasAccess(conn, nick, target, args, "oh")
+	if channel == "" {
+		return
+	}
+
+	if args == "" {
+		conn.Mode(channel, "-h " + nick.Nick)
+	} else {
+		channel, args = hasAccess(conn, nick, channel, args, "o")
+		if channel == "" {
+			return
+		}
+		halfops := strings.TrimSpace(args)
+		count := strings.Count(halfops, " ") + 1
+		modestring := "-" + strings.Repeat("h", count) + " " + halfops
+		conn.Mode(channel, modestring)
+	}
+}
+
+func kick(conn *irc.Conn, nick *irc.Nick, args, target string) {
+	channel, args := hasAccess(conn, nick, target, args, "oh")
+	if channel == "" || args == "" {
+		return
+	}
+
+	split := strings.Split(args, " ", 2)
+	reason := "(" + nick.Nick + ")"
+	if len(split) == 2 {
+		reason += " " + split[1]
+	}
+	conn.Kick(channel, split[0], reason)
 }

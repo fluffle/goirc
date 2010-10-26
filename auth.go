@@ -131,7 +131,7 @@ func hasAccess(conn *irc.Conn, nick *irc.Nick, target, args, flag string) (strin
 	if err != nil {
 		return "", args
 	}
-	if strings.Index(flags, flag) > -1 {
+	if flag == "" || strings.IndexAny(flags, flag) > -1 {
 		return channel, args
 	}
 	return "", args
