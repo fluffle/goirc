@@ -20,6 +20,9 @@ func readAuth() {
 }
 
 func user(nick *irc.Nick) string {
+	if nick.Ident == "" || nick.Host == "" {
+		return ""
+	}
 	if nick.Ident[0] == '~' {
 		return nick.Ident[1:] + "@" + nick.Host
 	}
