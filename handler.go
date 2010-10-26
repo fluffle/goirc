@@ -163,6 +163,41 @@ func youtube(conn *irc.Conn, nick *irc.Nick, video, channel string) {
 	}
 }
 
+// this allows target to be a channel or a privmsg in which the channel is the first argument
+// passing a flag of "" will check if the user has any access
+// returns the channel the user has access on and remaining args
+// or a blank channel if the user doesn't have access on that channel
+func parseAccess(conn *irc.Conn, nick *irc.Nick, target, args, flag string) (string, string) {
+	channel, args := parseChannel(target, args)
+	if channel == "" {
+		return "", args
+	}
+	if hasAccess(conn, nick, channel, flag) {
+		return channel, args
+	}
+	return "", args
+}
+
+func parseChannel(target, args string) (string, string) {
+	var channel string
+	if isChannel(target) {
+		channel = target
+	} else {
+		split := strings.Split(args, " ", 2)
+		if split[0] != "" && isChannel(split[0]) {
+			channel = split[0]
+			if len(split) == 2 {
+				args = split[1]
+			} else {
+				args = ""
+			}
+		} else {
+			return "", args
+		}
+	}
+	return channel, args
+}
+
 func translate(conn *irc.Conn, nick *irc.Nick, args, target string) {
 	var langPairs vector.StringVector
 	for {
@@ -231,7 +266,7 @@ func sayTr(conn *irc.Conn, target string, data interface{}) {
 }
 
 func add(conn *irc.Conn, nick *irc.Nick, args, target string) {
-	channel, args := hasAccess(conn, nick, target, args, "a")
+	channel, args := parseAccess(conn, nick, target, args, "a")
 	if channel == "" {
 		return
 	}
@@ -247,7 +282,7 @@ func add(conn *irc.Conn, nick *irc.Nick, args, target string) {
 	}
 }
 func remove(conn *irc.Conn, nick *irc.Nick, args, target string) {
-	channel, args := hasAccess(conn, nick, target, args, "a")
+	channel, args := parseAccess(conn, nick, target, args, "a")
 	if channel == "" {
 		return
 	}
@@ -273,7 +308,7 @@ func remove(conn *irc.Conn, nick *irc.Nick, args, target string) {
 }
 
 func flags(conn *irc.Conn, nick *irc.Nick, args, target string) {
-	channel, args := hasAccess(conn, nick, target, args, "")
+	channel, args := parseAccess(conn, nick, target, args, "")
 	if channel == "" {
 		return
 	}
@@ -303,7 +338,7 @@ func flags(conn *irc.Conn, nick *irc.Nick, args, target string) {
 }
 
 func topic(conn *irc.Conn, nick *irc.Nick, args, target string) {
-	channel, args := hasAccess(conn, nick, target, args, "t")
+	channel, args := parseAccess(conn, nick, target, args, "t")
 	if channel == "" {
 		return
 	}
@@ -317,7 +352,7 @@ func topic(conn *irc.Conn, nick *irc.Nick, args, target string) {
 	}
 }
 func appendtopic(conn *irc.Conn, nick *irc.Nick, args, target string) {
-	channel, args := hasAccess(conn, nick, target, args, "t")
+	channel, args := parseAccess(conn, nick, target, args, "t")
 	if channel == "" {
 		return
 	}
@@ -338,14 +373,14 @@ func appendtopic(conn *irc.Conn, nick *irc.Nick, args, target string) {
 }
 
 func csay(conn *irc.Conn, nick *irc.Nick, args, target string) {
-	channel, args := hasAccess(conn, nick, target, args, "s")
+	channel, args := parseAccess(conn, nick, target, args, "s")
 	if channel != "" {
 		say(conn, channel, args)
 	}
 }
 
 func op(conn *irc.Conn, nick *irc.Nick, args, target string) {
-	channel, args := hasAccess(conn, nick, target, args, "o")
+	channel, args := parseAccess(conn, nick, target, args, "o")
 	if channel == "" {
 		return
 	}
@@ -361,7 +396,7 @@ func op(conn *irc.Conn, nick *irc.Nick, args, target string) {
 }
 
 func deop(conn *irc.Conn, nick *irc.Nick, args, target string) {
-	channel, args := hasAccess(conn, nick, target, args, "o")
+	channel, args := parseAccess(conn, nick, target, args, "o")
 	if channel == "" {
 		return
 	}
@@ -377,7 +412,7 @@ func deop(conn *irc.Conn, nick *irc.Nick, args, target string) {
 }
 
 func halfop(conn *irc.Conn, nick *irc.Nick, args, target string) {
-	channel, args := hasAccess(conn, nick, target, args, "oh")
+	channel, args := parseAccess(conn, nick, target, args, "oh")
 	if channel == "" {
 		return
 	}
@@ -386,8 +421,7 @@ func halfop(conn *irc.Conn, nick *irc.Nick, args, target string) {
 		conn.Mode(channel, "+h " + nick.Nick)
 	} else {
 		// giving others +h requires o
-		channel, args = hasAccess(conn, nick, channel, args, "o")
-		if channel == "" {
+		if !hasAccess(conn, nick, channel, "o") {
 			return
 		}
 		halfops := strings.TrimSpace(args)
@@ -398,7 +432,7 @@ func halfop(conn *irc.Conn, nick *irc.Nick, args, target string) {
 }
 
 func dehalfop(conn *irc.Conn, nick *irc.Nick, args, target string) {
-	channel, args := hasAccess(conn, nick, target, args, "oh")
+	channel, args := parseAccess(conn, nick, target, args, "oh")
 	if channel == "" {
 		return
 	}
@@ -406,8 +440,7 @@ func dehalfop(conn *irc.Conn, nick *irc.Nick, args, target string) {
 	if args == "" {
 		conn.Mode(channel, "-h " + nick.Nick)
 	} else {
-		channel, args = hasAccess(conn, nick, channel, args, "o")
-		if channel == "" {
+		if !hasAccess(conn, nick, channel, "o") {
 			return
 		}
 		halfops := strings.TrimSpace(args)
@@ -418,7 +451,7 @@ func dehalfop(conn *irc.Conn, nick *irc.Nick, args, target string) {
 }
 
 func kick(conn *irc.Conn, nick *irc.Nick, args, target string) {
-	channel, args := hasAccess(conn, nick, target, args, "oh")
+	channel, args := parseAccess(conn, nick, target, args, "oh")
 	if channel == "" || args == "" {
 		return
 	}

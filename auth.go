@@ -98,43 +98,20 @@ func removeUser(conn *irc.Conn, channel, nick string) (string, bool) {
 	return user, true
 }
 
-// this allows target to be a channel or a privmsg in which the channel is the first argument
-// passing a flag of "" will check if the user has any access
-// returns the channel the user has access on and remaining args
-// or a blank channel if the user doesn't have access on that channel
-func hasAccess(conn *irc.Conn, nick *irc.Nick, target, args, flag string) (string, string) {
-	// figure out what the channel and args are
-	var channel string
-	if isChannel(target) {
-		channel = target
-	} else {
-		split := strings.Split(args, " ", 2)
-		if split[0] != "" && isChannel(split[0]) {
-			channel = split[0]
-			if len(split) == 2 {
-				args = split[1]
-			} else {
-				args = ""
-			}
-		} else {
-			return "", args
-		}
-	}
-
-	// actually check access
+func hasAccess(conn *irc.Conn, nick *irc.Nick, channel, flag string) bool {
 	user := user(nick)
 	if owner, _ := auth.String(conn.Network, "owner"); owner == user {
-		return channel, args
+		return true
 	}
 
 	flags, err := auth.String(conn.Network + " " + channel, user)
 	if err != nil {
-		return "", args
+		return false
 	}
 	if flag == "" || strings.IndexAny(flags, flag) > -1 {
-		return channel, args
+		return true
 	}
-	return "", args
+	return false
 }
 
 func updateAuth() os.Error {
