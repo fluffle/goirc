@@ -3,12 +3,15 @@ package main
 import (
 	"irc"
 	"fmt"
+	"os"
 	"strings"
 	"http"
 	"json"
 	"io/ioutil"
 	"container/vector"
 	"html"
+	"regexp"
+	"strconv"
 )
 
 const googleAPIKey = "ABQIAAAA6-N_jl4ETgtMf2M52JJ_WRQjQjNunkAJHIhTdFoxe8Di7fkkYhRRcys7ZxNbH3MIy_MKKcEO4-9_Ag"
@@ -78,4 +81,42 @@ func sayTr(conn *irc.Conn, target string, data interface{}) {
 		trText := data.(map[string]interface{})["translatedText"].(string)
 		say(conn, target, html.UnescapeString(trText))
 	}
+}
+
+func calc(conn *irc.Conn, nick *irc.Nick, args, target string) {
+	if args == "" {
+		return
+	}
+	url := fmt.Sprintf("http://www.google.com/ig/calculator?hl=en&q=%s&key=%s", http.URLEscape(args), googleAPIKey)
+	response, _, err := http.Get(url)
+	defer response.Body.Close()
+	if err != nil {
+		say(conn, target, "%s: Error while requesting calculation", nick.Nick); return
+	}
+
+	b, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		say(conn, target, "%s: Error while downloading calculation", nick.Nick); return
+	}
+
+	re := regexp.MustCompile(`{lhs: "(.*)",rhs: "(.*)",error: "(.*)",icc: (true|false)}`)
+	result := re.FindSubmatch(b)
+	if len(result) != 5 || len(result[3]) > 1 {
+		say(conn, target, "%s: Error while calculating.", nick.Nick); return
+	}
+
+	str := fmt.Sprintf("%s = %s", result[1], result[2])
+	output := ""
+	// decode unicode escapes
+	for str != "" {
+		var err os.Error
+		var rune int
+		rune, _, str, err = strconv.UnquoteChar(str, 0)
+		if err != nil {
+			say(conn, target, "%s: Error while decoding.", nick.Nick); return
+		}
+		output += string(rune)
+	}
+	output = html.UnescapeString(output)
+	say(conn, target, output)
 }

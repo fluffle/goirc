@@ -35,6 +35,7 @@ var commands = map [string]func(*irc.Conn, *irc.Nick, string, string) {
 
 	// google
 	"tr": translate,
+	"calc": calc,
 }
 
 func handlePrivmsg(conn *irc.Conn, line *irc.Line) {
