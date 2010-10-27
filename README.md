@@ -37,6 +37,7 @@ In addition, a user must have at least one flag to use `flags` (so users without
 All commands are prefixed with the trigger configured in rbot.conf.
 
 Access related commands:
+
 - `flags raylu`: get's raylu's flags
 - `flags`: get's your flags
 - `add raylu t`: gives raylu the t flag
@@ -44,7 +45,8 @@ Access related commands:
 - `remove raylu`: removes all of raylu's flags
 - `say text`: says text to the channel
 
-Op commands
+Op commands:
+
 - `halfop|hop`: halfop yourself
 - `halfop|hop raylu john`: halfop raylu and john
 - `op`: op yourself
@@ -62,6 +64,7 @@ Op commands
 - `appendtopic text`: if the topic does not starts with basetopic, sets the basetopic to the current topic. Makes the topic basetopic+text.
 
 Google API commands:
+
 - `tr text`: detect the language of text
 - `tr en|ja en|es text`: translate text into Japanese and Spanish
 - `calc 2-1 usd in yen`: convert 1 USD to Japanese yen
