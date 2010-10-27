@@ -76,6 +76,38 @@ func dehalfop(conn *irc.Conn, nick *irc.Nick, args, target string) {
 	}
 }
 
+func voice(conn *irc.Conn, nick *irc.Nick, args, target string) {
+	channel, args := parseAccess(conn, nick, target, args, "v")
+	if channel == "" {
+		return
+	}
+
+	if args == "" {
+		conn.Mode(channel, "+v " + nick.Nick)
+	} else {
+		voices := strings.TrimSpace(args)
+		count := strings.Count(voices, " ") + 1
+		modestring := "+" + strings.Repeat("v", count) + " " + voices
+		conn.Mode(channel, modestring)
+	}
+}
+
+func devoice(conn *irc.Conn, nick *irc.Nick, args, target string) {
+	channel, args := parseAccess(conn, nick, target, args, "v")
+	if channel == "" {
+		return
+	}
+
+	if args == "" {
+		conn.Mode(channel, "-v " + nick.Nick)
+	} else {
+		voices := strings.TrimSpace(args)
+		count := strings.Count(voices, " ") + 1
+		modestring := "-" + strings.Repeat("v", count) + " " + voices
+		conn.Mode(channel, modestring)
+	}
+}
+
 func kick(conn *irc.Conn, nick *irc.Nick, args, target string) {
 	channel, args := parseAccess(conn, nick, target, args, "oh")
 	if channel == "" || args == "" {

@@ -23,6 +23,8 @@ var commands = map [string]func(*irc.Conn, *irc.Nick, string, string) {
 	"deop": deop,
 	"dehalfop": dehalfop,
 	"dehop": dehalfop,
+	"voice": voice,
+	"devoice": devoice,
 	"kick": kick,
 	"k": kick,
 	"b": ban,
@@ -74,6 +76,30 @@ func handlePrivmsg(conn *irc.Conn, line *irc.Line) {
 func handleMode(conn *irc.Conn, line *irc.Line) {
 	if line.Args[0] == conn.Me.Nick && line.Text == "+r" {
 		autojoin(conn)
+	}
+}
+
+func handleJoin(conn *irc.Conn, line *irc.Line) {
+	// autovoice users with v flag
+	if line.Nick == conn.Me.Nick {
+		return
+	}
+
+	channel := conn.GetChannel(line.Text)
+	if channel == nil || !channel.Modes.Moderated {
+		return
+	}
+
+	privs := conn.Me.Channels[channel]
+	if !(privs.Op || privs.Admin || privs.HalfOp || privs.Owner) {
+		return
+	}
+	nick := conn.GetNick(line.Nick)
+	if nick == nil {
+		return
+	}
+	if hasAccess(conn, nick, line.Text, "v") {
+		conn.Mode(line.Text, "+v " + line.Nick)
 	}
 }
 

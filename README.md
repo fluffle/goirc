@@ -26,7 +26,8 @@ The following is a description of the commands enabled by each flag:
 
 - `a`: add remove
 - `o`: op halfop deop dehalfop kick|k ban|b unban|u kb
-- `h`: halfop|hop dehalfop|dehop kick ban unban kb (hop and dehop can only be used on yourself and you cannot kick or kb people with o or h)
+- `h`: halfop|hop dehalfop|dehop kick|k ban|b unban|u kb (hop and dehop can only be used on yourself and you cannot kick or kb people with o or h)
+- `v`: voice, devoice
 - `t`: topic appendtopic
 - `s`: say
 
@@ -55,6 +56,10 @@ Op commands:
 - `deop raylu john`: deop raylu and john
 - `dehalfop`: dehalfop yourself
 - `dehalfop|dehop raylu john`: dehalfop raylu and john
+- `voice`: voice yourself
+- `voice raylu john`: voice raylu and john
+- `devoice`: devoice yourself
+- `devoice raylu john`: devoice raylu and john
 - `kick|k raylu`: kick raylu
 - `ban|b raylu john!*@*`: ban raylu by hostname and john by nick
 - `unban|u raylu john!*@*`: unban raylu by hostname and john by nick

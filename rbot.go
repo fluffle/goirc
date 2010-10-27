@@ -53,6 +53,7 @@ func connect(network string) {
 		})
 	c.AddHandler("privmsg", handlePrivmsg)
 	c.AddHandler("mode", handleMode)
+	c.AddHandler("join", handleJoin)
 	c.AddHandler("invite", handleInvite)
 
 	for {
