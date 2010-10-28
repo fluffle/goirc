@@ -37,6 +37,7 @@ var commands = map [string]func(*irc.Conn, *irc.Nick, string, string) {
 
 	// google
 	"tr": translate,
+	"roman": roman,
 	"calc": calc,
 }
 

@@ -4,13 +4,17 @@ import (
 	"irc"
 	"fmt"
 	"strings"
+	"os"
 	"http"
-	"json"
+	"net"
+	"bufio"
 	"io/ioutil"
 	"container/vector"
 	"html"
+	"json"
 	"regexp"
 	"strconv"
+	"utf8"
 )
 
 const googleAPIKey = "ABQIAAAA6-N_jl4ETgtMf2M52JJ_WRQjQjNunkAJHIhTdFoxe8Di7fkkYhRRcys7ZxNbH3MIy_MKKcEO4-9_Ag"
@@ -80,6 +84,57 @@ func sayTr(conn *irc.Conn, target string, data interface{}) {
 		trText := data.(map[string]interface{})["translatedText"].(string)
 		say(conn, target, html.UnescapeString(trText))
 	}
+}
+
+func roman(conn *irc.Conn, nick *irc.Nick, args, target string) {
+	if args == "" {
+		return
+	}
+
+	var sourcelang string;
+	if utf8.NewString(args).IsASCII() {
+		sourcelang = "en"
+	} else {
+		sourcelang = "ja"
+	}
+	url := fmt.Sprintf("http://translate.google.com/translate_a/t?client=t&hl=ja&sl=%s&tl=en-U&text=%s",
+		sourcelang, http.URLEscape(args))
+
+	// please disregard the reproduction of src/pkg/http/client.go:send below
+	var request http.Request
+	var err os.Error
+	request.URL, err = http.ParseURL(url)
+	if err != nil {
+		say(conn, target, "%s: Error while preparing URL", nick.Nick); return
+	}
+	request.UserAgent = "Mozilla/5.0"
+
+	httpcon, err := net.Dial("tcp", "", request.URL.Host + ":" + request.URL.Scheme)
+	if err != nil {
+		say(conn, target, "%s: Error while opening connection", nick.Nick); return
+	}
+	defer httpcon.Close()
+	err = request.Write(httpcon)
+	if err != nil {
+		say(conn, target, "%s: Error while requesting romanization", nick.Nick); return
+	}
+	reader := bufio.NewReader(httpcon)
+	response, err := http.ReadResponse(reader, request.Method)
+	if err != nil {
+		say(conn, target, "%s: Error while reading response header", nick.Nick); return
+	}
+
+	b, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		say(conn, target, "%s: Error while downloading romanization", nick.Nick); return
+	}
+
+	result := strings.Split(string(b), `"`, 7)
+	if len(result) < 7 {
+		say(conn, target, "%s: Error while parsing romanization", nick.Nick); return
+	}
+
+	say(conn, target, "%s: %s", result[1], result[5])
 }
 
 func calc(conn *irc.Conn, nick *irc.Nick, args, target string) {
