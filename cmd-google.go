@@ -3,7 +3,6 @@ package main
 import (
 	"irc"
 	"fmt"
-	"os"
 	"strings"
 	"http"
 	"json"
@@ -105,17 +104,10 @@ func calc(conn *irc.Conn, nick *irc.Nick, args, target string) {
 		say(conn, target, "%s: Error while calculating.", nick.Nick); return
 	}
 
-	str := fmt.Sprintf("%s = %s", result[1], result[2])
-	output := ""
-	// decode unicode escapes
-	for str != "" {
-		var err os.Error
-		var rune int
-		rune, _, str, err = strconv.UnquoteChar(str, 0)
-		if err != nil {
-			say(conn, target, "%s: Error while decoding.", nick.Nick); return
-		}
-		output += string(rune)
+	output := fmt.Sprintf(`"%s = %s"`, result[1], result[2])
+	output, err = strconv.Unquote(output)
+	if err != nil {
+		say(conn, target, "%s: Error while decoding.", nick.Nick); return
 	}
 	output = html.UnescapeString(output)
 	say(conn, target, output)
