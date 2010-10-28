@@ -50,13 +50,8 @@ func handlePrivmsg(conn *irc.Conn, line *irc.Line) {
 	target := line.Args[0]
 	if isChannel(target) {
 		// message to a channel
-		var video string
-		if strings.HasPrefix(line.Text, "http://www.youtube.com/watch?v=") {
-			video = line.Text[31:]
-		} else if strings.HasPrefix(line.Text, "http://www.youtube.com/watch?v=") {
-			video = line.Text[27:]
-		}
-		if video != "" {
+		if start := strings.Index(line.Text, "youtube.com/watch?v="); start > -1 {
+			video := line.Text[start+20:]
 			if end := strings.IndexAny(video, " &#"); end > -1 {
 				video = video[0:end]
 			}
