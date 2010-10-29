@@ -217,10 +217,14 @@ func (conn *Conn) recv() {
 		if len(args) > 1 {
 			line.Text = args[1]
 		}
-		args = strings.Split(args[0], " ", -1)
+		args = strings.Fields(args[0])
 		line.Cmd = strings.ToUpper(args[0])
 		if len(args) > 1 {
 			line.Args = args[1:len(args)]
+			// some servers (Gamesurge) don't use : properly
+			if line.Text == "" {
+				line.Text = args[1]
+			}
 		}
 		conn.in <- line
 	}
