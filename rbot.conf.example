@@ -8,6 +8,7 @@ user: rbot
 ssl: true
 nickserv: identify_password
 autoconnect: true
+roman: ja
 
 [Rizon #raylu]
 autojoin: true

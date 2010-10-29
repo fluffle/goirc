@@ -91,14 +91,18 @@ func roman(conn *irc.Conn, nick *irc.Nick, args, target string) {
 		return
 	}
 
-	var sourcelang string;
+	var sourcelang, targetlang string;
 	if utf8.NewString(args).IsASCII() {
 		sourcelang = "en"
 	} else {
 		sourcelang = "ja"
 	}
-	url := fmt.Sprintf("http://translate.google.com/translate_a/t?client=t&hl=ja&sl=%s&tl=en-U&text=%s",
-		sourcelang, http.URLEscape(args))
+	targetlang, _ = conf.String(conn.Network, "roman")
+	if targetlang == "" {
+		targetlang = "ja"
+	}
+	url := fmt.Sprintf("http://translate.google.com/translate_a/t?client=t&hl=%s&sl=%s&tl=en-U&text=%s",
+		targetlang, sourcelang, http.URLEscape(args))
 
 	// please disregard the reproduction of src/pkg/http/client.go:send below
 	var request http.Request
