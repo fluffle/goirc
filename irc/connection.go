@@ -223,7 +223,7 @@ func (conn *Conn) recv() {
 			line.Args = args[1:len(args)]
 			// some servers (Gamesurge) don't use : properly
 			if line.Text == "" {
-				line.Text = args[1]
+				line.Text = args[len(args)-1]
 			}
 		}
 		conn.in <- line
