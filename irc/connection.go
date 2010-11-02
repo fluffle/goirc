@@ -222,9 +222,13 @@ func (conn *Conn) recv() {
 		if len(args) > 1 {
 			line.Args = args[1:len(args)]
 			// some servers (Gamesurge) don't use : properly
+			// so duplicate Args[0] into Text
 			if line.Text == "" {
 				line.Text = args[len(args)-1]
 			}
+		} else {
+			// now duplicate Text into Args[0] if no args
+			line.Args = []string{line.Text}
 		}
 		conn.in <- line
 	}

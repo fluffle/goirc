@@ -186,12 +186,15 @@ func (conn *Conn) setupEvents() {
 
 	// Handle PARTs from channels to maintain state
 	conn.AddHandler("PART", func(conn *Conn, line *Line) {
-		ch := conn.GetChannel(line.Args[0])
+		var ch *Channel
+		if len(line.Args) > 0 {
+			ch = conn.GetChannel(line.Args[0])
+		}
 		n := conn.GetNick(line.Nick)
 		if ch != nil && n != nil {
 			ch.DelNick(n)
 		} else {
-			conn.error("irc.PART(): buh? PART of channel %s by nick %s", line.Args[0], line.Nick)
+			conn.error("irc.PART(): buh? %s", line.Raw)
 		}
 	})
 
