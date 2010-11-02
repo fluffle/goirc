@@ -17,6 +17,7 @@ type Conn struct {
 	// Connection Hostname and Nickname
 	Host string
 	Me   *Nick
+	Network string
 
 	// I/O stuff to server
 	sock      net.Conn
@@ -33,6 +34,8 @@ type Conn struct {
 
 	// Set this to true to disable flood protection and false to re-enable
 	Flood bool
+
+	Debug bool
 
 	// Event handler mapping
 	events map[string][]func(*Conn, *Line)
@@ -163,7 +166,9 @@ func (conn *Conn) send() {
 			break
 		}
 		conn.io.Flush()
-		fmt.Println("-> " + line)
+		if conn.Debug {
+			fmt.Println("-> " + line)
+		}
 	}
 }
 
@@ -177,7 +182,9 @@ func (conn *Conn) recv() {
 			break
 		}
 		s = strings.Trim(s, "\r\n")
-		fmt.Println("<- " + s)
+		if conn.Debug {
+			fmt.Println("<- " + s)
+		}
 
 		line := &Line{Raw: s}
 		if s[0] == ':' {
