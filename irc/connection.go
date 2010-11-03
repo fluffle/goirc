@@ -133,10 +133,14 @@ func (conn *Conn) Connect(host string, ssl bool, pass ...string) os.Error {
 }
 
 // dispatch a nicely formatted os.Error to the error channel
-func (conn *Conn) error(s string, a ...interface{}) { conn.Err <- os.NewError(fmt.Sprintf(s, a)) }
+func (conn *Conn) error(s string, a ...interface{}) {
+	conn.Err <- os.NewError(fmt.Sprintf(s, a...))
+}
 
 // copied from http.client for great justice
-func hasPort(s string) bool { return strings.LastIndex(s, ":") > strings.LastIndex(s, "]") }
+func hasPort(s string) bool {
+	return strings.LastIndex(s, ":") > strings.LastIndex(s, "]")
+}
 
 // dispatch input from channel as \r\n terminated line to peer
 // flood controlled using hybrid's algorithm if conn.Flood is true
@@ -216,7 +220,7 @@ func (conn *Conn) recv() {
 		if len(args) > 1 {
 			line.Text = args[1]
 		}
-		args = strings.Split(args[0], " ", -1)
+		args = strings.Fields(args[0])
 		line.Cmd = strings.ToUpper(args[0])
 		if len(args) > 1 {
 			line.Args = args[1:len(args)]
