@@ -25,8 +25,9 @@ type Conn struct {
 	out       chan string
 	connected bool
 
-    // Are we connecting via SSL?
+	// Are we connecting via SSL? Do we care about certificate validity?
 	SSL bool
+	SSLConfig *tls.Config
 
 	// Error channel to transmit any fail back to the user
 	Err chan os.Error
@@ -74,6 +75,8 @@ func (conn *Conn) initialise() {
 	conn.in = make(chan *Line, 32)
 	conn.out = make(chan string, 32)
 	conn.Err = make(chan os.Error, 4)
+	conn.SSL = false
+	conn.SSLConfig = nil
 	conn.io = nil
 	conn.sock = nil
 
@@ -86,36 +89,47 @@ func (conn *Conn) initialise() {
 
 // Connect the IRC connection object to "host[:port]" which should be either
 // a hostname or an IP address, with an optional port. To enable explicit SSL
-// on the connection to the IRC server, set ssl to true. The port will default
-// to 6697 if ssl is enabled, and 6667 otherwise. You can also provide an
-// optional connect password.
-func (conn *Conn) Connect(host string, ssl bool, pass ...string) os.Error {
+// on the connection to the IRC server, set Conn.SSL to true before calling
+// Connect(). The port will default to 6697 if ssl is enabled, and 6667
+// otherwise. You can also provide an optional connect password.
+func (conn *Conn) Connect(host string, pass ...string) os.Error {
 	if conn.connected {
-		return os.NewError(fmt.Sprintf("irc.Connect(): already connected to %s, cannot connect to %s", conn.Host, host))
+		return os.NewError(fmt.Sprintf(
+		  "irc.Connect(): already connected to %s, cannot connect to %s",
+		  conn.Host, host))
 	}
-	if !hasPort(host) {
-		if ssl {
+
+	if conn.SSL {
+		if !hasPort(host) {
 			host += ":6697"
+		}
+		// It's unfortunate that tls.Dial doesn't allow a tls.Config arg,
+		// so we simply replicate it here with the correct Config.
+		// http://codereview.appspot.com/2883041
+		if s, err := net.Dial("tcp", "", host); err == nil {
+			// Passing nil config => certs are validated.
+			c := tls.Client(s, conn.SSLConfig)
+			if err = c.Handshake(); err == nil {
+				conn.sock = c
+			} else {
+				s.Close()
+				return err
+			}
 		} else {
+			return err
+		}
+	} else {
+		if !hasPort(host) {
 			host += ":6667"
+		}
+		if s, err := net.Dial("tcp", "", host); err == nil {
+			conn.sock = s
+		} else {
+			return err
 		}
 	}
 
-	var sock net.Conn;
-	var err os.Error;
-	if ssl {
-		sock, err = tls.Dial("tcp", "", host)
-	} else {
-		sock, err = net.Dial("tcp", "", host)
-	}
-	if err != nil {
-		return err
-	}
-
 	conn.Host = host
-	conn.SSL = ssl
-	conn.sock = sock
-
 	conn.io = bufio.NewReadWriter(
 		bufio.NewReader(conn.sock),
 		bufio.NewWriter(conn.sock))
