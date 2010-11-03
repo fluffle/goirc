@@ -5,7 +5,6 @@ import (
 	"os"
 	"net"
 	"crypto/tls"
-	"crypto/rand"
 	"fmt"
 	"strings"
 	"time"
@@ -102,12 +101,15 @@ func (conn *Conn) Connect(host string, ssl bool, pass ...string) os.Error {
 		}
 	}
 
-	sock, err := net.Dial("tcp", "", host)
+	var sock net.Conn;
+	var err os.Error;
+	if ssl {
+		sock, err = tls.Dial("tcp", "", host)
+	} else {
+		sock, err = net.Dial("tcp", "", host)
+	}
 	if err != nil {
 		return err
-	}
-	if ssl {
-		sock = tls.Client(sock, &tls.Config{Rand: rand.Reader, Time: time.Nanoseconds})
 	}
 
 	conn.Host = host
