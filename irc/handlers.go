@@ -146,7 +146,16 @@ func (conn *Conn) setupEvents() {
 
 	// Handle JOINs to channels to maintain state
 	conn.AddHandler("JOIN", func(conn *Conn, line *Line) {
-		ch := conn.GetChannel(line.Text)
+		// Some IRCds (ircu) send ':n!u@h JOIN #chan' not ':n!u@h JOIN :#chan'
+		// Unfortunately the RFCs aren't specific about this. In fact the
+		// examples indicate no colon should be sent, but it's unusual.
+		var chname string
+		if len(line.Text) > 0 {
+			chname = line.Text
+		} else if len(line.Args) > 0 {
+			chname = line.Args[0]
+		}
+		ch := conn.GetChannel(chname)
 		n := conn.GetNick(line.Nick)
 		if ch == nil {
 			// first we've seen of this channel, so should be us joining it
@@ -155,7 +164,7 @@ func (conn *Conn) setupEvents() {
 				conn.error("irc.JOIN(): buh? JOIN to unknown channel %s recieved from (non-me) nick %s", line.Text, line.Nick)
 				return
 			}
-			ch = conn.NewChannel(line.Text)
+			ch = conn.NewChannel(chname)
 			// since we don't know much about this channel, ask server for info
 			// we get the channel users automatically in 353 and the channel
 			// topic in 332 on join, so we just need to get the modes
@@ -176,12 +185,20 @@ func (conn *Conn) setupEvents() {
 
 	// Handle PARTs from channels to maintain state
 	conn.AddHandler("PART", func(conn *Conn, line *Line) {
-		ch := conn.GetChannel(line.Args[0])
+		// Some IRCds (ircu) send 'PART :#chan' when there's no part message
+		// instead of 'PART #chan'. This is *questionable* behaviour...
+		var chname string
+		if len(line.Args) > 0 {
+			chname = line.Args[0]
+		} else if len(line.Text) > 0 {
+			chname = line.Text
+		}
+		ch := conn.GetChannel(chname)
 		n := conn.GetNick(line.Nick)
 		if ch != nil && n != nil {
 			ch.DelNick(n)
 		} else {
-			conn.error("irc.PART(): buh? PART of channel %s by nick %s", line.Args[0], line.Nick)
+			conn.error("irc.PART(): buh? PART of channel %s by nick %s", chname, line.Nick)
 		}
 	})
 
