@@ -1,5 +1,7 @@
 package irc
 
+import "strings"
+
 // this file contains the various commands you can
 // send to the server using an Conn connection
 
@@ -27,7 +29,7 @@ func (conn *Conn) Join(channel string) { conn.out <- "JOIN "+channel }
 
 // Part() sends a PART command to the server with an optional part message
 func (conn *Conn) Part(channel string, message ...string) {
-	msg := getStringMsg(message)
+	msg := strings.Join(message, " ")
 	if msg != "" {
 		msg = " :" + msg
 	}
@@ -36,7 +38,7 @@ func (conn *Conn) Part(channel string, message ...string) {
 
 // Kick() sends a KICK command to remove a nick from a channel
 func (conn *Conn) Kick(channel, nick string, message ...string) {
-	msg := getStringMsg(message)
+	msg := strings.Join(message, " ")
 	if msg != "" {
 		msg = " :" + msg
 	}
@@ -45,7 +47,7 @@ func (conn *Conn) Kick(channel, nick string, message ...string) {
 
 // Quit() sends a QUIT command to the server with an optional quit message
 func (conn *Conn) Quit(message ...string) {
-	msg := getStringMsg(message)
+	msg := strings.Join(message, " ")
 	if msg == "" {
 		msg = "GoBye!"
 	}
@@ -67,7 +69,7 @@ func (conn *Conn) Notice(t, msg string) { conn.out <- "NOTICE "+t+" :"+msg }
 // Ctcp() sends a (generic) CTCP message to the target t
 // with an optional argument
 func (conn *Conn) Ctcp(t, ctcp string, arg ...string) {
-	msg := getStringMsg(arg)
+	msg := strings.Join(arg, " ")
 	if msg != "" {
 		msg = " " + msg
 	}
@@ -77,7 +79,7 @@ func (conn *Conn) Ctcp(t, ctcp string, arg ...string) {
 // CtcpReply() sends a generic CTCP reply to the target t
 // with an optional argument
 func (conn *Conn) CtcpReply(t, ctcp string, arg ...string) {
-	msg := getStringMsg(arg)
+	msg := strings.Join(arg, " ")
 	if msg != "" {
 		msg = " " + msg
 	}
@@ -94,7 +96,7 @@ func (conn *Conn) Action(t, msg string) { conn.Ctcp(t, "ACTION", msg) }
 //   Topic(channel) retrieves the current channel topic (see "332" handler)
 //   Topic(channel, topic) sets the topic for the channel
 func (conn *Conn) Topic(channel string, topic ...string) {
-	t := getStringMsg(topic)
+	t := strings.Join(topic, " ")
 	if t != "" {
 		t = " :" + t
 	}
@@ -109,7 +111,7 @@ func (conn *Conn) Topic(channel string, topic ...string) {
 // This means you'll need to do your own mode work. It may be linked in with
 // the state tracking and ChanMode/NickMode/ChanPrivs objects later...
 func (conn *Conn) Mode(t string, modestring ...string) {
-	mode := getStringMsg(modestring)
+	mode := strings.Join(modestring, " ")
 	if mode != "" {
 		mode = " " + mode
 	}
@@ -120,7 +122,7 @@ func (conn *Conn) Mode(t string, modestring ...string) {
 //   Away() resets away status
 //   Away(message) sets away with the given message
 func (conn *Conn) Away(message ...string) {
-	msg := getStringMsg(message)
+	msg := strings.Join(message, " ")
 	if msg != "" {
 		msg = " :"+msg
 	}
@@ -135,11 +137,4 @@ func (conn *Conn) Invite(nick, channel string) {
 // Oper() sends an OPER command to the server
 func (conn *Conn) Oper(user, pass string) {
 	conn.out <- "OPER "+user+" "+pass
-}
-
-func getStringMsg(a ...string) (msg string) {
-	if len(a) > 0 {
-		return a[0]
-	}
-	return ""
 }
