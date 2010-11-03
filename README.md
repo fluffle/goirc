@@ -31,7 +31,7 @@ The following is a description of the commands enabled by each flag:
 - `t`: topic appendtopic
 - `s`: say
 
-In addition, a user must have at least one flag to use `flags` (so users without access can't spam the bot).
+In addition, a user must have at least one flag to use `flags` and `list` (so users without access can't spam the bot).
 
 ### Commands
 
@@ -45,6 +45,7 @@ Access related commands:
 - `remove raylu t`: removes the t flag from raylu
 - `remove raylu`: removes all of raylu's flags
 - `say text`: says text to the channel
+- `list`: lists all users and their access
 
 Op commands:
 

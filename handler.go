@@ -14,6 +14,7 @@ var commands = map [string]func(*irc.Conn, *irc.Nick, string, string) {
 	"flags": flags,
 	"add": add,
 	"remove": remove,
+	"list": accesslist,
 	"say": csay,
 
 	// op

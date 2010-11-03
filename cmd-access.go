@@ -77,6 +77,31 @@ func flags(conn *irc.Conn, nick *irc.Nick, args, target string) {
 	}
 }
 
+func accesslist(conn *irc.Conn, nick *irc.Nick, args, target string) {
+	channel, args := parseAccess(conn, nick, target, args, "")
+	if channel == "" {
+		return
+	}
+
+	owner, err := auth.String(conn.Network, "owner")
+	if err != nil {
+		say(conn, nick.Nick, "%s is the owner", owner)
+	}
+
+	section := conn.Network + " " + channel
+	users, err := auth.Options(section)
+	if err != nil {
+		say(conn, nick.Nick, "%s: Error while getting users")
+		return
+	}
+	for _, u := range users {
+		flags, err := auth.String(section, u)
+		if err == nil {
+			say(conn, nick.Nick, "%s: %s", u, flags)
+		}
+	}
+}
+
 func csay(conn *irc.Conn, nick *irc.Nick, args, target string) {
 	channel, args := parseAccess(conn, nick, target, args, "s")
 	if channel != "" {
