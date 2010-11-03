@@ -24,17 +24,7 @@ import (
 func (conn *Conn) AddHandler(name string, f func(*Conn, *Line)) {
 	n := strings.ToUpper(name)
 	if e, ok := conn.events[n]; ok {
-		if len(e) == cap(e) {
-			// crap, we're full. expand e by another 10 handler slots
-			ne := make([]func(*Conn, *Line), len(e), len(e)+10)
-			for i := 0; i < len(e); i++ {
-				ne[i] = e[i]
-			}
-			e = ne
-		}
-		e = e[0 : len(e)+1]
-		e[len(e)-1] = f
-		conn.events[n] = e
+		conn.events[n] = append(e, f)
 	} else {
 		e := make([]func(*Conn, *Line), 1, 10)
 		e[0] = f
