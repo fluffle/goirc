@@ -22,8 +22,12 @@ Synopsis:
     import "irc"
     func main() {
         c := irc.New("nick", "ident", "real name")
+        // Optionally, turn on debugging
+        c.Debug = true
+        // Optionally, enable SSL
+        c.SSL = true
         // add handlers to do things here!
-	    if err := c.Connect("irc.freenode.net", ""); err != nil {
+	    if err := c.Connect("irc.freenode.net"); err != nil {
 		    fmt.Printf("Connection error: %s\n", err.String())
 	    }
         for {
@@ -58,5 +62,5 @@ indebted to Matt Gruen for his work on
 the re-organisation and channel-based communication structure of `*Conn.send()`
 and `*Conn.recv()`. I'm sure things could be more asynchronous, still.
 
-This code is (c) 2009 Alex Bramley, and released under the same licence terms
+This code is (c) 2009-10 Alex Bramley, and released under the same licence terms
 as Go itself.
