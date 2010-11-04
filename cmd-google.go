@@ -91,7 +91,7 @@ func roman(conn *irc.Conn, nick *irc.Nick, args, target string) {
 		return
 	}
 
-	var sourcelang, targetlang string;
+	var sourcelang, targetlang string
 	if utf8.NewString(args).IsASCII() {
 		sourcelang = "en"
 	} else {
@@ -168,6 +168,6 @@ func calc(conn *irc.Conn, nick *irc.Nick, args, target string) {
 	if err != nil {
 		say(conn, target, "%s: Error while decoding.", nick.Nick); return
 	}
-	output = html.UnescapeString(output)
+	output = html.UnescapeString(output) // see go issue 1233
 	say(conn, target, output)
 }
