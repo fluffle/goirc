@@ -6,6 +6,8 @@ package irc
 import (
 	"fmt"
 	"reflect"
+	"strconv"
+	"strings"
 )
 
 // A struct representing an IRC channel
@@ -95,6 +97,113 @@ func (conn *Conn) GetChannel(c string) *Channel {
 		return ch
 	}
 	return nil
+}
+
+// Parses mode strings for a channel
+func (conn *Conn) ParseChannelModes(ch *Channel, modes string, modeargs []string) {
+	var modeop bool // true => add mode, false => remove mode
+	var modestr string
+	for i := 0; i < len(modes); i++ {
+		switch m := modes[i]; m {
+		case '+':
+			modeop = true
+			modestr = string(m)
+		case '-':
+			modeop = false
+			modestr = string(m)
+		case 'i':
+			ch.Modes.InviteOnly = modeop
+		case 'm':
+			ch.Modes.Moderated = modeop
+		case 'n':
+			ch.Modes.NoExternalMsg = modeop
+		case 'p':
+			ch.Modes.Private = modeop
+		case 's':
+			ch.Modes.Secret = modeop
+		case 't':
+			ch.Modes.ProtectedTopic = modeop
+		case 'z':
+			ch.Modes.SSLOnly = modeop
+		case 'O':
+			ch.Modes.OperOnly = modeop
+		case 'k':
+			if len(modeargs) != 0 {
+				ch.Modes.Key, modeargs = modeargs[0], modeargs[1:len(modeargs)]
+			} else {
+				conn.error("irc.ParseChanModes(): buh? not enough arguments to process MODE %s %s%s", ch.Name, modestr, m)
+			}
+		case 'l':
+			if len(modeargs) != 0 {
+				ch.Modes.Limit, _ = strconv.Atoi(modeargs[0])
+				modeargs = modeargs[1:len(modeargs)]
+			} else {
+				conn.error("irc.ParseChanModes(): buh? not enough arguments to process MODE %s %s%s", ch.Name, modestr, m)
+			}
+		case 'q', 'a', 'o', 'h', 'v':
+			if len(modeargs) != 0 {
+				n := conn.GetNick(modeargs[0])
+				if p, ok := ch.Nicks[n]; ok && n != nil {
+					switch m {
+					case 'q':
+						p.Owner = modeop
+					case 'a':
+						p.Admin = modeop
+					case 'o':
+						p.Op = modeop
+					case 'h':
+						p.HalfOp = modeop
+					case 'v':
+						p.Voice = modeop
+					}
+					modeargs = modeargs[1:len(modeargs)]
+				} else {
+					conn.error("irc.ParseChanModes(): MODE %s %s%s %s: buh? state tracking failure.", ch.Name, modestr, m, modeargs[0])
+				}
+			} else {
+				conn.error("irc.ParseChanModes(): buh? not enough arguments to process MODE %s %s%s", ch.Name, modestr, m)
+			}
+		case 'b':
+			if len(modeargs) != 0 {
+				// we only care about host bans
+				if modeop && strings.HasPrefix(modeargs[0], "*!*@") {
+					for n, _ := range ch.Nicks {
+						if modeargs[0][4:] == n.Host {
+							ch.AddBan(n.Nick, modeargs[0])
+						}
+					}
+				} else if !modeop {
+					ch.DeleteBan(modeargs[0])
+				}
+				modeargs = modeargs[1:len(modeargs)]
+			} else {
+				conn.error("irc.MODE(): buh? not enough arguments to process MODE %s %s%s", ch.Name, modestr, m)
+			}
+		}
+	}
+}
+
+// Parse mode strings for a nick 
+func (conn *Conn) ParseNickModes(n *Nick, modes string) {
+	var modeop bool // true => add mode, false => remove mode
+	for i := 0; i < len(modes); i++ {
+		switch m := modes[i]; m {
+		case '+':
+			modeop = true
+		case '-':
+			modeop = false
+		case 'i':
+			n.Modes.Invisible = modeop
+		case 'o':
+			n.Modes.Oper = modeop
+		case 'w':
+			n.Modes.WallOps = modeop
+		case 'x':
+			n.Modes.HiddenHost = modeop
+		case 'z':
+			n.Modes.SSL = modeop
+		}
+	}
 }
 
 /******************************************************************************\
@@ -217,44 +326,44 @@ func (n *Nick) Delete() {
 
 // Map *irc.ChanMode fields to IRC mode characters
 var ChanModeToString = map[string]string{
-	"Private": "p",
-	"Secret": "s",
+	"Private":        "p",
+	"Secret":         "s",
 	"ProtectedTopic": "t",
-	"NoExternalMsg": "n",
-	"Moderated": "m",
-	"InviteOnly": "i",
-	"OperOnly": "O",
-	"SSLOnly": "z",
-	"Key": "k",
-	"Limit": "l",
+	"NoExternalMsg":  "n",
+	"Moderated":      "m",
+	"InviteOnly":     "i",
+	"OperOnly":       "O",
+	"SSLOnly":        "z",
+	"Key":            "k",
+	"Limit":          "l",
 }
 
 // Map *irc.NickMode fields to IRC mode characters
 var NickModeToString = map[string]string{
-	"Invisible": "i",
-	"Oper": "o",
-	"WallOps": "w",
+	"Invisible":  "i",
+	"Oper":       "o",
+	"WallOps":    "w",
 	"HiddenHost": "x",
-	"SSL": "z",
+	"SSL":        "z",
 }
 
 // Map *irc.ChanPrivs fields to IRC mode characters
 var ChanPrivToString = map[string]string{
-	"Owner": "q",
-	"Admin": "a",
-	"Op": "o",
+	"Owner":  "q",
+	"Admin":  "a",
+	"Op":     "o",
 	"HalfOp": "h",
-	"Voice": "v",
+	"Voice":  "v",
 }
 
 // Map *irc.ChanPrivs fields to the symbols used to represent these modes
 // in NAMES and WHOIS responses
 var ChanPrivToModeChar = map[string]byte{
-	"Owner": '~',
-	"Admin": '&',
-	"Op": '@',
+	"Owner":  '~',
+	"Admin":  '&',
+	"Op":     '@',
 	"HalfOp": '%',
-	"Voice": '+',
+	"Voice":  '+',
 }
 
 // Reverse mappings of the above datastructures
@@ -340,7 +449,7 @@ func (cm *ChanMode) String() string {
 		case *reflect.IntValue:
 			if f.Get() != 0 {
 				str += ChanModeToString[t.Field(i).Name]
-				a[1] = fmt.Sprintf("%d", cm.Limit)
+				a[1] = fmt.Sprintf("%d", f.Get())
 			}
 		}
 	}

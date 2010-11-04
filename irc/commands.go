@@ -1,8 +1,9 @@
 package irc
 
+import "strings"
+
 // this file contains the various commands you can
 // send to the server using an Conn connection
-
 
 // This could be a lot less ugly with the ability to manipulate
 // the symbol table and add methods/functions on the fly
@@ -27,8 +28,8 @@ func (conn *Conn) User(ident, name string) {
 func (conn *Conn) Join(channel string) { conn.out <- "JOIN "+channel }
 
 // Part() sends a PART command to the server with an optional part message
-func (conn *Conn) Part(channel string, message string) {
-	msg := message
+func (conn *Conn) Part(channel string, message ...string) {
+	msg := strings.Join(message, " ")
 	if msg != "" {
 		msg = " :" + msg
 	}
@@ -36,8 +37,8 @@ func (conn *Conn) Part(channel string, message string) {
 }
 
 // Kick() sends a KICK command to remove a nick from a channel
-func (conn *Conn) Kick(channel, nick string, message string) {
-	msg := message
+func (conn *Conn) Kick(channel, nick string, message ...string) {
+	msg := strings.Join(message, " ")
 	if msg != "" {
 		msg = " :" + msg
 	}
@@ -45,8 +46,8 @@ func (conn *Conn) Kick(channel, nick string, message string) {
 }
 
 // Quit() sends a QUIT command to the server with an optional quit message
-func (conn *Conn) Quit(message string) {
-	msg := message
+func (conn *Conn) Quit(message ...string) {
+	msg := strings.Join(message, " ")
 	if msg == "" {
 		msg = "GoBye!"
 	}
@@ -67,8 +68,8 @@ func (conn *Conn) Notice(t, msg string) { conn.out <- "NOTICE "+t+" :"+msg }
 
 // Ctcp() sends a (generic) CTCP message to the target t
 // with an optional argument
-func (conn *Conn) Ctcp(t, ctcp,arg string) {
-	msg := arg
+func (conn *Conn) Ctcp(t, ctcp string, arg ...string) {
+	msg := strings.Join(arg, " ")
 	if msg != "" {
 		msg = " " + msg
 	}
@@ -77,8 +78,8 @@ func (conn *Conn) Ctcp(t, ctcp,arg string) {
 
 // CtcpReply() sends a generic CTCP reply to the target t
 // with an optional argument
-func (conn *Conn) CtcpReply(t, ctcp string, arg string) {
-	msg := arg
+func (conn *Conn) CtcpReply(t, ctcp string, arg ...string) {
+	msg := strings.Join(arg, " ")
 	if msg != "" {
 		msg = " " + msg
 	}
@@ -86,7 +87,7 @@ func (conn *Conn) CtcpReply(t, ctcp string, arg string) {
 }
 
 // Version() sends a CTCP "VERSION" to the target t
-func (conn *Conn) Version(t string) { conn.Ctcp(t, "VERSION","") }
+func (conn *Conn) Version(t string) { conn.Ctcp(t, "VERSION") }
 
 // Action() sends a CTCP "ACTION" to the target t
 func (conn *Conn) Action(t, msg string) { conn.Ctcp(t, "ACTION", msg) }
@@ -94,8 +95,8 @@ func (conn *Conn) Action(t, msg string) { conn.Ctcp(t, "ACTION", msg) }
 // Topic() sends a TOPIC command to the channel
 //   Topic(channel) retrieves the current channel topic (see "332" handler)
 //   Topic(channel, topic) sets the topic for the channel
-func (conn *Conn) Topic(channel string, topic string) {
-	t := topic
+func (conn *Conn) Topic(channel string, topic ...string) {
+	t := strings.Join(topic, " ")
 	if t != "" {
 		t = " :" + t
 	}
@@ -109,8 +110,8 @@ func (conn *Conn) Topic(channel string, topic string) {
 //     modestring == e.g. "+o <nick>" or "+ntk <key>" or "-is"
 // This means you'll need to do your own mode work. It may be linked in with
 // the state tracking and ChanMode/NickMode/ChanPrivs objects later...
-func (conn *Conn) Mode(t string, modestring string) {
-	mode := modestring
+func (conn *Conn) Mode(t string, modestring ...string) {
+	mode := strings.Join(modestring, " ")
 	if mode != "" {
 		mode = " " + mode
 	}
@@ -120,10 +121,10 @@ func (conn *Conn) Mode(t string, modestring string) {
 // Away() sends an AWAY command to the server
 //   Away() resets away status
 //   Away(message) sets away with the given message
-func (conn *Conn) Away(message string) {
-	msg := message
+func (conn *Conn) Away(message ...string) {
+	msg := strings.Join(message, " ")
 	if msg != "" {
-		msg = " :"+msg
+		msg = " :" + msg
 	}
 	conn.out <- "AWAY"+msg
 }
@@ -137,4 +138,3 @@ func (conn *Conn) Invite(nick, channel string) {
 func (conn *Conn) Oper(user, pass string) {
 	conn.out <- "OPER "+user+" "+pass
 }
-

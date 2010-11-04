@@ -12,4 +12,3 @@ func TestIRC(t *testing.T) {
 		t.FailNow()
 	}
 }
-
