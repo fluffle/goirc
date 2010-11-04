@@ -68,18 +68,19 @@ Op commands:
 - `topic text`: sets the topic and basetopic to text
 - `topic`: gets the current basetopic
 - `appendtopic text`: if the topic does not starts with basetopic, sets the basetopic to the current topic. Makes the topic basetopic+text.
+- `part`: leaves the channel
 
 Google API commands:
 
 - `tr text`: detect the language of text
 - `tr en|ja en|es text`: translate text into Japanese and Spanish
-- `calc 2-1 usd in yen`: convert 1 USD to Japanese yen
+- `calc 1 usd in yen`: convert 1 USD to Japanese yen
 
 Commands that don't require access behave the same when sent to a channel the bot is in and when whispered to the bot.
 
 Commands that require access are listed above as if they were sent to a channel. When sent as a whisper, the first argument must be a channel name.
 
-The bot will accept invites from the owner to any channel.
+The bot will accept invites from the owner to any channel and only the owner can use `part`.
 
 ### Miscellaneous
 

@@ -241,3 +241,14 @@ func appendtopic(conn *irc.Conn, nick *irc.Nick, args, target string) {
 	}
 	conn.Topic(channel, basetopic + args)
 }
+
+func part(conn *irc.Conn, nick *irc.Nick, args, target string) {
+	channel, args := parseChannel(target, args)
+	if channel == "" {
+		return
+	}
+	user := user(nick)
+	if owner, _ := auth.String(conn.Network, "owner"); owner == user {
+		conn.Part(channel, "")
+	}
+}

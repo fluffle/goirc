@@ -35,6 +35,7 @@ var commands = map [string]func(*irc.Conn, *irc.Nick, string, string) {
 	"kb": kickban,
 	"topic": topic,
 	"appendtopic": appendtopic,
+	"part": part,
 
 	// google
 	"tr": translate,
