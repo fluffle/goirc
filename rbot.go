@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
+	"crypto/tls"
+	"crypto/rand"
 	"github.com/kless/goconfig/config"
 )
 
@@ -36,11 +39,16 @@ func connect(network string) {
 	server := readConfString(network, "server")
 	nick := readConfString(network, "nick")
 	user := readConfString(network, "user")
-	ssl := readConfBool(network, "ssl")
 	nickserv, _ := conf.String(network, "nickserv")
 
 	c := irc.New(nick, user, user)
 	c.Network = network
+	c.SSL = readConfBool(network, "ssl")
+	if c.SSL {
+		// we don't care about certificate validity
+		c.SSLConfig = &tls.Config{Rand: rand.Reader, Time: time.Nanoseconds}
+	}
+
 	c.AddHandler("connected",
 		func(conn *irc.Conn, line *irc.Line) {
 			fmt.Printf("Connected to %s!\n", conn.Host)
@@ -58,7 +66,7 @@ func connect(network string) {
 
 	for {
 		fmt.Printf("Connecting to %s...\n", server)
-		if err := c.Connect(server, ssl, ""); err != nil {
+		if err := c.Connect(server); err != nil {
 			fmt.Printf("Connection error: %s\n", err)
 			break
 		}
