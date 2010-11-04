@@ -326,7 +326,7 @@ func (cm *ChanMode) String() string {
 		case *reflect.IntValue:
 			if f.Get() != 0 {
 				str += ChanModeToString[t.Field(i).Name]
-				a[1] = fmt.Sprintf("%d", cm.Limit)
+				a[1] = fmt.Sprintf("%d", f.Get())
 			}
 		}
 	}
