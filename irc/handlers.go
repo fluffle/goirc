@@ -3,10 +3,7 @@ package irc
 // this file contains the basic set of event handlers
 // to manage tracking an irc connection etc.
 
-import (
-	"strings"
-	"strconv"
-)
+import "strings"
 
 // AddHandler() adds an event handler for a specific IRC command.
 //
@@ -214,100 +211,17 @@ func (conn *Conn) h_QUIT(line *Line) {
 }
 
 // Handle MODE changes for channels we know about (and our nick personally)
-// this is moderately ugly. suggestions for improvement welcome
 func (conn *Conn) h_MODE(line *Line) {
 	// channel modes first
 	if ch := conn.GetChannel(line.Args[0]); ch != nil {
-		modeargs := line.Args[2:len(line.Args)]
-		var modeop bool // true => add mode, false => remove mode
-		var modestr string
-		for i := 0; i < len(line.Args[1]); i++ {
-			switch m := line.Args[1][i]; m {
-			case '+':
-				modeop = true
-				modestr = string(m)
-			case '-':
-				modeop = false
-				modestr = string(m)
-			case 'i':
-				ch.Modes.InviteOnly = modeop
-			case 'm':
-				ch.Modes.Moderated = modeop
-			case 'n':
-				ch.Modes.NoExternalMsg = modeop
-			case 'p':
-				ch.Modes.Private = modeop
-			case 's':
-				ch.Modes.Secret = modeop
-			case 't':
-				ch.Modes.ProtectedTopic = modeop
-			case 'z':
-				ch.Modes.SSLOnly = modeop
-			case 'O':
-				ch.Modes.OperOnly = modeop
-			case 'k':
-				if len(modeargs) != 0 {
-					ch.Modes.Key, modeargs = modeargs[0], modeargs[1:len(modeargs)]
-				} else {
-					conn.error("irc.MODE(): buh? not enough arguments to process MODE %s %s%s", ch.Name, modestr, m)
-				}
-			case 'l':
-				if len(modeargs) != 0 {
-					ch.Modes.Limit, _ = strconv.Atoi(modeargs[0])
-					modeargs = modeargs[1:len(modeargs)]
-				} else {
-					conn.error("irc.MODE(): buh? not enough arguments to process MODE %s %s%s", ch.Name, modestr, m)
-				}
-			case 'q', 'a', 'o', 'h', 'v':
-				if len(modeargs) != 0 {
-					n := conn.GetNick(modeargs[0])
-					if p, ok := ch.Nicks[n]; ok && n != nil {
-						switch m {
-						case 'q':
-							p.Owner = modeop
-						case 'a':
-							p.Admin = modeop
-						case 'o':
-							p.Op = modeop
-						case 'h':
-							p.HalfOp = modeop
-						case 'v':
-							p.Voice = modeop
-						}
-						modeargs = modeargs[1:len(modeargs)]
-					} else {
-						conn.error("irc.MODE(): MODE %s %s%s %s: buh? state tracking failure.", ch.Name, modestr, m, modeargs[0])
-					}
-				} else {
-					conn.error("irc.MODE(): buh? not enough arguments to process MODE %s %s%s", ch.Name, modestr, m)
-				}
-			}
-		}
+		conn.ParseChannelModes(ch, line.Args[1], line.Args[2:len(line.Args)])
 	} else if n := conn.GetNick(line.Args[0]); n != nil {
 		// nick mode change, should be us
 		if n != conn.Me {
 			conn.error("irc.MODE(): buh? recieved MODE %s for (non-me) nick %s", line.Text, n.Nick)
 			return
 		}
-		var modeop bool // true => add mode, false => remove mode
-		for i := 0; i < len(line.Text); i++ {
-			switch m := line.Text[i]; m {
-			case '+':
-				modeop = true
-			case '-':
-				modeop = false
-			case 'i':
-				n.Modes.Invisible = modeop
-			case 'o':
-				n.Modes.Oper = modeop
-			case 'w':
-				n.Modes.WallOps = modeop
-			case 'x':
-				n.Modes.HiddenHost = modeop
-			case 'z':
-				n.Modes.SSL = modeop
-			}
-		}
+		conn.ParseNickModes(n, line.Text)
 	} else {
 		if line.Text != "" {
 			conn.error("irc.MODE(): buh? not sure what to do with nick MODE %s %s", line.Args[0], line.Text)
@@ -341,48 +255,7 @@ func (conn *Conn) h_311(line *Line) {
 func (conn *Conn) h_324(line *Line) {
 	// XXX: copypasta from MODE, needs tidying.
 	if ch := conn.GetChannel(line.Args[1]); ch != nil {
-		modeargs := line.Args[3:len(line.Args)]
-		var modeop bool // true => add mode, false => remove mode
-		var modestr string
-		for i := 0; i < len(line.Args[2]); i++ {
-			switch m := line.Args[2][i]; m {
-			case '+':
-				modeop = true
-				modestr = string(m)
-			case '-':
-				modeop = false
-				modestr = string(m)
-			case 'i':
-				ch.Modes.InviteOnly = modeop
-			case 'm':
-				ch.Modes.Moderated = modeop
-			case 'n':
-				ch.Modes.NoExternalMsg = modeop
-			case 'p':
-				ch.Modes.Private = modeop
-			case 's':
-				ch.Modes.Secret = modeop
-			case 't':
-				ch.Modes.ProtectedTopic = modeop
-			case 'z':
-				ch.Modes.SSLOnly = modeop
-			case 'O':
-				ch.Modes.OperOnly = modeop
-			case 'k':
-				if len(modeargs) != 0 {
-					ch.Modes.Key, modeargs = modeargs[0], modeargs[1:len(modeargs)]
-				} else {
-					conn.error("irc.324(): buh? not enough arguments to process MODE %s %s%s", ch.Name, modestr, m)
-				}
-			case 'l':
-				if len(modeargs) != 0 {
-					ch.Modes.Limit, _ = strconv.Atoi(modeargs[0])
-					modeargs = modeargs[1:len(modeargs)]
-				} else {
-					conn.error("irc.324(): buh? not enough arguments to process MODE %s %s%s", ch.Name, modestr, m)
-				}
-			}
-		}
+		conn.ParseChannelModes(ch, line.Args[2], line.Args[3:len(line.Args)])
 	} else {
 		conn.error("irc.324(): buh? received MODE settings for unknown channel %s", line.Args[1])
 	}
