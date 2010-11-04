@@ -160,17 +160,25 @@ func unban(conn *irc.Conn, nick *irc.Nick, args, target string) {
 		return
 	}
 
+	ch := conn.GetChannel(channel)
+	if ch == nil {
+		say(conn, target , "%s: Unable to get channel information about %s", nick.Nick, channel)
+		return
+	}
 	bans := strings.TrimSpace(args)
 	split := strings.Fields(bans)
 	for i, ban := range(split) {
 		if strings.Index(ban, "@") != -1 {
+			// it's already a host, do nothing
 			continue
 		}
-		n := conn.GetNick(ban)
-		if n == nil {
-			continue
+		if b, ok := ch.Bans[ban]; ok {
+			// we've seen this nick banned before
+			split[i] = b
+		} else if n := conn.GetNick(ban); n != nil {
+			// the user is in one of our channels, here's our best guess
+			split[i] = "*!*@" + n.Host
 		}
-		split[i] = "*!*@" + n.Host
 	}
 	bans = strings.Join(split, " ")
 	modestring := "-" + strings.Repeat("b", len(bans)) + " " + bans

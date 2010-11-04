@@ -288,6 +288,22 @@ func (conn *Conn) setupEvents() {
 					} else {
 						conn.error("irc.MODE(): buh? not enough arguments to process MODE %s %s%s", ch.Name, modestr, m)
 					}
+				case 'b':
+					if len(modeargs) != 0 {
+						// we only care about host bans
+						if modeop && strings.HasPrefix(modeargs[0], "*!*@") {
+							for n, _ := range ch.Nicks {
+								if modeargs[0][4:] == n.Host {
+									ch.AddBan(n.Nick, modeargs[0])
+								}
+							}
+						} else if !modeop {
+							ch.DeleteBan(modeargs[0])
+						}
+						modeargs = modeargs[1:len(modeargs)]
+					} else {
+						conn.error("irc.MODE(): buh? not enough arguments to process MODE %s %s%s", ch.Name, modestr, m)
+					}
 				}
 			}
 		} else if n := conn.GetNick(line.Args[0]); n != nil {

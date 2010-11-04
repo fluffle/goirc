@@ -13,6 +13,7 @@ type Channel struct {
 	Name, Topic string
 	Modes       *ChanMode
 	Nicks       map[*Nick]*ChanPrivs
+	Bans        map[string]string
 	conn        *Conn
 }
 
@@ -103,6 +104,7 @@ func (conn *Conn) GetChannel(c string) *Channel {
 func (ch *Channel) initialise() {
 	ch.Modes = new(ChanMode)
 	ch.Nicks = make(map[*Nick]*ChanPrivs)
+	ch.Bans = make(map[string]string)
 }
 
 // Associates an *irc.Nick with an *irc.Channel using a shared *irc.ChanPrivs
@@ -130,6 +132,18 @@ func (ch *Channel) DelNick(n *Nick) {
 	} // no else here ...
 	// we call Channel.DelNick() and Nick.DelChan() from each other to ensure
 	// consistency, and this would mean spewing an error message every delete
+}
+
+func (ch *Channel) AddBan(nick, ban string) {
+	ch.Bans[nick] = ban
+}
+
+func (ch *Channel) DeleteBan(ban string) {
+	for n, b := range ch.Bans {
+		if b == ban {
+			ch.Bans[n] = "", false // see go issue 1249
+		}
+	}
 }
 
 // Stops the channel from being tracked by state tracking handlers. Also calls
