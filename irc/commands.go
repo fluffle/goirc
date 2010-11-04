@@ -124,7 +124,7 @@ func (conn *Conn) Mode(t string, modestring ...string) {
 func (conn *Conn) Away(message ...string) {
 	msg := strings.Join(message, " ")
 	if msg != "" {
-		msg = " :"+msg
+		msg = " :" + msg
 	}
 	conn.out <- "AWAY"+msg
 }

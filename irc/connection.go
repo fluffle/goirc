@@ -14,8 +14,8 @@ import (
 // encountered are piped down *Conn.Err; this channel is closed on disconnect.
 type Conn struct {
 	// Connection Hostname and Nickname
-	Host string
-	Me   *Nick
+	Host    string
+	Me      *Nick
 	Network string
 
 	// I/O stuff to server
@@ -26,7 +26,7 @@ type Conn struct {
 	connected bool
 
 	// Are we connecting via SSL? Do we care about certificate validity?
-	SSL bool
+	SSL       bool
 	SSLConfig *tls.Config
 
 	// Error channel to transmit any fail back to the user
@@ -95,8 +95,8 @@ func (conn *Conn) initialise() {
 func (conn *Conn) Connect(host string, pass ...string) os.Error {
 	if conn.connected {
 		return os.NewError(fmt.Sprintf(
-		  "irc.Connect(): already connected to %s, cannot connect to %s",
-		  conn.Host, host))
+			"irc.Connect(): already connected to %s, cannot connect to %s",
+			conn.Host, host))
 	}
 
 	if conn.SSL {
@@ -160,7 +160,7 @@ func hasPort(s string) bool {
 // flood controlled using hybrid's algorithm if conn.Flood is true
 func (conn *Conn) send() {
 	lastsent := time.Nanoseconds()
-	var badness, linetime, second int64 = 0, 0, 1000000000;
+	var badness, linetime, second int64 = 0, 0, 1000000000
 	for line := range conn.out {
 		// Hybrid's algorithm allows for 2 seconds per line and an additional
 		// 1/120 of a second per character on that line.
@@ -245,7 +245,7 @@ func (conn *Conn) recv() {
 
 func (conn *Conn) runLoop() {
 	for line := range conn.in {
-			conn.dispatchEvent(line)
+		conn.dispatchEvent(line)
 	}
 }
 

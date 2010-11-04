@@ -203,44 +203,44 @@ func (n *Nick) Delete() {
 
 // Map *irc.ChanMode fields to IRC mode characters
 var ChanModeToString = map[string]string{
-	"Private": "p",
-	"Secret": "s",
+	"Private":        "p",
+	"Secret":         "s",
 	"ProtectedTopic": "t",
-	"NoExternalMsg": "n",
-	"Moderated": "m",
-	"InviteOnly": "i",
-	"OperOnly": "O",
-	"SSLOnly": "z",
-	"Key": "k",
-	"Limit": "l",
+	"NoExternalMsg":  "n",
+	"Moderated":      "m",
+	"InviteOnly":     "i",
+	"OperOnly":       "O",
+	"SSLOnly":        "z",
+	"Key":            "k",
+	"Limit":          "l",
 }
 
 // Map *irc.NickMode fields to IRC mode characters
 var NickModeToString = map[string]string{
-	"Invisible": "i",
-	"Oper": "o",
-	"WallOps": "w",
+	"Invisible":  "i",
+	"Oper":       "o",
+	"WallOps":    "w",
 	"HiddenHost": "x",
-	"SSL": "z",
+	"SSL":        "z",
 }
 
 // Map *irc.ChanPrivs fields to IRC mode characters
 var ChanPrivToString = map[string]string{
-	"Owner": "q",
-	"Admin": "a",
-	"Op": "o",
+	"Owner":  "q",
+	"Admin":  "a",
+	"Op":     "o",
 	"HalfOp": "h",
-	"Voice": "v",
+	"Voice":  "v",
 }
 
 // Map *irc.ChanPrivs fields to the symbols used to represent these modes
 // in NAMES and WHOIS responses
 var ChanPrivToModeChar = map[string]byte{
-	"Owner": '~',
-	"Admin": '&',
-	"Op": '@',
+	"Owner":  '~',
+	"Admin":  '&',
+	"Op":     '@',
 	"HalfOp": '%',
-	"Voice": '+',
+	"Voice":  '+',
 }
 
 // Reverse mappings of the above datastructures
