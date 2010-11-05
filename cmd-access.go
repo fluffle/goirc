@@ -103,10 +103,3 @@ func accesslist(conn *irc.Conn, nick *irc.Nick, args, target string) {
 		}
 	}
 }
-
-func csay(conn *irc.Conn, nick *irc.Nick, args, target string) {
-	channel, args := parseAccess(conn, nick, target, args, "s")
-	if channel != "" {
-		say(conn, channel, args)
-	}
-}
