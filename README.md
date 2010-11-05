@@ -46,6 +46,7 @@ Access related commands:
 - `remove raylu`: removes all of raylu's flags
 - `say text`: says text to the channel
 - `list`: lists all users and their access
+- `list raylu`: searches the access list for raylu
 
 Op commands:
 

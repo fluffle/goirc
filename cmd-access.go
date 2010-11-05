@@ -84,7 +84,7 @@ func accesslist(conn *irc.Conn, nick *irc.Nick, args, target string) {
 	}
 
 	owner, err := auth.String(conn.Network, "owner")
-	if err != nil {
+	if err == nil && strings.Contains(owner, args)  {
 		say(conn, nick.Nick, "%s is the owner", owner)
 	}
 
@@ -95,9 +95,11 @@ func accesslist(conn *irc.Conn, nick *irc.Nick, args, target string) {
 		return
 	}
 	for _, u := range users {
-		flags, err := auth.String(section, u)
-		if err == nil {
-			say(conn, nick.Nick, "%s: %s", u, flags)
+		if strings.Contains(u, args) {
+			flags, err := auth.String(section, u)
+			if err == nil {
+				say(conn, nick.Nick, "%s: %s", u, flags)
+			}
 		}
 	}
 }
