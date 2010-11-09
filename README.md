@@ -48,6 +48,7 @@ Access related commands:
 - `list raylu`: searches the access list for raylu
 
 Admin commands:
+
 - `nick john`: changes the bot's nick to john
 - `say text`: says text to the channel
 
