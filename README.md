@@ -5,8 +5,7 @@ GoIRC Client Framework
 
 Pretty simple, really:
 
-	git clone git://github.com/fluffle/goirc.git
-	make -C irc install
+	goinstall github.com/fluffle/goirc
 
 You can build the test client also with:
 
@@ -19,7 +18,7 @@ This will connect to freenode and join `#go-nuts` by default, so be careful ;-)
 
 Synopsis:
 
-    import "irc"
+    import irc "github.com/fluffle/goirc/client"
     func main() {
         c := irc.New("nick", "ident", "real name")
         // Optionally, turn on debugging
@@ -41,9 +40,9 @@ Synopsis:
     }
 
 The test client provides a good (if basic) example of how to use the framework.
-Reading `irc/handlers.go` gives a more in-depth look at how handlers can be
+Reading `client/handlers.go` gives a more in-depth look at how handlers can be
 written. Commands to be sent to the server (e.g. PRIVMSG) are methods of the
-main `*irc.Conn` object, and can be found in `irc/commands.go` (not all of the
+main `*Conn` struct, and can be found in `client/commands.go` (not all of the
 possible IRC commands are implemented yet). Events are produced directly from
 the messages from the IRC server, so you have to handle e.g. "332" for
 `RPL_TOPIC` to get the topic for a channel.
