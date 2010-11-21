@@ -1,4 +1,4 @@
-package irc
+package client
 
 // Here you'll find the Channel and Nick structs
 // as well as the internal state maintenance code for the handlers

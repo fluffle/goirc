@@ -4,7 +4,7 @@
 
 include $(GOROOT)/src/Make.inc
 
-TARG=irc
+TARG=github.com/fluffle/goirc/client
 GOFILES=\
 	connection.go\
 	commands.go\

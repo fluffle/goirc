@@ -1,4 +1,4 @@
-package irc
+package client
 
 import "strings"
 

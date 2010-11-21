@@ -1,4 +1,4 @@
-package irc
+package client
 
 // this file contains the basic set of event handlers
 // to manage tracking an irc connection etc.
