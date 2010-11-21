@@ -1,4 +1,5 @@
 /gobot
+/ircd-test
 *.[568]
 _obj/
 _test/
