@@ -37,6 +37,9 @@ type Conn struct {
 
 	Debug bool
 
+	// Function which returns a *time.Time for use as a timestamp
+	Timestamp func() *time.Time
+
 	// Event handler mapping
 	events map[string][]func(*Conn, *Line)
 
@@ -63,6 +66,7 @@ type Line struct {
 // that you can add event handlers to it. See AddHandler() for details.
 func New(nick, user, name string) *Conn {
 	conn := new(Conn)
+	conn.Timestamp = time.LocalTime
 	conn.initialise()
 	conn.Me = conn.NewNick(nick, user, name, "")
 	conn.setupEvents()
@@ -188,7 +192,7 @@ func (conn *Conn) send() {
 		}
 		conn.io.Flush()
 		if conn.Debug {
-			fmt.Println(time.UTC().Format("[15:04:05]") + " -> " + line)
+			fmt.Println(conn.Timestamp().Format("[15:04:05]") + " -> " + line)
 		}
 	}
 }
@@ -197,7 +201,7 @@ func (conn *Conn) send() {
 func (conn *Conn) recv() {
 	for {
 		s, err := conn.io.ReadString('\n')
-		t := time.UTC()
+		t := conn.Timestamp()
 		if err != nil {
 			conn.error("irc.recv(): %s", err.String())
 			conn.shutdown()
