@@ -54,7 +54,7 @@ type Conn struct {
 //   Cmd == e.g. PRIVMSG, 332
 type Line struct {
 	Nick, Ident, Host, Src string
-	Cmd, Text, Raw         string
+	Cmd, Raw               string
 	Args                   []string
 	Time                   *time.Time
 }
@@ -234,9 +234,10 @@ func (conn *Conn) recv() {
 		// s should contain "cmd args[] :text"
 		args := strings.Split(s, " :", 2)
 		if len(args) > 1 {
-			line.Text = args[1]
+			args = append(strings.Fields(args[0]), args[1])
+		} else {
+			args = strings.Fields(args[0])
 		}
-		args = strings.Fields(args[0])
 		line.Cmd = strings.ToUpper(args[0])
 		if len(args) > 1 {
 			line.Args = args[1:len(args)]
