@@ -18,6 +18,13 @@ type Conn struct {
 	Me      *Nick
 	Network string
 
+	// Event handler mapping
+	events map[string][]func(*Conn, *Line)
+	// Map of channels we're on
+	chans map[string]*Channel
+	// Map of nicks we know about
+	nicks map[string]*Nick
+
 	// I/O stuff to server
 	sock      net.Conn
 	io        *bufio.ReadWriter
@@ -25,26 +32,23 @@ type Conn struct {
 	out       chan string
 	connected bool
 
+	// Error channel to transmit any fail back to the user
+	Err chan os.Error
+
+	// Misc knobs to tweak client behaviour:
 	// Are we connecting via SSL? Do we care about certificate validity?
 	SSL       bool
 	SSLConfig *tls.Config
 
-	// Error channel to transmit any fail back to the user
-	Err chan os.Error
-
 	// Set this to true to disable flood protection and false to re-enable
 	Flood bool
 
+	// Function which returns a *time.Time for use as a timestamp
+	Timestamp func() *time.Time
+
+	// Enable debugging? Set format for timestamps on debug output.
 	Debug bool
-
-	// Event handler mapping
-	events map[string][]func(*Conn, *Line)
-
-	// Map of channels we're on
-	chans map[string]*Channel
-
-	// Map of nicks we know about
-	nicks map[string]*Nick
+	TSFormat string
 }
 
 // We parse an incoming line into this struct. Line.Cmd is used as the trigger
@@ -54,8 +58,9 @@ type Conn struct {
 //   Cmd == e.g. PRIVMSG, 332
 type Line struct {
 	Nick, Ident, Host, Src string
-	Cmd, Text, Raw         string
+	Cmd, Raw               string
 	Args                   []string
+	Time                   *time.Time
 }
 
 // Creates a new IRC connection object, but doesn't connect to anything so
@@ -63,7 +68,11 @@ type Line struct {
 func New(nick, user, name string) *Conn {
 	conn := new(Conn)
 	conn.initialise()
+	conn.SSL = false
+	conn.SSLConfig = nil
 	conn.Me = conn.NewNick(nick, user, name, "")
+	conn.Timestamp = time.LocalTime
+	conn.Format = "15:04:05"
 	conn.setupEvents()
 	return conn
 }
@@ -75,8 +84,6 @@ func (conn *Conn) initialise() {
 	conn.in = make(chan *Line, 32)
 	conn.out = make(chan string, 32)
 	conn.Err = make(chan os.Error, 4)
-	conn.SSL = false
-	conn.SSLConfig = nil
 	conn.io = nil
 	conn.sock = nil
 
@@ -187,7 +194,7 @@ func (conn *Conn) send() {
 		}
 		conn.io.Flush()
 		if conn.Debug {
-			fmt.Println("-> " + line)
+			fmt.Println(conn.Timestamp().Format(conn.Format) + " -> " + line)
 		}
 	}
 }
@@ -196,6 +203,7 @@ func (conn *Conn) send() {
 func (conn *Conn) recv() {
 	for {
 		s, err := conn.io.ReadString('\n')
+		t := conn.Timestamp()
 		if err != nil {
 			conn.error("irc.recv(): %s", err.String())
 			conn.shutdown()
@@ -203,10 +211,10 @@ func (conn *Conn) recv() {
 		}
 		s = strings.Trim(s, "\r\n")
 		if conn.Debug {
-			fmt.Println("<- " + s)
+			fmt.Println(t.Format(conn.Format) + " <- " + s)
 		}
 
-		line := &Line{Raw: s}
+		line := &Line{Raw: s, Time: t}
 		if s[0] == ':' {
 			// remove a source and parse it
 			if idx := strings.Index(s, " "); idx != -1 {
@@ -232,9 +240,10 @@ func (conn *Conn) recv() {
 		// s should contain "cmd args[] :text"
 		args := strings.Split(s, " :", 2)
 		if len(args) > 1 {
-			line.Text = args[1]
+			args = append(strings.Fields(args[0]), args[1])
+		} else {
+			args = strings.Fields(args[0])
 		}
-		args = strings.Fields(args[0])
 		line.Cmd = strings.ToUpper(args[0])
 		if len(args) > 1 {
 			line.Args = args[1:len(args)]
