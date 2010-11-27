@@ -36,7 +36,7 @@ type keywordMap map[string]func(*Config, interface{})
 
 var configKeywords = configMap{
 	"port": (*Config).parsePort,
-//	"oper": (*Config).parseOper,
+	"oper": (*Config).parseOper,
 //	"link": (*Config).parseLink,
 //	"ban":  (*Config).parseBan,
 //	"info": (*Config).parseInfo,
@@ -140,6 +140,15 @@ func (conf *Config) expectInt() (int, bool) {
 		return 0, false
 	}
 	return num, true
+}
+
+func (conf *Config) expectString() (string, bool) {
+	tok, text := conf.next()
+	if tok != scanner.String && tok != scanner.Ident {
+		conf.parseError("Expected string, got '%s'", text)
+		return "", false
+	}
+	return text, true
 }
 
 func (conf *Config) expect(str string) bool {

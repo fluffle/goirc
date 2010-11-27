@@ -1,6 +1,7 @@
 package config
 
 import (
+	"net"
 	"fmt"
 	"strings"
 	"scanner"
@@ -8,40 +9,34 @@ import (
 
 type cPort struct {
 	Port     int
-	BindIP, Family, Class string
+	BindIP   net.IP // bind to a specific IP for listen port
+	Class    string // "server" or "client"
 
 	// Is port a tls.Listener? Does it support compression (no)?
 	SSL, Zip bool
-
-	// address == "<BindIP>:<Port>"
-	address	 string
 }
 
 var portKeywords = keywordMap{
-//	"bind_ip": (*Config).parsePortBindIP,
-//	"family": (*Config).parsePortFamily,
+	"bind_ip": (*Config).parsePortBindIP,
 	"class": (*Config).parsePortClass,
 	"ssl": (*Config).parsePortSSL,
-//	"zip": (*Config).parsePortZip,
-}
-
-var cPortDefaults = cPort{
-	BindIP: "", Family: "tcp", Class: "client",
-	SSL: false, Zip: false,
+	"zip": (*Config).parsePortZip,
 }
 
 func defaultPort() *cPort {
-	p := cPortDefaults
-	return &p
+	return &cPort{
+		BindIP: nil, Class: "client",
+		SSL: false, Zip: false,
+	}
 }
 
 func (p *cPort) String() string {
     str := []string{fmt.Sprintf("port %d {", p.Port)}
-	if p.BindIP != "" {
-		str = append(str, "\tbind_ip = " + p.BindIP)
+	if p.BindIP != nil {
+		str = append(str,
+			fmt.Sprintf("\tbind_ip = \"%s\"", p.BindIP.String()))
 	}
 	str = append(str,
-		fmt.Sprintf("\tfamily = \"%s\"",p.Family),
 		fmt.Sprintf("\tclass  = \"%s\"", p.Class),
 		fmt.Sprintf("\tssl    = %t", p.SSL),
 		fmt.Sprintf("\tzip    = %t", p.Zip),
@@ -66,6 +61,16 @@ func (conf *Config) parsePort() {
 	fmt.Println(port.String())
 }
 
+func (conf *Config) parsePortBindIP(pi interface{}) {
+	port := pi.(*cPort)
+	_, text := conf.next()
+	if ip := net.ParseIP(text); ip != nil {
+		port.BindIP = ip
+	} else {
+		conf.parseError("'%s' is not a valid IP address", text)
+	}
+}
+
 func (conf *Config) parsePortClass(pi interface{}) {
 	port := pi.(*cPort)
 	tok, text := conf.next()
@@ -84,3 +89,9 @@ func (conf *Config) parsePortSSL(pi interface{}) {
 	}
 }
 
+func (conf *Config) parsePortZip(pi interface{}) {
+	port := pi.(*cPort)
+	if zip, ok := conf.expectBool(); ok {
+		port.Zip = zip
+	}
+}
