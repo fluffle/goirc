@@ -113,12 +113,8 @@ func defaultOper() *cOper {
 func (o *cOper) String() string {
     str := []string{fmt.Sprintf("oper %s {", o.Username)}
 	str = append(str, fmt.Sprintf("\tpassword = %s", o.Password))
-	if len(o.HostMask) == 0 {
-		str = append(str, fmt.Sprintf("\thostmask = *@*"))
-	} else {
-		for _, h := range o.HostMask {
-			str = append(str, fmt.Sprintf("\thostmask = %s", h))
-		}
+	for _, h := range o.HostMask {
+		str = append(str, fmt.Sprintf("\thostmask = %s", h))
 	}
 	str = append(str,
 		fmt.Sprintf("\tkill    = %t", o.CanKill),

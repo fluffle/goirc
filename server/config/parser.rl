@@ -11,6 +11,7 @@ import (
 %% machine config;
 %% write data;
 
+// some helpers
 var booleans = map[string]bool {
 	"true": true,
 	"yes": true,
@@ -22,7 +23,20 @@ var booleans = map[string]bool {
 	"0": false,
 }
 
+func getbool(val []byte) bool {
+	return booleans[string(val)]
+}
+
+func getint(val []byte) int {
+	if v, err := strconv.Atoi(string(val)); err == nil {
+		return v
+	}
+	return 0
+}
+
 %%{
+###############################################################################
+# basic parser bits
 	# mark the current position for acquiring data
 	action mark { mark = p }
 
@@ -49,52 +63,140 @@ var booleans = map[string]bool {
 		| ( xdigit{1,4} ":" ){5}( ":" xdigit{1,4} ){1,2} # 5::1-2
 		| ( xdigit{1,4} ":" ){6}( ":" xdigit{1,4} ) ;    # 6::1
 
+	# acceptable password chars:
+	# anything in the normal ascii set apart from spaces and control chars
+	passchar = ascii -- ( space | cntrl ) ;
+
+	# acceptable hostmask chars:
+	# alphanumeric, plus "*", "?" and "."
+	hostchar = ( alnum | "*" | "?" | "." ) ;
+
+###############################################################################
+# "port" configuration parser
 	# Actions to create a cPort and save it into the Config struct
-	action new_port { cur = defaultPort() }
-	action save_port {
+	action p_new { cur = defaultPort() }
+	action p_save {
 		port := cur.(*cPort)
 		conf.Ports[port.Port] = port
 		cur = nil
 	}
 
 	# parse and save the port number
-	action set_portnum {
-		cur.(*cPort).Port, _ = strconv.Atoi(string(data[mark:p]))
+	action px_port {
+		cur.(*cPort).Port = getint(data[mark:p])
 	}
-	portnum = digit+ >mark %set_portnum ;
+	pv_port = digit+ >mark %px_port ;
 
 	# parse a bind_ip statement and save the IP
-	action set_bindip {
+	action px_bind_ip {
 		cur.(*cPort).BindIP = net.ParseIP(string(data[mark:p]))
 	}
-	bindip = (ipv4addr | ipv6addr) >mark %set_bindip ;
-	portbindip = "bind_ip" " "+ "=" " "+ bindip ;
+	pv_bind_ip = (ipv4addr | ipv6addr) >mark %px_bind_ip ;
+	ps_bind_ip = "bind_ip" " "+ "=" " "+ pv_bind_ip ;
 
 	# parse a class statement and save it
-	action set_class {
+	action px_class {
 		cur.(*cPort).Class = string(data[mark:p])
 	}
-	portclass = "class" " "+ "=" " "+ ("server" | "client" >mark %set_class) ;
+	pv_class = ( "server" | "client" ) >mark %px_class ;
+	ps_class = "class" " "+ "=" " "+ pv_class ;
 
 	# parse SSL and Zip booleans
-	action set_ssl {
-		cur.(*cPort).SSL = booleans[string(data[mark:p])]
+	action px_ssl {
+		cur.(*cPort).SSL = getbool(data[mark:p])
 	}
-	portssl = "ssl" " "+ "=" " "+ (boolean >mark %set_ssl) ;
-	action set_zip {
-		cur.(*cPort).Zip = booleans[string(data[mark:p])]
-	}
-	portzip = "zip" " "+ "=" " "+ (boolean >mark %set_zip) ;
+	pv_ssl = boolean >mark %px_ssl ;
+	ps_ssl = "ssl" " "+ "=" " "+ pv_ssl ;
 
-	portstmt = ( portbindip | portclass | portssl | portzip ) ;
-	portblock = "{" space* ( portstmt | (portstmt " "* "\n" space* )+ ) space* "}" ;
+	action px_zip {
+		cur.(*cPort).Zip = getbool(data[mark:p])
+	}
+	pv_zip = boolean >mark %px_zip ;
+	ps_zip = "zip" " "+ "=" " "+ pv_zip ;
+
+	# a port statement can be any one of the above statements
+	p_stmt = ( ps_bind_ip | ps_class | ps_ssl | ps_zip ) ;
+	# and a port block combines one or more statements
+	p_block = "{" space* ( p_stmt | (p_stmt " "* "\n" space*)+ ) space* "}" ;
 
 	# a port configuration can either be:
-	# port <portnum>\n
-	# port <portnum> { portblock }
-	basicport = "port" >new_port " "+ portnum " "* "\n" %save_port;
-	portdefn = "port" >new_port " "+ portnum " "+ portblock %save_port ;
-	portconfig = space* ( basicport | portdefn ) space*;
+	# port <port>\n
+	# port <port> { <statement> ... }
+	p_line = "port" >p_new " "+ pv_port " "* "\n" %p_save ;
+	p_defn = "port" >p_new " "+ pv_port " "+ p_block %p_save ;
+	port_config = space* ( p_line | p_defn ) space* ;
+
+
+###############################################################################
+# "oper" configuration parser
+	# actions to create a new cOper and save it into the Config struct
+	action o_new { cur = defaultOper() }
+	action o_save {
+		oper := cur.(*cOper)
+		conf.Opers[oper.Username] = oper
+		cur = nil
+	}
+
+	# parse and save the username
+	action ox_username {
+		cur.(*cOper).Username = string(data[mark:p])
+	}
+	ov_username = alpha >mark alnum* %ox_username ;
+
+	# parse a password statement and save it
+	action ox_password {
+		cur.(*cOper).Password = string(data[mark:p])
+	}
+	ov_password = passchar+ >mark %ox_password ;
+	os_password = "password" " "+ "=" " "+ ov_password ;
+
+	# parse a hostmask statement and save it
+	action ox_hostmask {
+		cur.(*cOper).HostMask = append(
+			cur.(*cOper).HostMask, string(data[mark:p]))
+	}
+	ov_hostmask = hostchar+ >mark "@" hostchar+ %ox_hostmask ;
+	os_hostmask = "hostmask" " "+ "=" " "+ ov_hostmask ;
+
+	# parse and save the various oper permissions
+	action ox_kill {
+		cur.(*cOper).CanKill = getbool(data[mark:p])
+	}
+	ov_kill = boolean >mark %ox_kill ;
+	os_kill = "kill" " "+ "=" " "+ ov_kill ;
+
+	action ox_ban {
+		cur.(*cOper).CanBan = getbool(data[mark:p])
+	}
+	ov_ban = boolean >mark %ox_ban ;
+	os_ban = "ban" " "+ "=" " "+ ov_ban ;
+
+	action ox_renick {
+		cur.(*cOper).CanRenick = getbool(data[mark:p])
+	}
+	ov_renick = boolean >mark %ox_renick ;
+	os_renick = "renick" " "+ "=" " "+ ov_renick ;
+
+	action ox_link {
+		cur.(*cOper).CanLink = getbool(data[mark:p])
+	}
+	ov_link = boolean >mark %ox_link ;
+	os_link = "link" " "+ "=" " "+ ov_link ;
+
+	# an oper statement can be any of the above statements
+	o_stmt = ( os_password
+	  | os_hostmask
+	  | os_kill
+	  | os_ban
+	  | os_renick
+	  | os_link ) ;
+	# and an oper block combines one or more statements
+	o_block = "{" space* ( o_stmt | (o_stmt " "* "\n" space*)+ ) space* "}" ;
+
+	# an oper configuration looks like:
+	# oper <username> { <statement> ... }
+	oper_config =  "oper" >o_new " "+ ov_username
+					" "+ o_block %o_save space* ;
 
 #	config = portconfig+
 #	  | operconfig+
@@ -102,7 +204,7 @@ var booleans = map[string]bool {
 #	  | infoconfig
 #	  | settings ;
 
-	main := portconfig+;
+	main := ( port_config | oper_config )+ ;
 }%%
 
 func (conf *Config) Parse(r io.Reader) {
@@ -132,5 +234,8 @@ func (conf *Config) Parse(r io.Reader) {
 
 	for _, port := range conf.Ports {
 		fmt.Println(port.String())
+	}
+	for _, oper := range conf.Opers {
+		fmt.Println(oper.String())
 	}
 }
