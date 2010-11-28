@@ -7,11 +7,10 @@ include $(GOROOT)/src/Make.inc
 TARG=irc/server/config
 GOFILES=\
 	config.go\
-	port.go\
-	oper.go\
-	link.go\
-	ban.go\
-	info.go\
-    settings.go\
+    parser.go\
 
 include $(GOROOT)/src/Make.pkg
+
+parser.go: parser.rl
+	ragel -Z -G2 -o parser.go parser.rl
+

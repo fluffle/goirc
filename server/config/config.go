@@ -1,16 +1,14 @@
 package config
 
 import (
-	"io"
 	"os"
 	"fmt"
-	"strconv"
-	"scanner"
+	"net"
+	"strings"
 )
 
 type Config struct {
 	fn string
-	scan *scanner.Scanner
 
 	// Ports we listen on.
 	Ports map[int]*cPort
@@ -31,17 +29,6 @@ type Config struct {
 	Errors []os.Error
 }
 
-type configMap  map[string]func(*Config)
-type keywordMap map[string]func(*Config, interface{})
-
-var configKeywords = configMap{
-	"port": (*Config).parsePort,
-	"oper": (*Config).parseOper,
-//	"link": (*Config).parseLink,
-//	"ban":  (*Config).parseBan,
-//	"info": (*Config).parseInfo,
-//	"set":  (*Config).parseSettings,
-}
 
 func LoadConfig(filename string) *Config {
 	conf := &Config{fn: filename}
@@ -74,103 +61,129 @@ func (conf *Config) Rehash() {
 	}
 }
 
-func (conf *Config) Parse(io io.Reader) {
-	s := &scanner.Scanner{}
-	s.Init(io)
-	s.Filename = conf.fn
-	conf.scan = s
-	tok, text := conf.next()
-	for tok != scanner.EOF {
-		// This external loop should only parse Config things
-		if f, ok := configKeywords[text]; ok {
-			f(conf)
-		} else {
-			conf.parseError("Invalid top-level keyword '%s'", text)
+/* Port configuration */
+type cPort struct {
+	Port     int
+	BindIP   net.IP // bind to a specific IP for listen port
+	Class    string // "server" or "client"
+
+	// Is port a tls.Listener? Does it support compression (no)?
+	SSL, Zip bool
+}
+
+func defaultPort() *cPort {
+	return &cPort{
+		BindIP: nil, Class: "client",
+		SSL: false, Zip: false,
+	}
+}
+
+func (p *cPort) String() string {
+    str := []string{fmt.Sprintf("port %d {", p.Port)}
+	if p.BindIP != nil {
+		str = append(str,
+			fmt.Sprintf("\tbind_ip = %s", p.BindIP.String()))
+	}
+	str = append(str,
+		fmt.Sprintf("\tclass  = %s", p.Class),
+		fmt.Sprintf("\tssl    = %t", p.SSL),
+		fmt.Sprintf("\tzip    = %t", p.Zip),
+		"}",
+	)
+	return strings.Join(str, "\n")
+}
+
+/* Oper configuration */
+type cOper struct {
+	Username, Password string
+	HostMask []string
+
+	// Permissions for oper
+	CanKill, CanBan, CanRenick, CanLink  bool
+}
+
+func defaultOper() *cOper {
+	return &cOper{
+		HostMask: []string{},
+		CanKill: true, CanBan: true,
+		CanRenick: false, CanLink: false,
+	}
+}
+
+func (o *cOper) String() string {
+    str := []string{fmt.Sprintf("oper %s {", o.Username)}
+	str = append(str, fmt.Sprintf("\tpassword = %s", o.Password))
+	if len(o.HostMask) == 0 {
+		str = append(str, fmt.Sprintf("\thostmask = *@*"))
+	} else {
+		for _, h := range o.HostMask {
+			str = append(str, fmt.Sprintf("\thostmask = %s", h))
 		}
-		fmt.Printf("Token: '%s', type %s\n", s.TokenText(), scanner.TokenString(tok))
-		tok, text = conf.next()
 	}
+	str = append(str,
+		fmt.Sprintf("\tkill    = %t", o.CanKill),
+		fmt.Sprintf("\tban     = %t", o.CanBan),
+		fmt.Sprintf("\trenick  = %t", o.CanRenick),
+		fmt.Sprintf("\tlink    = %t", o.CanLink),
+		"}",
+	)
+	return strings.Join(str, "\n")
 }
 
-func (conf *Config) parseKwBlock(dst interface{}, bt string, kw keywordMap) {
-	if ok := conf.expect("{"); !ok {
-		conf.parseError("Expected %s configuration block.", bt)
-		return
-	}
-	tok, text := conf.next()
-	for tok != scanner.EOF {
-		if f, ok := kw[text]; ok {
-			if ok = conf.expect("="); ok {
-				f(conf, dst)
-			}
-		} else if text == "}" {
-			break
-		} else {
-			conf.parseError("Invalid %s keyword '%s'", bt, text)
-		}
-		tok, text = conf.next()
-	}
+/* Link configuration */
+type cLink struct {
+	Server      string // Server name for link
+	Address     string // {ip,ip6,host}:port
+	ReceivePass string // Password when server connects to us 
+	ConnectPass string // Password when we connect to server
+
+	// Do we use tls.Dial? or compression (no)? Do we auto-connect on start?
+	SSL, Zip, Auto bool
 }
 
-var booleans = map[string]bool {
-	"true": true,
-	"yes": true,
-	"on": true,
-	"1": true,
-	"false": false,
-	"no": false,
-	"off": false,
-	"0": false,
+/* Static ban configuration */
+type cBan interface {
+	Match(string) bool
+	Reason() string
 }
 
-func (conf *Config) expectBool() (bool, bool) {
-	tok, text := conf.next()
-	if val, ok := booleans[text]; tok == scanner.Ident && ok {
-		return val, ok
-	}
-	conf.parseError("Expected boolean, got '%s'", text)
-	return false, false
+// G-Line etc; 
+type cBanNick struct {
+	NickMask string // nick!ident@host
+	Reason   string
 }
 
-func (conf *Config) expectInt() (int, bool) {
-	tok, text := conf.next()
-	num, err := strconv.Atoi(text)
-	if tok != scanner.Int || err != nil {
-		conf.parseError("Expected integer, got '%s'", text)
-		return 0, false
-	}
-	return num, true
+// Z-Line
+type cBanIP struct {
+	Address string // ip (or hostname), plus optional CIDR netmask
+	Reason  string
+	ip		string // parsed into these
+	cidr	int
 }
 
-func (conf *Config) expectString() (string, bool) {
-	tok, text := conf.next()
-	if tok != scanner.String && tok != scanner.Ident {
-		conf.parseError("Expected string, got '%s'", text)
-		return "", false
-	}
-	return text, true
+// CTCP version ban
+type cBanVersion struct {
+	VersionRegex string // regex to match against version reply
+	Reason       string
 }
 
-func (conf *Config) expect(str string) bool {
-	_, text := conf.next()
-	if text != str {
-		conf.parseError("Expected '%s', got '%s'", str, text)
-		return false
-	}
-	return true
+// Ban server from linking to network
+type cBanServer struct {
+	ServerMask string // matched against name of linked server
+	Reason     string
 }
 
-func (conf *Config) next() (int, string) {
-	tok := conf.scan.Scan()
-	text := conf.scan.TokenText()
-	if tok == scanner.String {
-		// drop "quotes" -> quotes
-		text = text[1:len(text)-1]
-	}
-	return tok, text
+/* IRCd settings */
+type cSettings struct {
+	SSLKey, SSLCert, SSLCACert string
+	MaxChans, MaxConnsPerIP int
+	LogFile string
 }
 
-func (conf *Config) parseError(err string, args ...interface{}) {
-	err = conf.scan.Pos().String() + ": " + err
-	conf.Errors = append(conf.Errors, os.NewError(fmt.Sprintf(err, args...)))
+/* IRCd information */
+type cInfo struct {
+	Name, Network, Info, MOTDFile string
+	Admins []string
+	Numeric int
 }
+
