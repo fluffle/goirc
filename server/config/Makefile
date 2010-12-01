@@ -12,5 +12,5 @@ GOFILES=\
 include $(GOROOT)/src/Make.pkg
 
 parser.go: parser.rl
-	ragel -Z -G2 -o parser.go parser.rl
+	ragel-svn -Z -G2 -o parser.go parser.rl
 

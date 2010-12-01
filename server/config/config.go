@@ -137,6 +137,12 @@ type cLink struct {
 	SSL, Zip, Auto bool
 }
 
+func defaultLink() *cLink {
+	return &cLink{
+		SSL: false, Zip: false, Auto: false,
+	}
+}
+
 /* Static ban configuration */
 type cBan interface {
 	Match(string) bool
