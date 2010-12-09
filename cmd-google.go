@@ -104,33 +104,9 @@ func roman(conn *irc.Conn, nick *irc.Nick, args, target string) {
 	url := fmt.Sprintf("http://translate.google.com/translate_a/t?client=t&hl=%s&sl=%s&tl=en-U&text=%s",
 		targetlang, sourcelang, http.URLEscape(args))
 
-	// please disregard the reproduction of src/pkg/http/client.go:send below
-	var request http.Request
-	var err os.Error
-	request.URL, err = http.ParseURL(url)
-	if err != nil {
-		say(conn, target, "%s: Error while preparing URL", nick.Nick); return
-	}
-	request.UserAgent = "Mozilla/5.0"
-
-	httpcon, err := net.Dial("tcp", "", request.URL.Host + ":" + request.URL.Scheme)
-	if err != nil {
-		say(conn, target, "%s: Error while opening connection", nick.Nick); return
-	}
-	defer httpcon.Close()
-	err = request.Write(httpcon)
+	b, err := send(url)
 	if err != nil {
 		say(conn, target, "%s: Error while requesting romanization", nick.Nick); return
-	}
-	reader := bufio.NewReader(httpcon)
-	response, err := http.ReadResponse(reader, request.Method)
-	if err != nil {
-		say(conn, target, "%s: Error while reading response header", nick.Nick); return
-	}
-
-	b, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		say(conn, target, "%s: Error while downloading romanization", nick.Nick); return
 	}
 
 	result := strings.Split(string(b), `"`, 7)
@@ -146,15 +122,10 @@ func calc(conn *irc.Conn, nick *irc.Nick, args, target string) {
 		return
 	}
 	url := fmt.Sprintf("http://www.google.com/ig/calculator?hl=en&q=%s&key=%s", http.URLEscape(args), googleAPIKey)
-	response, _, err := http.Get(url)
-	defer response.Body.Close()
+
+	b, err := send(url)
 	if err != nil {
 		say(conn, target, "%s: Error while requesting calculation", nick.Nick); return
-	}
-
-	b, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		say(conn, target, "%s: Error while downloading calculation", nick.Nick); return
 	}
 
 	re := regexp.MustCompile(`{lhs: "(.*)",rhs: "(.*)",error: "(.*)",icc: (true|false)}`)
@@ -170,4 +141,37 @@ func calc(conn *irc.Conn, nick *irc.Nick, args, target string) {
 	}
 	output = html.UnescapeString(output) // see go issue 1233
 	say(conn, target, output)
+}
+
+// please disregard the reproduction of src/pkg/http/client.go:send below
+// it's definitely not to send a User-Agent for undocumented Google APIs
+func send(url string) ([]byte, os.Error) {
+	var request http.Request
+	var err os.Error
+	request.URL, err = http.ParseURL(url)
+	if err != nil {
+		return nil, err
+	}
+	request.UserAgent = "Mozilla/5.0"
+
+	httpcon, err := net.Dial("tcp", "", request.URL.Host + ":" + request.URL.Scheme)
+	if err != nil {
+		return nil, err
+	}
+	defer httpcon.Close()
+	err = request.Write(httpcon)
+	if err != nil {
+		return nil, err
+	}
+	reader := bufio.NewReader(httpcon)
+	response, err := http.ReadResponse(reader, request.Method)
+	if err != nil {
+		return nil, err
+	}
+
+	b, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return nil, err
+	}
+	return b, nil
 }
