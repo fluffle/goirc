@@ -1,7 +1,7 @@
 package main
 
 import (
-	"irc"
+	irc "github.com/fluffle/goirc/client"
 	"fmt"
 	"strings"
 	"http"
@@ -56,23 +56,23 @@ func handlePrivmsg(conn *irc.Conn, line *irc.Line) {
 	target := line.Args[0]
 	if isChannel(target) {
 		// message to a channel
-		if start := strings.Index(line.Text, "youtube.com/watch?v="); start > -1 {
-			video := line.Text[start+20:]
+		if start := strings.Index(line.Args[1], "youtube.com/watch?v="); start > -1 {
+			video := line.Args[1][start+20:]
 			if end := strings.IndexAny(video, " &#"); end > -1 {
 				video = video[0:end]
 			}
 			youtube(conn, nick, video, target)
 		} else {
-			command(conn, nick, line.Text, target)
+			command(conn, nick, line.Args[1], target)
 		}
 	} else if target == conn.Me.Nick {
 		// message to us
-		command(conn, nick, line.Text, line.Nick)
+		command(conn, nick, line.Args[1], line.Nick)
 	}
 }
 
 func handleMode(conn *irc.Conn, line *irc.Line) {
-	if line.Args[0] == conn.Me.Nick && line.Text == "+r" {
+	if line.Args[0] == conn.Me.Nick && line.Args[1] == "+r" {
 		autojoin(conn)
 	}
 }
@@ -83,7 +83,7 @@ func handleJoin(conn *irc.Conn, line *irc.Line) {
 		return
 	}
 
-	channel := conn.GetChannel(line.Text)
+	channel := conn.GetChannel(line.Args[1])
 	if channel == nil || !channel.Modes.Moderated {
 		return
 	}
@@ -96,8 +96,8 @@ func handleJoin(conn *irc.Conn, line *irc.Line) {
 	if nick == nil {
 		return
 	}
-	if hasAccess(conn, nick, line.Text, "v") {
-		conn.Mode(line.Text, "+v " + line.Nick)
+	if hasAccess(conn, nick, line.Args[1], "v") {
+		conn.Mode(line.Args[1], "+v " + line.Nick)
 	}
 }
 
@@ -113,7 +113,7 @@ func handleInvite(conn *irc.Conn, line *irc.Line) {
 
 	owner, _ := auth.String(conn.Network, "owner")
 	if user == owner {
-		conn.Join(line.Text)
+		conn.Join(line.Args[1])
 	}
 }
 

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"irc"
+	irc "github.com/fluffle/goirc/client"
 	"fmt"
 	"os"
 	"strings"

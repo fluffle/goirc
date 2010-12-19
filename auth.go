@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"irc"
+	irc "github.com/fluffle/goirc/client"
 	"github.com/kless/goconfig/config"
 )
 

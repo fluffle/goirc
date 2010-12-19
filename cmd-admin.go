@@ -1,7 +1,7 @@
 package main
 
 import (
-	"irc"
+	irc "github.com/fluffle/goirc/client"
 )
 
 func nick(conn *irc.Conn, nick *irc.Nick, args, target string) {
