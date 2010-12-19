@@ -41,10 +41,16 @@ func (conn *Conn) dispatchEvent(line *Line) {
 	// So, I think CTCP and (in particular) CTCP ACTION are better handled as
 	// separate events as opposed to forcing people to have gargantuan PRIVMSG
 	// handlers to cope with the possibilities.
-	if line.Cmd == "PRIVMSG" && len(line.Text) > 2 &&
-		line.Text[0] == '\001' && line.Text[len(line.Text)-1] == '\001' {
+	if line.Cmd == "PRIVMSG" &&
+		len(line.Args[1]) > 2 &&
+		line.Args[1][0] == '\001' &&
+		line.Args[1][len(line.Args[1])-1] == '\001' {
 		// WOO, it's a CTCP message
-		t := strings.Split(line.Text[1:len(line.Text)-1], " ", 2)
+		t := strings.Split(line.Args[1][1:len(line.Args[1])-1], " ", 2)
+		if len(t) > 1 {
+			// Replace the line with the unwrapped CTCP
+			line.Args[1] = t[1]
+		}
 		if c := strings.ToUpper(t[0]); c == "ACTION" {
 			// make a CTCP ACTION it's own event a-la PRIVMSG
 			line.Cmd = c
@@ -52,17 +58,7 @@ func (conn *Conn) dispatchEvent(line *Line) {
 			// otherwise, dispatch a generic CTCP event that
 			// contains the type of CTCP in line.Args[0]
 			line.Cmd = "CTCP"
-			a := make([]string, len(line.Args)+1)
-			a[0] = c
-			for i := 0; i < len(line.Args); i++ {
-				a[i+1] = line.Args[i]
-			}
-			line.Args = a
-		}
-		if len(t) > 1 {
-			// for some CTCP messages this could make more sense
-			// in line.Args[], but meh. MEH, I say.
-			line.Text = t[1]
+			line.Args = append([]string{c}, line.Args...)
 		}
 	}
 	if funcs, ok := conn.events[line.Cmd]; ok {
@@ -74,7 +70,7 @@ func (conn *Conn) dispatchEvent(line *Line) {
 
 // Basic ping/pong handler
 func (conn *Conn) h_PING(line *Line) {
-	conn.Raw("PONG :" + line.Text)
+	conn.Raw("PONG :" + line.Args[0])
 }
 
 // Handler to trigger a "CONNECTED" event on receipt of numeric 001
@@ -83,10 +79,11 @@ func (conn *Conn) h_001(line *Line) {
 	conn.connected = true
 	conn.dispatchEvent(&Line{Cmd: "CONNECTED"})
 	// and we're being given our hostname (from the server's perspective)
-	if ridx := strings.LastIndex(line.Text, " "); ridx != -1 {
-		h := line.Text[ridx+1 : len(line.Text)]
-		if idx := strings.Index(h, "@"); idx != -1 {
-			conn.Me.Host = h[idx+1 : len(h)]
+	t := line.Args[len(line.Args)-1]
+	if idx := strings.LastIndex(t, " "); idx != -1 {
+		t = t[idx+1:]
+		if idx = strings.Index(t, "@"); idx != -1 {
+			conn.Me.Host = t[idx+1:]
 		}
 	}
 }
@@ -115,7 +112,7 @@ func (conn *Conn) h_433(line *Line) {
 func (conn *Conn) h_NICK(line *Line) {
 	// all nicks should be handled the same way, our own included
 	if n := conn.GetNick(line.Nick); n != nil {
-		n.ReNick(line.Text)
+		n.ReNick(line.Args[0])
 	} else {
 		conn.error("irc.NICK(): buh? unknown nick %s.", line.Nick)
 	}
@@ -126,31 +123,24 @@ func (conn *Conn) h_CTCP(line *Line) {
 	if line.Args[0] == "VERSION" {
 		conn.CtcpReply(line.Nick, "VERSION", "powered by goirc...")
 	} else if line.Args[0] == "PING" {
-		conn.CtcpReply(line.Nick, "PING", line.Text)
+		conn.CtcpReply(line.Nick, "PING", line.Args[2])
 	}
 }
 
 // Handle JOINs to channels to maintain state
 func (conn *Conn) h_JOIN(line *Line) {
-	// Some IRCds (ircu) send ':n!u@h JOIN #chan' not ':n!u@h JOIN :#chan'
-	// Unfortunately the RFCs aren't specific about this. In fact the
-	// examples indicate no colon should be sent, but it's unusual.
-	var chname string
-	if len(line.Text) > 0 {
-		chname = line.Text
-	} else if len(line.Args) > 0 {
-		chname = line.Args[0]
-	}
-	ch := conn.GetChannel(chname)
+	ch := conn.GetChannel(line.Args[0])
 	n := conn.GetNick(line.Nick)
 	if ch == nil {
 		// first we've seen of this channel, so should be us joining it
 		// NOTE this will also take care of n == nil && ch == nil
 		if n != conn.Me {
-			conn.error("irc.JOIN(): buh? JOIN to unknown channel %s recieved from (non-me) nick %s", line.Text, line.Nick)
+			conn.error("irc.JOIN(): buh? JOIN to unknown channel %s recieved"+
+				"from (non-me) nick %s",
+				line.Args[0], line.Nick)
 			return
 		}
-		ch = conn.NewChannel(chname)
+		ch = conn.NewChannel(line.Args[0])
 		// since we don't know much about this channel, ask server for info
 		// we get the channel users automatically in 353 and the channel
 		// topic in 332 on join, so we just need to get the modes
@@ -171,20 +161,13 @@ func (conn *Conn) h_JOIN(line *Line) {
 
 // Handle PARTs from channels to maintain state
 func (conn *Conn) h_PART(line *Line) {
-	// Some IRCds (ircu) send 'PART :#chan' when there's no part message
-	// instead of 'PART #chan'. This is *questionable* behaviour...
-	var chname string
-	if len(line.Args) > 0 {
-		chname = line.Args[0]
-	} else if len(line.Text) > 0 {
-		chname = line.Text
-	}
-	ch := conn.GetChannel(chname)
+	ch := conn.GetChannel(line.Args[0])
 	n := conn.GetNick(line.Nick)
 	if ch != nil && n != nil {
 		ch.DelNick(n)
 	} else {
-		conn.error("irc.PART(): buh? PART of channel %s by nick %s", chname, line.Nick)
+		conn.error("irc.PART(): buh? PART of channel %s by nick %s",
+			line.Args[0], line.Nick)
 	}
 }
 
@@ -197,7 +180,8 @@ func (conn *Conn) h_KICK(line *Line) {
 	if ch != nil && n != nil {
 		ch.DelNick(n)
 	} else {
-		conn.error("irc.KICK(): buh? KICK from channel %s of nick %s", line.Args[0], line.Args[1])
+		conn.error("irc.KICK(): buh? KICK from channel %s of nick %s",
+			line.Args[0], line.Args[1])
 	}
 }
 
@@ -218,23 +202,19 @@ func (conn *Conn) h_MODE(line *Line) {
 	} else if n := conn.GetNick(line.Args[0]); n != nil {
 		// nick mode change, should be us
 		if n != conn.Me {
-			conn.error("irc.MODE(): buh? recieved MODE %s for (non-me) nick %s", line.Text, n.Nick)
+			conn.error("irc.MODE(): buh? recieved MODE %s for (non-me) nick %s", line.Args[0], n.Nick)
 			return
 		}
-		conn.ParseNickModes(n, line.Text)
+		conn.ParseNickModes(n, line.Args[0])
 	} else {
-		if line.Text != "" {
-			conn.error("irc.MODE(): buh? not sure what to do with nick MODE %s %s", line.Args[0], line.Text)
-		} else {
-			conn.error("irc.MODE(): buh? not sure what to do with chan MODE %s", strings.Join(line.Args, " "))
-		}
+		conn.error("irc.MODE(): buh? not sure what to do with MODE %s", strings.Join(line.Args, " "))
 	}
 }
 
 // Handle TOPIC changes for channels
 func (conn *Conn) h_TOPIC(line *Line) {
 	if ch := conn.GetChannel(line.Args[0]); ch != nil {
-		ch.Topic = line.Text
+		ch.Topic = line.Args[1]
 	} else {
 		conn.error("irc.TOPIC(): buh? topic change on unknown channel %s", line.Args[0])
 	}
@@ -245,7 +225,7 @@ func (conn *Conn) h_311(line *Line) {
 	if n := conn.GetNick(line.Args[1]); n != nil {
 		n.Ident = line.Args[2]
 		n.Host = line.Args[3]
-		n.Name = line.Text
+		n.Name = line.Args[4]
 	} else {
 		conn.error("irc.311(): buh? received WHOIS info for unknown nick %s", line.Args[1])
 	}
@@ -264,7 +244,7 @@ func (conn *Conn) h_324(line *Line) {
 // Handle 332 topic reply on join to channel
 func (conn *Conn) h_332(line *Line) {
 	if ch := conn.GetChannel(line.Args[1]); ch != nil {
-		ch.Topic = line.Text
+		ch.Topic = line.Args[2]
 	} else {
 		conn.error("irc.332(): buh? received TOPIC value for unknown channel %s", line.Args[1])
 	}
@@ -277,8 +257,8 @@ func (conn *Conn) h_352(line *Line) {
 		n.Host = line.Args[3]
 		// XXX: do we care about the actual server the nick is on?
 		//      or the hop count to this server?
-		// line.Text contains "<hop count> <real name>"
-		a := strings.Split(line.Text, " ", 2)
+		// last arg contains "<hop count> <real name>"
+		a := strings.Split(line.Args[len(line.Args)-1], " ", 2)
 		n.Name = a[1]
 		if idx := strings.Index(line.Args[6], "*"); idx != -1 {
 			n.Modes.Oper = true
@@ -294,7 +274,7 @@ func (conn *Conn) h_352(line *Line) {
 // Handle 353 names reply
 func (conn *Conn) h_353(line *Line) {
 	if ch := conn.GetChannel(line.Args[2]); ch != nil {
-		nicks := strings.Split(line.Text, " ", -1)
+		nicks := strings.Split(line.Args[len(line.Args)-1], " ", -1)
 		for _, nick := range nicks {
 			// UnrealIRCd's coders are lazy and leave a trailing space
 			if nick == "" {

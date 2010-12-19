@@ -37,6 +37,9 @@ type Conn struct {
 
 	Debug bool
 
+	// Function which returns a *time.Time for use as a timestamp
+	Timestamp func() *time.Time
+
 	// Event handler mapping
 	events map[string][]func(*Conn, *Line)
 
@@ -54,14 +57,16 @@ type Conn struct {
 //   Cmd == e.g. PRIVMSG, 332
 type Line struct {
 	Nick, Ident, Host, Src string
-	Cmd, Text, Raw         string
+	Cmd, Raw               string
 	Args                   []string
+	Time                   *time.Time
 }
 
 // Creates a new IRC connection object, but doesn't connect to anything so
 // that you can add event handlers to it. See AddHandler() for details.
 func New(nick, user, name string) *Conn {
 	conn := new(Conn)
+	conn.Timestamp = time.LocalTime
 	conn.initialise()
 	conn.Me = conn.NewNick(nick, user, name, "")
 	conn.setupEvents()
@@ -187,7 +192,7 @@ func (conn *Conn) send() {
 		}
 		conn.io.Flush()
 		if conn.Debug {
-			fmt.Println("-> " + line)
+			fmt.Println(conn.Timestamp().Format("[15:04:05]") + " -> " + line)
 		}
 	}
 }
@@ -196,6 +201,7 @@ func (conn *Conn) send() {
 func (conn *Conn) recv() {
 	for {
 		s, err := conn.io.ReadString('\n')
+		t := conn.Timestamp()
 		if err != nil {
 			conn.error("irc.recv(): %s", err.String())
 			conn.shutdown()
@@ -203,10 +209,10 @@ func (conn *Conn) recv() {
 		}
 		s = strings.Trim(s, "\r\n")
 		if conn.Debug {
-			fmt.Println("<- " + s)
+			fmt.Println(t.Format("[15:04:05]") + " <- " + s)
 		}
 
-		line := &Line{Raw: s}
+		line := &Line{Raw: s, Time: t}
 		if s[0] == ':' {
 			// remove a source and parse it
 			if idx := strings.Index(s, " "); idx != -1 {
@@ -232,20 +238,13 @@ func (conn *Conn) recv() {
 		// s should contain "cmd args[] :text"
 		args := strings.Split(s, " :", 2)
 		if len(args) > 1 {
-			line.Text = args[1]
+			args = append(strings.Fields(args[0]), args[1])
+		} else {
+			args = strings.Fields(args[0])
 		}
-		args = strings.Fields(args[0])
 		line.Cmd = strings.ToUpper(args[0])
 		if len(args) > 1 {
 			line.Args = args[1:len(args)]
-			// some servers (Gamesurge) don't use : properly
-			// so duplicate Args[0] into Text
-			if line.Text == "" {
-				line.Text = args[len(args)-1]
-			}
-		} else {
-			// now duplicate Text into Args[0] if no args
-			line.Args = []string{line.Text}
 		}
 		conn.in <- line
 	}
