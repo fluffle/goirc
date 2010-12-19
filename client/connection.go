@@ -44,7 +44,9 @@ type Conn struct {
 	Flood bool
 
 	// Function which returns a *time.Time for use as a timestamp
+	// Format for *time.Time when outputting timestamps
 	Timestamp func() *time.Time
+	Format    string
 
 	// Enable debugging? Set format for timestamps on debug output.
 	Debug bool
