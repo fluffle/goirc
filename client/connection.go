@@ -44,9 +44,7 @@ type Conn struct {
 	Flood bool
 
 	// Function which returns a *time.Time for use as a timestamp
-	// Format for *time.Time when outputting timestamps
 	Timestamp func() *time.Time
-	Format    string
 
 	// Enable debugging? Set format for timestamps on debug output.
 	Debug bool
@@ -74,7 +72,7 @@ func New(nick, user, name string) *Conn {
 	conn.SSLConfig = nil
 	conn.Me = conn.NewNick(nick, user, name, "")
 	conn.Timestamp = time.LocalTime
-	conn.Format = "15:04:05"
+	conn.TSFormat = "15:04:05"
 	conn.setupEvents()
 	return conn
 }
@@ -196,7 +194,7 @@ func (conn *Conn) send() {
 		}
 		conn.io.Flush()
 		if conn.Debug {
-			fmt.Println(conn.Timestamp().Format(conn.Format) + " -> " + line)
+			fmt.Println(conn.Timestamp().Format(conn.TSFormat) + " -> " + line)
 		}
 	}
 }
@@ -213,7 +211,7 @@ func (conn *Conn) recv() {
 		}
 		s = strings.Trim(s, "\r\n")
 		if conn.Debug {
-			fmt.Println(t.Format(conn.Format) + " <- " + s)
+			fmt.Println(t.Format(conn.TSFormat) + " <- " + s)
 		}
 
 		line := &Line{Raw: s, Time: t}
