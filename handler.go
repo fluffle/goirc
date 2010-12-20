@@ -83,7 +83,7 @@ func handleJoin(conn *irc.Conn, line *irc.Line) {
 		return
 	}
 
-	channel := conn.GetChannel(line.Args[1])
+	channel := conn.GetChannel(line.Args[0])
 	if channel == nil || !channel.Modes.Moderated {
 		return
 	}
@@ -96,8 +96,8 @@ func handleJoin(conn *irc.Conn, line *irc.Line) {
 	if nick == nil {
 		return
 	}
-	if hasAccess(conn, nick, line.Args[1], "v") {
-		conn.Mode(line.Args[1], "+v " + line.Nick)
+	if hasAccess(conn, nick, line.Nick, "v") {
+		conn.Mode(line.Args[0], "+v " + line.Nick)
 	}
 }
 
