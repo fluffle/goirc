@@ -18,6 +18,13 @@ type Conn struct {
 	Me      *Nick
 	Network string
 
+	// Event handler mapping
+	events map[string][]func(*Conn, *Line)
+	// Map of channels we're on
+	chans map[string]*Channel
+	// Map of nicks we know about
+	nicks map[string]*Nick
+
 	// I/O stuff to server
 	sock      net.Conn
 	io        *bufio.ReadWriter
@@ -25,29 +32,25 @@ type Conn struct {
 	out       chan string
 	connected bool
 
+	// Error channel to transmit any fail back to the user
+	Err chan os.Error
+
+	// Misc knobs to tweak client behaviour:
 	// Are we connecting via SSL? Do we care about certificate validity?
 	SSL       bool
 	SSLConfig *tls.Config
 
-	// Error channel to transmit any fail back to the user
-	Err chan os.Error
-
 	// Set this to true to disable flood protection and false to re-enable
 	Flood bool
 
-	Debug bool
-
 	// Function which returns a *time.Time for use as a timestamp
+	// Format for *time.Time when outputting timestamps
 	Timestamp func() *time.Time
+	Format    string
 
-	// Event handler mapping
-	events map[string][]func(*Conn, *Line)
-
-	// Map of channels we're on
-	chans map[string]*Channel
-
-	// Map of nicks we know about
-	nicks map[string]*Nick
+	// Enable debugging? Set format for timestamps on debug output.
+	Debug bool
+	TSFormat string
 }
 
 // We parse an incoming line into this struct. Line.Cmd is used as the trigger
@@ -66,9 +69,12 @@ type Line struct {
 // that you can add event handlers to it. See AddHandler() for details.
 func New(nick, user, name string) *Conn {
 	conn := new(Conn)
-	conn.Timestamp = time.LocalTime
 	conn.initialise()
+	conn.SSL = false
+	conn.SSLConfig = nil
 	conn.Me = conn.NewNick(nick, user, name, "")
+	conn.Timestamp = time.LocalTime
+	conn.Format = "15:04:05"
 	conn.setupEvents()
 	return conn
 }
@@ -80,8 +86,6 @@ func (conn *Conn) initialise() {
 	conn.in = make(chan *Line, 32)
 	conn.out = make(chan string, 32)
 	conn.Err = make(chan os.Error, 4)
-	conn.SSL = false
-	conn.SSLConfig = nil
 	conn.io = nil
 	conn.sock = nil
 
@@ -192,7 +196,7 @@ func (conn *Conn) send() {
 		}
 		conn.io.Flush()
 		if conn.Debug {
-			fmt.Println(conn.Timestamp().Format("[15:04:05]") + " -> " + line)
+			fmt.Println(conn.Timestamp().Format(conn.Format) + " -> " + line)
 		}
 	}
 }
@@ -209,7 +213,7 @@ func (conn *Conn) recv() {
 		}
 		s = strings.Trim(s, "\r\n")
 		if conn.Debug {
-			fmt.Println(t.Format("[15:04:05]") + " <- " + s)
+			fmt.Println(t.Format(conn.Format) + " <- " + s)
 		}
 
 		line := &Line{Raw: s, Time: t}
