@@ -5,13 +5,12 @@ rbot
 
 Assuming you have go set up (http://golang.org/),
 
-	git clone git://github.com/kless/goconfig.git
-	cd goconfig
-	make -C config install
-	cd ..
 	git clone git://github.com/raylu/rbot.git
 	cd rbot
+	git submodule init
+	git submodule update
 	make -C client install
+	make -C goconfig install
 	make
 
 rbot.conf and auth.conf will be copied. Configure those and then run the bot:
