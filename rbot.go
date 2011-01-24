@@ -8,7 +8,7 @@ import (
 	"time"
 	"crypto/tls"
 	"crypto/rand"
-	"github.com/kless/goconfig/config"
+	"goconfig"
 )
 
 const confFile = "rbot.conf"

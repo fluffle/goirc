@@ -1,0 +1,3 @@
+[submodule "goconfig"]
+	path = goconfig
+	url = https://github.com/raylu/goconfig.git
