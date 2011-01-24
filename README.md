@@ -11,7 +11,7 @@ Assuming you have go set up (http://golang.org/),
 	cd ..
 	git clone git://github.com/raylu/rbot.git
 	cd rbot
-	make -C irc install
+	make -C client install
 	make
 
 rbot.conf and auth.conf will be copied. Configure those and then run the bot:
