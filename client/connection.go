@@ -140,6 +140,7 @@ func (conn *Conn) Connect(host string, pass ...string) os.Error {
 	conn.io = bufio.NewReadWriter(
 		bufio.NewReader(conn.sock),
 		bufio.NewWriter(conn.sock))
+	conn.sock.SetTimeout(300000000000) // 5 minutes
 	go conn.send()
 	go conn.recv()
 
