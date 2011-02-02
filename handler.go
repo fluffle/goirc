@@ -140,7 +140,10 @@ func command(conn *irc.Conn, nick *irc.Nick, text, target string) {
 }
 
 func say(conn *irc.Conn, target, message string, a ...interface{}) {
-	text := strings.Replace(fmt.Sprintf(message, a...), "\n", " ", -1)
+	if len(a) > 0 {
+		message = fmt.Sprintf(message, a...)
+	}
+	text := strings.Replace(message, "\n", " ", -1)
 	if isChannel(target) {
 		conn.Privmsg(target, text)
 	} else {
