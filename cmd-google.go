@@ -130,17 +130,39 @@ func calc(conn *irc.Conn, nick *irc.Nick, args, target string) {
 
 	re := regexp.MustCompile(`{lhs: "(.*)",rhs: "(.*)",error: "(.*)",icc: (true|false)}`)
 	result := re.FindSubmatch(b)
-	if len(result) != 5 || len(result[3]) > 1 {
-		say(conn, target, "%s: Error while calculating.", nick.Nick); return
+	if len(result) != 5 {
+		say(conn, target, "%s: Error while parsing.", nick.Nick)
+		return
+	}
+	if len(result[3]) > 1 {
+		output := fmt.Sprintf(`"%s"`, result[3])
+		error := parseCalc(output)
+		if error != "" {
+			say(conn, target, "%s: Error: %s", nick.Nick, error)
+		} else {
+			say(conn, target, "%s: Error while calculating and error while decoding error.", nick.Nick)
+		}
+		return
+	}
+	if len(result[1]) == 0 || len(result[2]) == 0 {
+		say(conn, target, "%s: Error while calculating.", nick.Nick)
+		return
 	}
 
 	output := fmt.Sprintf(`"%s = %s"`, result[1], result[2])
-	output, err = strconv.Unquote(output)
-	if err != nil {
+	output = parseCalc(output)
+	if output == "" {
 		say(conn, target, "%s: Error while decoding.", nick.Nick); return
 	}
-	output = html.UnescapeString(output) // see go issue 1233
 	say(conn, target, output)
+}
+
+func parseCalc(output string) string {
+	unquote, err := strconv.Unquote(output)
+	if err != nil {
+		return ""
+	}
+	return html.UnescapeString(unquote)
 }
 
 // please disregard the reproduction of src/pkg/http/client.go:send below
