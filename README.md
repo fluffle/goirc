@@ -19,11 +19,11 @@ rbot.conf and auth.conf will be copied. Configure those and then run the bot:
 
 ### Flags
 
-Access is configured in auth.conf, is per-channel, based on ident and host; nick is ignored. The owner is configured per server and other access is configured per channel. Owners can use any commands.
+Access is configured in auth.conf, is per-channel, based on ident and host; nick is ignored. The owner is configured per server and other access is configured per channel. Owners can use any commands. Ignores are checked before access.
 
 The following is a description of the commands enabled by each flag:
 
-- `a`: add remove
+- `a`: add remove ignore unignore
 - `o`: op halfop deop dehalfop kick|k ban|b unban|u kb
 - `h`: halfop|hop dehalfop|dehop kick|k ban|b unban|u kb (hop and dehop can only be used on yourself and you cannot kick or kb people with o or h)
 - `v`: voice, devoice
@@ -43,6 +43,8 @@ Access related commands:
 - `add raylu t`: gives raylu the t flag
 - `remove raylu t`: removes the t flag from raylu
 - `remove raylu`: removes all of raylu's flags
+- `ignore raylu`: ignores all messages from raylu's host on this network
+- `unignore raylu`: unignore raylu
 - `list`: lists all users and their access
 - `list raylu`: searches the access list for raylu
 

@@ -14,6 +14,8 @@ var commands = map [string]func(*irc.Conn, *irc.Nick, string, string) {
 	"flags": flags,
 	"add": add,
 	"remove": remove,
+	"ignore": ignore,
+	"unignore": unignore,
 	"list": accesslist,
 
 	// admin
@@ -52,6 +54,9 @@ func handlePrivmsg(conn *irc.Conn, line *irc.Line) {
 		return
 	}
 	nick.Host = line.Host
+	if ignores[conn.Network][nick.Host] {
+		return
+	}
 
 	target := line.Args[0]
 	if isChannel(target) {

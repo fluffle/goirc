@@ -77,6 +77,46 @@ func flags(conn *irc.Conn, nick *irc.Nick, args, target string) {
 	}
 }
 
+func ignore(conn *irc.Conn, nick *irc.Nick, args, target string) {
+	channel, args := parseAccess(conn, nick, target, args, "a")
+	if channel == "" {
+		return
+	}
+
+	n := conn.GetNick(strings.TrimSpace(args))
+	if n == nil {
+		say(conn, target, "Could not find nick %s", args)
+		return
+	}
+	if nick == n {
+		say(conn, target, "%s: you cannot ignore yourself", nick.Nick)
+	}
+	owner, _ := auth.String(conn.Network, "owner")
+	if owner == user(n) {
+		return
+	}
+
+	if addIgnore(conn, channel, n) {
+		say(conn, target, "Ignoring %s", n.Host)
+	} else {
+		say(conn, target, "%s is already ignored", n.Host)
+	}
+}
+func unignore(conn *irc.Conn, nick *irc.Nick, args, target string) {
+	channel, args := parseAccess(conn, nick, target, args, "a")
+	if channel == "" {
+		return
+	}
+	host, success := removeIgnore(conn, channel, strings.TrimSpace(args))
+	if host == "" {
+		say(conn, target, "Could not find nick %s", args)
+	} else if !success {
+		say(conn, target, "%s was not ignored", host)
+	} else {
+		say(conn, target, "Unignored %s", host)
+	}
+}
+
 func accesslist(conn *irc.Conn, nick *irc.Nick, args, target string) {
 	channel, args := parseAccess(conn, nick, target, args, "")
 	if channel == "" {
