@@ -158,11 +158,14 @@ func calc(conn *irc.Conn, nick *irc.Nick, args, target string) {
 }
 
 func parseCalc(output string) string {
-	unquote, err := strconv.Unquote(output)
+	parsed, err := strconv.Unquote(output)
 	if err != nil {
 		return ""
 	}
-	return html.UnescapeString(unquote)
+	parsed = html.UnescapeString(parsed)
+	parsed = strings.Replace(parsed, "<sup>", "^(", -1)
+	parsed = strings.Replace(parsed, "</sup>", ")", -1)
+	return parsed
 }
 
 // please disregard the reproduction of src/pkg/http/client.go:send below
