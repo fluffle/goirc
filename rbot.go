@@ -64,11 +64,15 @@ func connect(network string) {
 	c.AddHandler("join", handleJoin)
 	c.AddHandler("invite", handleInvite)
 
+	var lastAttempt int64 = 0
 	for {
+		lastAttempt = time.Seconds()
 		fmt.Printf("Connecting to %s...\n", server)
 		if err := c.Connect(server); err != nil {
 			fmt.Printf("Connection error: %s\n", err)
-			break
+			if time.Seconds() - lastAttempt < 30 {
+				time.Sleep(60000000000) // 1 minute
+			}
 		}
 		for err := range c.Err {
 			fmt.Printf("goirc error: %s\n", err)
