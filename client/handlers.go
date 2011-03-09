@@ -121,7 +121,7 @@ func (conn *Conn) h_NICK(line *Line) {
 // Handle VERSION requests and CTCP PING
 func (conn *Conn) h_CTCP(line *Line) {
 	if line.Args[0] == "VERSION" {
-		conn.CtcpReply(line.Nick, "VERSION", "powered by goirc...")
+		conn.CtcpReply(line.Nick, "VERSION", "powered by goirc... https://github.com/raylu/rbot")
 	} else if line.Args[0] == "PING" {
 		conn.CtcpReply(line.Nick, "PING", line.Args[2])
 	}
