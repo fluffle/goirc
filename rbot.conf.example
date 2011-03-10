@@ -1,5 +1,8 @@
 [DEFAULT]
 trigger: !
+# 0 means don't run an identd. ircds expect 113, but on Linux that requires root
+# most users should be able to set it to 1130 and port forward 113->1130
+identdport: 0
 
 [Rizon]
 server: irc.rizon.net
