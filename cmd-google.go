@@ -101,7 +101,7 @@ func roman(conn *irc.Conn, nick *irc.Nick, args, target string) {
 	if targetlang == "" {
 		targetlang = "ja"
 	}
-	url := fmt.Sprintf("http://translate.google.com/translate_a/t?client=t&hl=%s&sl=%s&tl=en-U&text=%s",
+	url := fmt.Sprintf("http://translate.google.com/translate_a/t?client=t&hl=%s&sl=%s&tl=en-US&text=%s",
 		targetlang, sourcelang, http.URLEscape(args))
 
 	b, err := send(url)
@@ -114,7 +114,16 @@ func roman(conn *irc.Conn, nick *irc.Nick, args, target string) {
 		say(conn, target, "%s: Error while parsing romanization", nick.Nick); return
 	}
 
-	say(conn, target, "%s: %s", result[1], result[5])
+	source := result[1]
+	romanized := result[5]
+	if (sourcelang == "en" && !strings.Contains(args, " ") &&
+		source[:len(source)/2] == source[len(source)/2:] &&
+		strings.ToLower(romanized[:len(romanized)/2]) == strings.ToLower(romanized[len(romanized)/2+1:])) {
+		// Google duplicates when there is only one source word
+		say(conn, target, "%s: %s", source[:len(source)/2], romanized[:len(romanized)/2])
+	} else {
+		say(conn, target, "%s: %s", source, romanized)
+	}
 }
 
 func calc(conn *irc.Conn, nick *irc.Nick, args, target string) {
