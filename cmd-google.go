@@ -114,16 +114,21 @@ func roman(conn *irc.Conn, nick *irc.Nick, args, target string) {
 		say(conn, target, "%s: Error while parsing romanization", nick.Nick); return
 	}
 
-	source := result[1]
-	romanized := result[5]
-	if (sourcelang == "en" && !strings.Contains(args, " ") &&
-		source[:len(source)/2] == source[len(source)/2:] &&
-		strings.ToLower(romanized[:len(romanized)/2]) == strings.ToLower(romanized[len(romanized)/2+1:])) {
+	if (sourcelang == "en" && !strings.Contains(args, " ")) {
 		// Google duplicates when there is only one source word
-		say(conn, target, "%s: %s", source[:len(source)/2], romanized[:len(romanized)/2])
-	} else {
-		say(conn, target, "%s: %s", source, romanized)
+		source := utf8.NewString(result[1])
+		romanized := utf8.NewString(result[5])
+		source_left := source.Slice(0, source.RuneCount()/2)
+		source_right := source.Slice(source.RuneCount()/2, source.RuneCount())
+		romanized_left := romanized.Slice(0, romanized.RuneCount()/2)
+		romanized_right :=romanized.Slice(romanized.RuneCount()/2, romanized.RuneCount())
+		if (source_left == source_right &&
+			strings.ToLower(romanized_left) == strings.ToLower(romanized_right)) {
+			say(conn, target, "%s: %s", source_left, romanized_left)
+			return
+		}
 	}
+	say(conn, target, "%s: %s", result[1], result[5])
 }
 
 func calc(conn *irc.Conn, nick *irc.Nick, args, target string) {
