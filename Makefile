@@ -9,7 +9,15 @@ GOFILES=rbot.go handler.go auth.go cmd-access.go cmd-admin.go cmd-op.go cmd-goog
 
 include $(GOROOT)/src/Make.cmd
 
-all: rbot.conf auth.conf
+.PHONY: client goconfig
+
+all: rbot.conf auth.conf client goconfig
+
+client:
+	$(MAKE) -C client install
+
+goconfig:
+	$(MAKE) -C goconfig install
 
 rbot.conf: rbot.conf.example
 	@if [ -f $@ ] ; then \
