@@ -9,9 +9,9 @@ Assuming you have go set up (http://golang.org/),
 	cd rbot
 	git submodule init
 	git submodule update
-	make -C client install
-	make -C goconfig install
-	make
+	gomake -C client install
+	gomake -C goconfig install
+	gomake
 
 rbot.conf and auth.conf will be copied. Configure those and then run the bot:
 
