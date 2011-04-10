@@ -252,3 +252,23 @@ func part(conn *irc.Conn, nick *irc.Nick, args, target string) {
 		conn.Part(channel, "")
 	}
 }
+
+func highlightOps(conn *irc.Conn, nick *irc.Nick, args, target string) {
+	channel, args := parseAccess(conn, nick, target, args, "t")
+	if channel == "" {
+		return
+	}
+	c := conn.GetChannel(channel)
+	if c == nil {
+		say(conn, target, "Error while getting channel information for %s", channel)
+		return
+	}
+
+	var highlights string
+	for onick, privs := range c.Nicks {
+		if privs.Op && onick.Nick != nick.Nick {
+			highlights += onick.Nick + ", "
+		}
+	}
+	say(conn, channel, highlights[:len(highlights)-2] + "!")
+}
