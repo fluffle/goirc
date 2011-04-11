@@ -62,20 +62,20 @@ func handlePrivmsg(conn *irc.Conn, line *irc.Line) {
 	target := line.Args[0]
 	if isChannel(target) {
 		// message to a channel
-		var video string
-		if start := strings.Index(line.Args[1], "youtube.com/watch?v="); start > -1 {
-			video = line.Args[1][start+20:]
-		}
-		if start := strings.Index(line.Args[1], "youtu.be/"); start > -1 {
-			video = line.Args[1][start+9:]
-		}
-		if video != "" {
-			if end := strings.IndexAny(video, " &#"); end > -1 {
-				video = video[0:end]
+		if !command(conn, nick, line.Args[1], target) {
+			var video string
+			if start := strings.Index(line.Args[1], "youtube.com/watch?v="); start > -1 {
+				video = line.Args[1][start+20:]
 			}
-			youtube(conn, nick, video, target)
-		} else {
-			command(conn, nick, line.Args[1], target)
+			if start := strings.Index(line.Args[1], "youtu.be/"); start > -1 {
+				video = line.Args[1][start+9:]
+			}
+			if video != "" {
+				if end := strings.IndexAny(video, " &#"); end > -1 {
+					video = video[0:end]
+				}
+				youtube(conn, nick, video, target)
+			}
 		}
 	} else if target == conn.Me.Nick {
 		// message to us
@@ -133,13 +133,13 @@ func isChannel(target string) bool {
 	return target[0] == '#' || target[0] == '&'
 }
 
-func command(conn *irc.Conn, nick *irc.Nick, text, target string) {
+func command(conn *irc.Conn, nick *irc.Nick, text, target string) bool {
 	if !strings.HasPrefix(text, trigger) {
-		return
+		return false
 	}
 	split := strings.Split(text, " ", 2)
 	if len(split[0]) < 2 {
-		return
+		return false
 	}
 	handler := commands[split[0][1:]]
 	if handler != nil {
@@ -148,7 +148,9 @@ func command(conn *irc.Conn, nick *irc.Nick, text, target string) {
 		} else {
 			handler(conn, nick, "", target)
 		}
+		return true
 	}
+	return false
 }
 
 func say(conn *irc.Conn, target, message string, a ...interface{}) {
