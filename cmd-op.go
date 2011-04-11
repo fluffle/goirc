@@ -243,7 +243,7 @@ func appendtopic(conn *irc.Conn, nick *irc.Nick, args, target string) {
 }
 
 func part(conn *irc.Conn, nick *irc.Nick, args, target string) {
-	channel, args := parseChannel(target, args)
+	channel, _ := parseChannel(target, args)
 	if channel == "" {
 		return
 	}
@@ -254,7 +254,7 @@ func part(conn *irc.Conn, nick *irc.Nick, args, target string) {
 }
 
 func highlightOps(conn *irc.Conn, nick *irc.Nick, args, target string) {
-	channel, args := parseAccess(conn, nick, target, args, "t")
+	channel, _ := parseChannel(target, args)
 	if channel == "" {
 		return
 	}
