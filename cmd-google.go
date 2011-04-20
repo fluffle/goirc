@@ -22,10 +22,20 @@ const googleAPIKey = "ABQIAAAA6-N_jl4ETgtMf2M52JJ_WRQjQjNunkAJHIhTdFoxe8Di7fkkYh
 func translate(conn *irc.Conn, nick *irc.Nick, args, target string) {
 	var langPairs vector.StringVector
 	for {
-		split := strings.Split(args, " ", 2)
-		if len(split) == 2 && len(split[0]) == 5 && split[0][2] == '|' {
-			langPairs.Push("&langpair=" + split[0])
-			args = split[1]
+		field := strings.IndexAny(args, " 　") // handle spaces and ideographic spaces (U+3000)
+		if field != -1 {
+			first := args[:field]
+			if len(first) == 5 && first[2] == '|' {
+				langPairs.Push("&langpair=" + first)
+				if args[field] == ' ' {
+					args = args[field+1:]
+				} else {
+					args = args[field+utf8.RuneLen(3000):]
+				}
+				fmt.Printf("'%s' '%s'\n", first, args)
+			} else {
+				break
+			}
 		} else {
 			break
 		}
