@@ -32,7 +32,6 @@ func translate(conn *irc.Conn, nick *irc.Nick, args, target string) {
 				} else {
 					args = args[field+utf8.RuneLen(3000):]
 				}
-				fmt.Printf("'%s' '%s'\n", first, args)
 			} else {
 				break
 			}
