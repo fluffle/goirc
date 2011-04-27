@@ -4,6 +4,8 @@ import (
 	irc "github.com/fluffle/goirc/client"
 	"fmt"
 	"strings"
+	"runtime"
+	"reflect"
 	"http"
 	"xml"
 	"strconv"
@@ -58,6 +60,23 @@ func handlePrivmsg(conn *irc.Conn, line *irc.Line) {
 	if ignores[conn.Network][nick.Host] {
 		return
 	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("Recovered from", r)
+			callers := make([]uintptr, 10)
+			runtime.Callers(4, callers)
+			cutoff := runtime.FuncForPC(reflect.NewValue(handlePrivmsg).(*reflect.FuncValue).Get()).Entry()
+			for _, pc := range callers {
+				function := runtime.FuncForPC(pc - 1)
+				if function.Entry() == cutoff{
+					break
+				}
+				file, line := function.FileLine(pc - 1)
+				fmt.Printf("%s:%d\n\t%s\n", file, line, function.Name())
+			}
+		}
+	}()
 
 	target := line.Args[0]
 	if isChannel(target) {
