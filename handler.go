@@ -69,7 +69,7 @@ func handlePrivmsg(conn *irc.Conn, line *irc.Line) {
 			cutoff := runtime.FuncForPC(reflect.ValueOf(handlePrivmsg).Pointer()).Entry()
 			for _, pc := range callers {
 				function := runtime.FuncForPC(pc - 1)
-				if function.Entry() == cutoff{
+				if function.Entry() == cutoff {
 					break
 				}
 				file, line := function.FileLine(pc - 1)
