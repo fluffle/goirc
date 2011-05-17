@@ -47,7 +47,7 @@ type Conn struct {
 	Timestamp func() *time.Time
 
 	// Enable debugging? Set format for timestamps on debug output.
-	Debug bool
+	Debug    bool
 	TSFormat string
 }
 
@@ -113,7 +113,7 @@ func (conn *Conn) Connect(host string, pass ...string) os.Error {
 		// It's unfortunate that tls.Dial doesn't allow a tls.Config arg,
 		// so we simply replicate it here with the correct Config.
 		// http://codereview.appspot.com/2883041
-		if s, err := net.Dial("tcp", "", host); err == nil {
+		if s, err := net.Dial("tcp", host); err == nil {
 			// Passing nil config => certs are validated.
 			c := tls.Client(s, conn.SSLConfig)
 			if err = c.Handshake(); err == nil {
@@ -129,7 +129,7 @@ func (conn *Conn) Connect(host string, pass ...string) os.Error {
 		if !hasPort(host) {
 			host += ":6667"
 		}
-		if s, err := net.Dial("tcp", "", host); err == nil {
+		if s, err := net.Dial("tcp", host); err == nil {
 			conn.sock = s
 		} else {
 			return err

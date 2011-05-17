@@ -433,23 +433,23 @@ func (n *Nick) String() string {
 func (cm *ChanMode) String() string {
 	str := "+"
 	a := make([]string, 2)
-	v := reflect.Indirect(reflect.NewValue(cm)).(*reflect.StructValue)
-	t := v.Type().(*reflect.StructType)
+	v := reflect.Indirect(reflect.ValueOf(cm))
+	t := v.Type()
 	for i := 0; i < v.NumField(); i++ {
-		switch f := v.Field(i).(type) {
-		case *reflect.BoolValue:
-			if f.Get() {
+		switch f := v.Field(i); f.Kind() {
+		case reflect.Bool:
+			if f.Bool() {
 				str += ChanModeToString[t.Field(i).Name]
 			}
-		case *reflect.StringValue:
-			if f.Get() != "" {
+		case reflect.String:
+			if f.String() != "" {
 				str += ChanModeToString[t.Field(i).Name]
-				a[0] = f.Get()
+				a[0] = f.String()
 			}
-		case *reflect.IntValue:
-			if f.Get() != 0 {
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			if f.Int() != 0 {
 				str += ChanModeToString[t.Field(i).Name]
-				a[1] = fmt.Sprintf("%d", f.Get())
+				a[1] = fmt.Sprintf("%d", f.Int())
 			}
 		}
 	}
@@ -468,13 +468,13 @@ func (cm *ChanMode) String() string {
 //	+iwx
 func (nm *NickMode) String() string {
 	str := "+"
-	v := reflect.Indirect(reflect.NewValue(nm)).(*reflect.StructValue)
-	t := v.Type().(*reflect.StructType)
+	v := reflect.Indirect(reflect.ValueOf(nm))
+	t := v.Type()
 	for i := 0; i < v.NumField(); i++ {
-		switch f := v.Field(i).(type) {
+		switch f := v.Field(i); f.Kind() {
 		// only bools here at the mo!
-		case *reflect.BoolValue:
-			if f.Get() {
+		case reflect.Bool:
+			if f.Bool() {
 				str += NickModeToString[t.Field(i).Name]
 			}
 		}
@@ -489,13 +489,13 @@ func (nm *NickMode) String() string {
 //	+o
 func (p *ChanPrivs) String() string {
 	str := "+"
-	v := reflect.Indirect(reflect.NewValue(p)).(*reflect.StructValue)
-	t := v.Type().(*reflect.StructType)
+	v := reflect.Indirect(reflect.ValueOf(p))
+	t := v.Type()
 	for i := 0; i < v.NumField(); i++ {
-		switch f := v.Field(i).(type) {
+		switch f := v.Field(i); f.Kind() {
 		// only bools here at the mo too!
-		case *reflect.BoolValue:
-			if f.Get() {
+		case reflect.Bool:
+			if f.Bool() {
 				str += ChanPrivToString[t.Field(i).Name]
 			}
 		}

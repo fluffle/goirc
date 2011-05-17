@@ -66,7 +66,7 @@ func handlePrivmsg(conn *irc.Conn, line *irc.Line) {
 			fmt.Println("Recovered from", r)
 			callers := make([]uintptr, 10)
 			runtime.Callers(4, callers)
-			cutoff := runtime.FuncForPC(reflect.NewValue(handlePrivmsg).(*reflect.FuncValue).Get()).Entry()
+			cutoff := runtime.FuncForPC(reflect.ValueOf(handlePrivmsg).Pointer()).Entry()
 			for _, pc := range callers {
 				function := runtime.FuncForPC(pc - 1)
 				if function.Entry() == cutoff{

@@ -202,7 +202,7 @@ func send(url string) ([]byte, os.Error) {
 	}
 	request.UserAgent = "Mozilla/5.0"
 
-	httpcon, err := net.Dial("tcp", "", request.URL.Host + ":" + request.URL.Scheme)
+	httpcon, err := net.Dial("tcp", request.URL.Host + ":" + request.URL.Scheme)
 	if err != nil {
 		return nil, err
 	}
