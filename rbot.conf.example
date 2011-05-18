@@ -18,3 +18,10 @@ autojoin: true
 
 [Rizon #vn-meta]
 autojoin: false
+
+[Freenode]
+server: irc.freenode.net:8001
+nick: rbot
+user: rbot
+autoconnect: false
+ssl: false
