@@ -7,7 +7,6 @@ import (
 	"os"
 	"http"
 	"net"
-	"bufio"
 	"io/ioutil"
 	"container/vector"
 	"html"
@@ -52,7 +51,7 @@ func translate(conn *irc.Conn, nick *irc.Nick, args, target string) {
 		                   http.URLEscape(args), googleAPIKey)
 	}
 
-	response, _, err := http.Get(url)
+	response, err := http.Get(url)
 	defer response.Body.Close()
 	if err != nil {
 		say(conn, target, "%s: Error while requesting translation", nick.Nick); return
@@ -113,7 +112,7 @@ func roman(conn *irc.Conn, nick *irc.Nick, args, target string) {
 	url := fmt.Sprintf("http://translate.google.com/translate_a/t?client=t&hl=%s&sl=%s&tl=en-US&text=%s",
 		targetlang, sourcelang, http.URLEscape(args))
 
-	b, err := send(url)
+	b, err := getUserAgent(url)
 	if err != nil {
 		say(conn, target, "%s: Error while requesting romanization", nick.Nick); return
 	}
@@ -146,7 +145,7 @@ func calc(conn *irc.Conn, nick *irc.Nick, args, target string) {
 	}
 	url := fmt.Sprintf("http://www.google.com/ig/calculator?hl=en&q=%s&key=%s", http.URLEscape(args), googleAPIKey)
 
-	b, err := send(url)
+	b, err := getUserAgent(url)
 	if err != nil {
 		say(conn, target, "%s: Error while requesting calculation", nick.Nick); return
 	}
@@ -191,35 +190,32 @@ func parseCalc(output string) string {
 	return parsed
 }
 
-// please disregard the reproduction of src/pkg/http/client.go:send below
-// it's definitely not to send a User-Agent for undocumented Google APIs
-func send(url string) ([]byte, os.Error) {
-	var request http.Request
-	var err os.Error
-	request.URL, err = http.ParseURL(url)
+// make a GET request with a fake user agent
+// this is definitely not for those undocumented Google APIs
+func getUserAgent(urlstr string) ([]byte, os.Error) {
+	url, err := http.ParseURL(urlstr)
 	if err != nil {
 		return nil, err
 	}
-	request.UserAgent = "Mozilla/5.0"
 
-	httpcon, err := net.Dial("tcp", request.URL.Host + ":" + request.URL.Scheme)
+	conn, err := net.Dial("tcp", url.Host + ":http")
 	if err != nil {
 		return nil, err
 	}
-	defer httpcon.Close()
-	err = request.Write(httpcon)
+
+	req, err := http.NewRequest("GET", urlstr, nil)
 	if err != nil {
 		return nil, err
 	}
-	reader := bufio.NewReader(httpcon)
-	response, err := http.ReadResponse(reader, request.Method)
+	req.UserAgent = "Mozilla/5.0"
+
+	httpconn := http.NewClientConn(conn, nil)
+	response, err := httpconn.Do(req)
 	if err != nil {
 		return nil, err
 	}
+	defer response.Body.Close()
 
 	b, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		return nil, err
-	}
-	return b, nil
+	return b, err
 }

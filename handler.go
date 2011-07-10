@@ -186,7 +186,7 @@ func say(conn *irc.Conn, target, message string, a ...interface{}) {
 
 func youtube(conn *irc.Conn, nick *irc.Nick, video, channel string) {
 	url := fmt.Sprintf("http://gdata.youtube.com/feeds/api/videos/%s?v=2", video)
-	response, _, err := http.Get(url)
+	response, err := http.Get(url)
 	defer response.Body.Close()
 	if err != nil {
 		return
