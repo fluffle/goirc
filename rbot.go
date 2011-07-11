@@ -127,8 +127,6 @@ func updateConf(section, option, value string) {
 	if err := conf.WriteFile(confFile, 0644, ""); err != nil {
 		panic("Error while writing to " + confFile)
 	}
-	// config.WriteFile destroys the config, so
-	readConf()
 }
 
 func identd(port string) {

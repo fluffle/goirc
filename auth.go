@@ -174,7 +174,5 @@ func updateAuth() os.Error {
 	if err := auth.WriteFile(authFile, 0644, ""); err != nil {
 		return err
 	}
-	// config.WriteFile destroys the config, so
-	readAuth()
 	return nil
 }
