@@ -1,9 +1,12 @@
 package config
 
 import (
+	"bufio"
+	"bytes"
 	"os"
 	"fmt"
 	"net"
+	"json"
 	"strings"
 )
 
@@ -29,17 +32,22 @@ type Config struct {
 	Errors []os.Error
 }
 
-
-func LoadConfig(filename string) *Config {
+func ConfigFromFile(filename string) (*Config, os.Error) {
 	conf := &Config{fn: filename}
 	conf.initialise()
 	if fh, err := os.Open(conf.fn, os.O_RDONLY, 0644); err == nil {
-		conf.Parse(fh)
+		// Cheat and use bufio.ReadBytes to slurp the file.
+		rdr := bufio.NewReader(fh)
+		data, err := rdr.ReadBytes('\000')
 		fh.Close()
-	} else {
-		conf.Errors = append(conf.Errors, err)
+		if err != os.EOF {
+			return nil, err
+		}
+		if err = json.Unmarshal(data, conf); err != nil {
+			return nil, err
+		}
 	}
-	return conf
+	return conf, nil
 }
 
 func (conf *Config) initialise() {
@@ -52,13 +60,36 @@ func (conf *Config) initialise() {
 	conf.Errors = make([]os.Error, 0)
 }
 
-func (conf *Config) Rehash() {
-	neu := LoadConfig(conf.fn)
-	if len(neu.Errors) > 0 {
-		conf.Errors = neu.Errors
-	} else {
-		conf = neu
+func NewConfig() *Config {
+	conf := new(Config)
+	conf.initialise()
+	return conf
+}
+
+func (conf *Config) String() string {
+	str, err := json.MarshalIndent(conf, "" , "  ")
+	if err == nil {
+		return string(str)
 	}
+	return fmt.Sprintf("marshal error: %s", err)
+}
+
+func (conf *Config) MarshalJSON() ([]byte, os.Error) {
+	buf := &bytes.Buffer{}
+	ports := make([]*cPort, len(conf.Ports))
+	i := 0
+	for _, p := range(conf.Ports) {
+		ports[i] = p
+		i++
+	}
+	b, err := json.Marshal(ports)
+	if err != nil {
+		return nil, err
+	}
+	buf.WriteString("{\"Ports\":")
+	buf.Write(b)
+	buf.WriteByte('}')
+	return buf.Bytes(), nil
 }
 
 /* Port configuration */
@@ -71,7 +102,7 @@ type cPort struct {
 	SSL, Zip bool
 }
 
-func defaultPort() *cPort {
+func DefaultPort() *cPort {
 	return &cPort{
 		BindIP: nil, Class: "client",
 		SSL: false, Zip: false,
@@ -79,18 +110,11 @@ func defaultPort() *cPort {
 }
 
 func (p *cPort) String() string {
-    str := []string{fmt.Sprintf("port %d {", p.Port)}
-	if p.BindIP != nil {
-		str = append(str,
-			fmt.Sprintf("\tbind_ip = %s", p.BindIP.String()))
+	str, err := json.MarshalIndent(p, "" , "  ")
+	if err == nil {
+		return string(str)
 	}
-	str = append(str,
-		fmt.Sprintf("\tclass  = %s", p.Class),
-		fmt.Sprintf("\tssl    = %t", p.SSL),
-		fmt.Sprintf("\tzip    = %t", p.Zip),
-		"}",
-	)
-	return strings.Join(str, "\n")
+	return fmt.Sprintf("marshal error: %s", err)
 }
 
 /* Oper configuration */

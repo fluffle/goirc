@@ -7,10 +7,5 @@ include $(GOROOT)/src/Make.inc
 TARG=irc/server/config
 GOFILES=\
 	config.go\
-    parser.go\
 
 include $(GOROOT)/src/Make.pkg
-
-parser.go: parser.rl
-	ragel-svn -Z -G2 -o parser.go parser.rl
-
