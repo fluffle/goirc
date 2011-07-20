@@ -96,6 +96,10 @@ func autojoin(conn *irc.Conn) {
 				fmt.Printf("Joining %s on %s\n", split[1], conn.Network)
 				conn.Join(split[1])
 			}
+
+			if annstream, _ := conf.Bool(s, "stream"); annstream {
+				announceJustinTv(conn, split[1])
+			}
 		}
 	}
 }
