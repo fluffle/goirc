@@ -41,7 +41,7 @@ type Conn struct {
 	SSLConfig *tls.Config
 
 	// Socket timeout, in seconds. Defaulted to 5m in New().
-	Timeout int
+	Timeout int64
 
 	// Set this to true to disable flood protection and false to re-enable
 	Flood bool
