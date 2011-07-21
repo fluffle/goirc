@@ -69,29 +69,30 @@ type Line struct {
 // Creates a new IRC connection object, but doesn't connect to anything so
 // that you can add event handlers to it. See AddHandler() for details.
 func New(nick, user, name string) *Conn {
-	conn := new(Conn)
-	conn.initialise()
-	conn.SSL = false
-	conn.SSLConfig = nil
-	conn.Timeout = 300
+	conn := &Conn{
+		in: make(chan *Line, 32),
+		out: make(chan string, 32),
+		Err: make(chan os.Error, 4),
+		SSL: false,
+		SSLConfig: nil,
+		Timeout: 300,
+		Timestamp: time.LocalTime,
+		TSFormat: "15:04:05",
+	}
 	conn.Me = conn.NewNick(nick, user, name, "")
-	conn.Timestamp = time.LocalTime
-	conn.TSFormat = "15:04:05"
+	conn.initialise()
 	conn.setupEvents()
 	return conn
 }
 
+// Per-connection state initialisation.
 func (conn *Conn) initialise() {
-	// allocate meh some memoraaaahh
 	conn.nicks = make(map[string]*Nick)
 	conn.chans = make(map[string]*Channel)
-	conn.in = make(chan *Line, 32)
-	conn.out = make(chan string, 32)
-	conn.Err = make(chan os.Error, 4)
 	conn.io = nil
 	conn.sock = nil
 
-	// if this is being called because we are reconnecting, conn.Me
+	// If this is being called because we are reconnecting, conn.Me
 	// will still have all the old channels referenced -- nuke them!
 	if conn.Me != nil {
 		conn.Me = conn.NewNick(conn.Me.Nick, conn.Me.Ident, conn.Me.Name, "")
@@ -254,9 +255,6 @@ func (conn *Conn) runLoop() {
 }
 
 func (conn *Conn) shutdown() {
-	close(conn.in)
-	close(conn.out)
-	close(conn.Err)
 	conn.connected = false
 	conn.sock.Close()
 	// reinit datastructures ready for next connection
