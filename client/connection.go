@@ -138,7 +138,7 @@ func (conn *Conn) Connect(host string, pass ...string) os.Error {
 	conn.io = bufio.NewReadWriter(
 		bufio.NewReader(conn.sock),
 		bufio.NewWriter(conn.sock))
-	conn.sock.SetTimeout(conn.Timeout * 1e9)
+	conn.sock.SetTimeout(conn.Timeout * second)
 	conn.connected = true
 	go conn.send()
 	go conn.recv()
