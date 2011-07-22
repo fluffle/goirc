@@ -9,6 +9,7 @@ GOFILES=\
 	connection.go\
 	commands.go\
 	handlers.go\
+	line.go\
 	nickchan.go
 
 include $(GOROOT)/src/Make.pkg
