@@ -139,6 +139,7 @@ func (conn *Conn) Connect(host string, pass ...string) os.Error {
 		bufio.NewReader(conn.sock),
 		bufio.NewWriter(conn.sock))
 	conn.sock.SetTimeout(conn.Timeout * 1e9)
+	conn.connected = true
 	go conn.send()
 	go conn.recv()
 
@@ -247,14 +248,18 @@ func (conn *Conn) rateLimit(chars int64) {
 }
 
 func (conn *Conn) shutdown() {
-	conn.connected = false
-	conn.sock.Close()
-	conn.cSend <- true
-	conn.cLoop <- true
-	conn.dispatchEvent(&Line{Cmd: "DISCONNECTED"})
-	// reinit datastructures ready for next connection
-	// do this here rather than after runLoop()'s for due to race
-	conn.initialise()
+	// Guard against double-call of shutdown() if we get an error in send()
+	// as calling sock.Close() will cause recv() to recieve EOF in readstring()
+	if conn.connected {
+		conn.connected = false
+		conn.sock.Close()
+		conn.cSend <- true
+		conn.cLoop <- true
+		conn.dispatchEvent(&Line{Cmd: "DISCONNECTED"})
+		// reinit datastructures ready for next connection
+		// do this here rather than after runLoop()'s for due to race
+		conn.initialise()
+	}
 }
 
 // Dumps a load of information about the current state of the connection to a
