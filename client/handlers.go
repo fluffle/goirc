@@ -16,7 +16,7 @@ import "strings"
 // "name" being equivalent to Line.Cmd. Read the RFCs for details on what
 // replies could come from the server. They'll generally be things like
 // "PRIVMSG", "JOIN", etc. but all the numeric replies are left as ascii
-// strings of digits like "332" (mainly because I really didn't feel like 
+// strings of digits like "332" (mainly because I really didn't feel like
 // putting massive constant tables in).
 func (conn *Conn) AddHandler(name string, f func(*Conn, *Line)) {
 	n := strings.ToUpper(name)

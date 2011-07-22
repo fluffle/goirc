@@ -183,7 +183,7 @@ func (conn *Conn) ParseChannelModes(ch *Channel, modes string, modeargs []string
 	}
 }
 
-// Parse mode strings for a nick 
+// Parse mode strings for a nick
 func (conn *Conn) ParseNickModes(n *Nick, modes string) {
 	var modeop bool // true => add mode, false => remove mode
 	for i := 0; i < len(modes); i++ {
@@ -276,7 +276,7 @@ func (n *Nick) initialise() {
 //
 // Very slightly different to irc.Channel.AddNick() in that it tests for a
 // pre-existing association within the *irc.Nick object rather than the
-// *irc.Channel object before associating the two. 
+// *irc.Channel object before associating the two.
 func (n *Nick) AddChannel(ch *Channel) {
 	if _, ok := n.Channels[ch]; !ok {
 		ch.Nicks[n] = new(ChanPrivs)

@@ -263,7 +263,7 @@ func (conn *Conn) shutdown() {
 }
 
 // Dumps a load of information about the current state of the connection to a
-// string for debugging state tracking and other such things. 
+// string for debugging state tracking and other such things.
 func (conn *Conn) String() string {
 	str := "GoIRC Connection\n"
 	str += "----------------\n\n"
