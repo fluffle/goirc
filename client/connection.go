@@ -82,9 +82,9 @@ func New(nick, user, name string) *Conn {
 		Timestamp: time.LocalTime,
 		TSFormat: "15:04:05",
 	}
-	conn.Me = conn.NewNick(nick, user, name, "")
 	conn.initialise()
 	conn.setupEvents()
+	conn.Me = conn.NewNick(nick, user, name, "")
 	return conn
 }
 
