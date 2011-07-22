@@ -15,6 +15,11 @@ func main() {
 	c.AddHandler("connected",
 		func(conn *irc.Conn, line *irc.Line) { conn.Join("#go-nuts") })
 
+	// Set up a handler to notify of disconnect events.
+	quit := make(chan bool)
+	c.AddHandler("disconnected",
+		func(conn *irc.Conn, line *irc.Line) { quit <- true })
+
 	// connect to server
 	if err := c.Connect("irc.freenode.net"); err != nil {
 		fmt.Printf("Connection error: %s\n", err)
@@ -74,18 +79,18 @@ func main() {
 		}
 	}()
 
-	// stall here waiting for asplode on error channel
-	for {
-		for err := range c.Err {
+	for !reallyquit {
+		select {
+		case err := <-c.Err:
 			fmt.Printf("goirc error: %s\n", err)
-		}
-		if reallyquit {
-			break
-		}
-		fmt.Println("Reconnecting...")
-		if err := c.Connect("irc.freenode.net"); err != nil {
-			fmt.Printf("Connection error: %s\n", err)
-			break
+		case <-quit:
+			if !reallyquit {
+				fmt.Println("Reconnecting...")
+				if err := c.Connect("irc.freenode.net"); err != nil {
+					fmt.Printf("Connection error: %s\n", err)
+					reallyquit = true
+				}
+			}
 		}
 	}
 }
