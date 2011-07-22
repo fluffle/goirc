@@ -76,7 +76,6 @@ func (conn *Conn) h_PING(line *Line) {
 // Handler to trigger a "CONNECTED" event on receipt of numeric 001
 func (conn *Conn) h_001(line *Line) {
 	// we're connected!
-	conn.connected = true
 	conn.dispatchEvent(&Line{Cmd: "CONNECTED"})
 	// and we're being given our hostname (from the server's perspective)
 	t := line.Args[len(line.Args)-1]
@@ -103,7 +102,7 @@ func (conn *Conn) h_433(line *Line) {
 	// if this is happening before we're properly connected (i.e. the nick
 	// we sent in the initial NICK command is in use) we will not receive
 	// a NICK message to confirm our change of nick, so ReNick here...
-	if !conn.connected && line.Args[1] == conn.Me.Nick {
+	if line.Args[1] == conn.Me.Nick {
 		conn.Me.ReNick(line.Args[1] + "_")
 	}
 }
