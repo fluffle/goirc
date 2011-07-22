@@ -25,14 +25,20 @@ Synopsis:
         c.Debug = true
         // Optionally, enable SSL
         c.SSL = true
-        // add handlers to do things here!
-	    if err := c.Connect("irc.freenode.net"); err != nil {
+
+		// Add handlers to do things here!
+		// e.g. watching for disconnection from the server.
+		connected := true
+		c.AddHandler("disconnected",
+			func(conn *irc.Conn, line *irc.Line) { connected = false })
+	    
+		// Tell client to connect
+		if err := c.Connect("irc.freenode.net"); err != nil {
 		    fmt.Printf("Connection error: %s\n", err.String())
 	    }
-        for {
-            if closed(c.Err) {
-                break
-            }
+
+		// Loop until client gets disconnected, printing any errors
+        for connected {
             if err := <-c.Err; err != nil {
                 fmt.Printf("goirc error: %s", err.String())
             }
@@ -61,5 +67,5 @@ indebted to Matt Gruen for his work on
 the re-organisation and channel-based communication structure of `*Conn.send()`
 and `*Conn.recv()`. I'm sure things could be more asynchronous, still.
 
-This code is (c) 2009-10 Alex Bramley, and released under the same licence terms
+This code is (c) 2009-11 Alex Bramley, and released under the same licence terms
 as Go itself.
