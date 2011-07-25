@@ -43,10 +43,10 @@ func (conn *Conn) dispatchEvent(line *Line) {
 	// handlers to cope with the possibilities.
 	if line.Cmd == "PRIVMSG" &&
 		len(line.Args[1]) > 2 &&
-		line.Args[1][0] == '\001' &&
-		line.Args[1][len(line.Args[1])-1] == '\001' {
+		strings.HasPrefix(line.Args[1], "\001") &&
+		strings.HasSuffix(line.Args[1], "\001") {
 		// WOO, it's a CTCP message
-		t := strings.SplitN(line.Args[1][1:len(line.Args[1])-1], " ", 2)
+		t := strings.SplitN(strings.Trim(line.Args[1], "\001"), " ", 2)
 		if len(t) > 1 {
 			// Replace the line with the unwrapped CTCP
 			line.Args[1] = t[1]
@@ -197,7 +197,7 @@ func (conn *Conn) h_QUIT(line *Line) {
 func (conn *Conn) h_MODE(line *Line) {
 	// channel modes first
 	if ch := conn.GetChannel(line.Args[0]); ch != nil {
-		conn.ParseChannelModes(ch, line.Args[1], line.Args[2:len(line.Args)])
+		conn.ParseChannelModes(ch, line.Args[1], line.Args[2:])
 	} else if n := conn.GetNick(line.Args[0]); n != nil {
 		// nick mode change, should be us
 		if n != conn.Me {
@@ -232,9 +232,8 @@ func (conn *Conn) h_311(line *Line) {
 
 // Handle 324 mode reply
 func (conn *Conn) h_324(line *Line) {
-	// XXX: copypasta from MODE, needs tidying.
 	if ch := conn.GetChannel(line.Args[1]); ch != nil {
-		conn.ParseChannelModes(ch, line.Args[2], line.Args[3:len(line.Args)])
+		conn.ParseChannelModes(ch, line.Args[2], line.Args[3:])
 	} else {
 		conn.error("irc.324(): buh? received MODE settings for unknown channel %s", line.Args[1])
 	}
@@ -281,7 +280,7 @@ func (conn *Conn) h_353(line *Line) {
 			}
 			switch c := nick[0]; c {
 			case '~', '&', '@', '%', '+':
-				nick = nick[1:len(nick)]
+				nick = nick[1:]
 				fallthrough
 			default:
 				n := conn.GetNick(nick)

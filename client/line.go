@@ -22,10 +22,10 @@ func parseLine(s string) *Line {
 	if s[0] == ':' {
 		// remove a source and parse it
 		if idx := strings.Index(s, " "); idx != -1 {
-			line.Src, s = s[1:idx], s[idx+1:len(s)]
+			line.Src, s = s[1:idx], s[idx+1:]
 		} else {
 			// pretty sure we shouldn't get here ...
-			line.Src = s[1:len(s)]
+			line.Src = s[1:]
 			return line
 		}
 
@@ -33,9 +33,9 @@ func parseLine(s string) *Line {
 		line.Host = line.Src
 		nidx, uidx := strings.Index(line.Src, "!"), strings.Index(line.Src, "@")
 		if uidx != -1 && nidx != -1 {
-			line.Nick = line.Src[0:nidx]
-			line.Ident = line.Src[nidx+1 : uidx]
-			line.Host = line.Src[uidx+1 : len(line.Src)]
+			line.Nick = line.Src[:nidx]
+			line.Ident = line.Src[nidx+1:uidx]
+			line.Host = line.Src[uidx+1:]
 		}
 	}
 
@@ -49,7 +49,7 @@ func parseLine(s string) *Line {
 	}
 	line.Cmd = strings.ToUpper(args[0])
 	if len(args) > 1 {
-		line.Args = args[1:len(args)]
+		line.Args = args[1:]
 	}
 	return line
 }

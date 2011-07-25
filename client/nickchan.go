@@ -127,14 +127,14 @@ func (conn *Conn) ParseChannelModes(ch *Channel, modes string, modeargs []string
 			ch.Modes.OperOnly = modeop
 		case 'k':
 			if len(modeargs) != 0 {
-				ch.Modes.Key, modeargs = modeargs[0], modeargs[1:len(modeargs)]
+				ch.Modes.Key, modeargs = modeargs[0], modeargs[1:]
 			} else {
 				conn.error("irc.ParseChanModes(): buh? not enough arguments to process MODE %s %s%s", ch.Name, modestr, m)
 			}
 		case 'l':
 			if len(modeargs) != 0 {
 				ch.Modes.Limit, _ = strconv.Atoi(modeargs[0])
-				modeargs = modeargs[1:len(modeargs)]
+				modeargs = modeargs[1:]
 			} else {
 				conn.error("irc.ParseChanModes(): buh? not enough arguments to process MODE %s %s%s", ch.Name, modestr, m)
 			}
@@ -154,7 +154,7 @@ func (conn *Conn) ParseChannelModes(ch *Channel, modes string, modeargs []string
 					case 'v':
 						p.Voice = modeop
 					}
-					modeargs = modeargs[1:len(modeargs)]
+					modeargs = modeargs[1:]
 				} else {
 					conn.error("irc.ParseChanModes(): MODE %s %s%s %s: buh? state tracking failure.", ch.Name, modestr, m, modeargs[0])
 				}
