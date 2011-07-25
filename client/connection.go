@@ -29,6 +29,10 @@ type Conn struct {
 	// Map of nicks we know about
 	nicks map[string]*Nick
 
+	// Use the State field to store external state that handlers might need.
+	// Remember ... you might need locking for this ;-)
+	State interface{}
+
 	// I/O stuff to server
 	sock      net.Conn
 	io        *bufio.ReadWriter
