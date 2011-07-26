@@ -46,7 +46,7 @@ func (conn *Conn) dispatchEvent(line *Line) {
 		strings.HasPrefix(line.Args[1], "\001") &&
 		strings.HasSuffix(line.Args[1], "\001") {
 		// WOO, it's a CTCP message
-		t := strings.SplitN(strings.Trim(line.Args[1], "\001"), " ", 2)
+		t := strings.Split(strings.Trim(line.Args[1], "\001"), " ", 2)
 		if len(t) > 1 {
 			// Replace the line with the unwrapped CTCP
 			line.Args[1] = t[1]
@@ -256,7 +256,7 @@ func (conn *Conn) h_352(line *Line) {
 		// XXX: do we care about the actual server the nick is on?
 		//      or the hop count to this server?
 		// last arg contains "<hop count> <real name>"
-		a := strings.SplitN(line.Args[len(line.Args)-1], " ", 2)
+		a := strings.Split(line.Args[len(line.Args)-1], " ", 2)
 		n.Name = a[1]
 		if idx := strings.Index(line.Args[6], "*"); idx != -1 {
 			n.Modes.Oper = true
@@ -272,7 +272,7 @@ func (conn *Conn) h_352(line *Line) {
 // Handle 353 names reply
 func (conn *Conn) h_353(line *Line) {
 	if ch := conn.GetChannel(line.Args[2]); ch != nil {
-		nicks := strings.Split(line.Args[len(line.Args)-1], " ")
+		nicks := strings.Split(line.Args[len(line.Args)-1], " ", -1)
 		for _, nick := range nicks {
 			// UnrealIRCd's coders are lazy and leave a trailing space
 			if nick == "" {
