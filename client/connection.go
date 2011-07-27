@@ -266,7 +266,7 @@ func (conn *Conn) shutdown() {
 		conn.sock.Close()
 		conn.cSend <- true
 		conn.cLoop <- true
-		conn.Dispatcher.Dispatch("disconnected")
+		conn.Dispatcher.Dispatch("disconnected", conn, nil)
 		// reinit datastructures ready for next connection
 		// do this here rather than after runLoop()'s for due to race
 		conn.initialise()

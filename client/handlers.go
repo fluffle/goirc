@@ -22,10 +22,14 @@ import (
 // strings of digits like "332" (mainly because I really didn't feel like 
 // putting massive constant tables in).
 func (conn *Conn) AddHandler(name string, f func(*Conn, *Line)) {
-	// Wrap f in an anonymous unboxing function
-	conn.Registry.AddHandler(name, event.NewHandler(func(ev ...interface{}) {
+	conn.Registry.AddHandler(name, IRCHandler(f))
+}
+
+// Wrap f in an anonymous unboxing function
+func IRCHandler(f func(*Conn, *Line)) event.Handler {
+	return event.NewHandler(func(ev ...interface{}) {
 		f(ev[0].(*Conn), ev[1].(*Line))
-	}))
+	})
 }
 
 // Basic ping/pong handler
@@ -36,7 +40,7 @@ func (conn *Conn) h_PING(line *Line) {
 // Handler to trigger a "CONNECTED" event on receipt of numeric 001
 func (conn *Conn) h_001(line *Line) {
 	// we're connected!
-	conn.Dispatcher.Dispatch("connected")
+	conn.Dispatcher.Dispatch("connected", conn, line)
 	// and we're being given our hostname (from the server's perspective)
 	t := line.Args[len(line.Args)-1]
 	if idx := strings.LastIndex(t, " "); idx != -1 {
