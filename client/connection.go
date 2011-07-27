@@ -2,10 +2,11 @@ package client
 
 import (
 	"bufio"
-	"os"
-	"net"
 	"crypto/tls"
+	"event"
 	"fmt"
+	"net"
+	"os"
 	"strings"
 	"time"
 )
@@ -23,7 +24,7 @@ type Conn struct {
 	Network string
 
 	// Event handler mapping
-	events map[string][]func(*Conn, *Line)
+	Registry event.EventRegistry
 	// Map of channels we're on
 	chans map[string]*Channel
 	// Map of nicks we know about
@@ -72,6 +73,7 @@ type Conn struct {
 // that you can add event handlers to it. See AddHandler() for details.
 func New(nick, user, name string) *Conn {
 	conn := &Conn{
+		Registry: event.NewRegistry(),
 		in: make(chan *Line, 32),
 		out: make(chan string, 32),
 		Err: make(chan os.Error, 4),

@@ -3,7 +3,10 @@ package client
 // this file contains the basic set of event handlers
 // to manage tracking an irc connection etc.
 
-import "strings"
+import (
+	"event"
+	"strings"
+)
 
 // AddHandler() adds an event handler for a specific IRC command.
 //
@@ -19,14 +22,10 @@ import "strings"
 // strings of digits like "332" (mainly because I really didn't feel like 
 // putting massive constant tables in).
 func (conn *Conn) AddHandler(name string, f func(*Conn, *Line)) {
-	n := strings.ToUpper(name)
-	if e, ok := conn.events[n]; ok {
-		conn.events[n] = append(e, f)
-	} else {
-		e := make([]func(*Conn, *Line), 1, 10)
-		e[0] = f
-		conn.events[n] = e
-	}
+	// Wrap f in an anonymous unboxing function
+	conn.Registry.AddHandler(name, event.NewHandler(func(ev ...interface{}) {
+		f(ev[0].(*Conn), ev[1].(*Line))
+	}))
 }
 
 // loops through all event handlers for line.Cmd, running each in a goroutine
@@ -61,11 +60,7 @@ func (conn *Conn) dispatchEvent(line *Line) {
 			line.Args = append([]string{c}, line.Args...)
 		}
 	}
-	if funcs, ok := conn.events[line.Cmd]; ok {
-		for _, f := range funcs {
-			go f(conn, line)
-		}
-	}
+	conn.Registry.Dispatch(line.Cmd, conn, line)
 }
 
 // Basic ping/pong handler
@@ -324,8 +319,6 @@ func (conn *Conn) h_671(line *Line) {
 
 // sets up the internal event handlers to do useful things with lines
 func (conn *Conn) setupEvents() {
-	conn.events = make(map[string][]func(*Conn, *Line))
-
 	conn.AddHandler("CTCP", (*Conn).h_CTCP)
 	conn.AddHandler("JOIN", (*Conn).h_JOIN)
 	conn.AddHandler("KICK", (*Conn).h_KICK)
