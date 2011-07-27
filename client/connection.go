@@ -197,9 +197,10 @@ func (conn *Conn) recv() {
 			fmt.Println(t.Format(conn.TSFormat) + " <- " + s)
 		}
 
-		line := parseLine(s)
-		line.Time = t
-		conn.in <- line
+		if line := parseLine(s); line != nil {
+			line.Time = t
+			conn.in <- line
+		}
 	}
 }
 
@@ -208,9 +209,7 @@ func (conn *Conn) runLoop() {
 	for {
 		select {
 		case line := <-conn.in:
-			if line != nil {
-				conn.dispatchEvent(line)
-			}
+			conn.dispatchEvent(line)
 		case <-conn.cLoop:
 			// strobe on control channel, bail out
 			return
