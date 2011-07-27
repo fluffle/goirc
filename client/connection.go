@@ -3,7 +3,7 @@ package client
 import (
 	"bufio"
 	"crypto/tls"
-	"event"
+	"github.com/fluffle/goirc/event"
 	"fmt"
 	"net"
 	"os"
