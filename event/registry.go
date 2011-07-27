@@ -50,7 +50,7 @@ type registry struct {
 	dispatcher func(r *registry, name string, ev ...interface{})
 }	
 
-func NewRegistry() *registry {
+func NewRegistry() EventRegistry {
 	r := &registry{events: make(map[string]*list.List)}
 	r.Parallel()
 	return r
@@ -87,6 +87,14 @@ func (r *registry) DelHandler(h Handler) {
 
 func (r *registry) Dispatch(name string, ev ...interface{}) {
 	r.dispatcher(r, name, ev...)
+}
+
+func (r *registry) ClearEvents(name string) {
+	r.Lock()
+	defer r.Unlock()
+	if l, ok := r.events[name]; ok {
+		l.Init()
+	}
 }
 
 func (r *registry) Parallel() {
