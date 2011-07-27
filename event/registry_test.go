@@ -1,4 +1,4 @@
-package registry
+package event
 
 // oh hey unit tests. or functionality tests, or something.
 
