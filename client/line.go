@@ -51,6 +51,30 @@ func parseLine(s string) *Line {
 	if len(args) > 1 {
 		line.Args = args[1:]
 	}
+
+	// So, I think CTCP and (in particular) CTCP ACTION are better handled as
+	// separate events as opposed to forcing people to have gargantuan PRIVMSG
+	// handlers to cope with the possibilities.
+	if line.Cmd == "PRIVMSG" &&
+		len(line.Args[1]) > 2 &&
+		strings.HasPrefix(line.Args[1], "\001") &&
+		strings.HasSuffix(line.Args[1], "\001") {
+		// WOO, it's a CTCP message
+		t := strings.Split(strings.Trim(line.Args[1], "\001"), " ", 2)
+		if len(t) > 1 {
+			// Replace the line with the unwrapped CTCP
+			line.Args[1] = t[1]
+		}
+		if c := strings.ToUpper(t[0]); c == "ACTION" {
+			// make a CTCP ACTION it's own event a-la PRIVMSG
+			line.Cmd = c
+		} else {
+			// otherwise, dispatch a generic CTCP event that
+			// contains the type of CTCP in line.Args[0]
+			line.Cmd = "CTCP"
+			line.Args = append([]string{c}, line.Args...)
+		}
+	}
 	return line
 }
 

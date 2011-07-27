@@ -208,7 +208,9 @@ func (conn *Conn) runLoop() {
 	for {
 		select {
 		case line := <-conn.in:
-			conn.dispatchEvent(line)
+			if line != nil {
+				conn.dispatchEvent(line)
+			}
 		case <-conn.cLoop:
 			// strobe on control channel, bail out
 			return
