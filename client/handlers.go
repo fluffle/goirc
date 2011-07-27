@@ -28,11 +28,6 @@ func (conn *Conn) AddHandler(name string, f func(*Conn, *Line)) {
 	}))
 }
 
-// loops through all event handlers for line.Cmd, running each in a goroutine
-func (conn *Conn) dispatchEvent(line *Line) {
-	conn.Registry.Dispatch(line.Cmd, conn, line)
-}
-
 // Basic ping/pong handler
 func (conn *Conn) h_PING(line *Line) {
 	conn.Raw("PONG :" + line.Args[0])
@@ -41,7 +36,7 @@ func (conn *Conn) h_PING(line *Line) {
 // Handler to trigger a "CONNECTED" event on receipt of numeric 001
 func (conn *Conn) h_001(line *Line) {
 	// we're connected!
-	conn.dispatchEvent(&Line{Cmd: "CONNECTED"})
+	conn.Dispatcher.Dispatch("connected")
 	// and we're being given our hostname (from the server's perspective)
 	t := line.Args[len(line.Args)-1]
 	if idx := strings.LastIndex(t, " "); idx != -1 {
@@ -288,7 +283,7 @@ func (conn *Conn) h_671(line *Line) {
 }
 
 // sets up the internal event handlers to do useful things with lines
-func (conn *Conn) setupEvents() {
+func (conn *Conn) SetupHandlers() {
 	conn.AddHandler("CTCP", (*Conn).h_CTCP)
 	conn.AddHandler("JOIN", (*Conn).h_JOIN)
 	conn.AddHandler("KICK", (*Conn).h_KICK)

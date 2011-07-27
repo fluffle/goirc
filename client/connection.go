@@ -23,8 +23,10 @@ type Conn struct {
 	Me      *Nick
 	Network string
 
-	// Event handler mapping
+	// Event handler registry and dispatcher
 	Registry event.EventRegistry
+	Dispatcher event.EventDispatcher
+
 	// Map of channels we're on
 	chans map[string]*Channel
 	// Map of nicks we know about
@@ -72,8 +74,10 @@ type Conn struct {
 // Creates a new IRC connection object, but doesn't connect to anything so
 // that you can add event handlers to it. See AddHandler() for details.
 func New(nick, user, name string) *Conn {
+	reg := event.NewRegistry()
 	conn := &Conn{
-		Registry: event.NewRegistry(),
+		Registry: reg,
+		Dispatcher: reg,
 		in: make(chan *Line, 32),
 		out: make(chan string, 32),
 		Err: make(chan os.Error, 4),
@@ -89,7 +93,7 @@ func New(nick, user, name string) *Conn {
 		TSFormat: "15:04:05",
 	}
 	conn.initialise()
-	conn.setupEvents()
+	conn.SetupHandlers()
 	conn.Me = conn.NewNick(nick, user, name, "")
 	return conn
 }
@@ -209,7 +213,7 @@ func (conn *Conn) runLoop() {
 	for {
 		select {
 		case line := <-conn.in:
-			conn.dispatchEvent(line)
+			conn.Dispatcher.Dispatch(line.Cmd, conn, line)
 		case <-conn.cLoop:
 			// strobe on control channel, bail out
 			return
@@ -262,7 +266,7 @@ func (conn *Conn) shutdown() {
 		conn.sock.Close()
 		conn.cSend <- true
 		conn.cLoop <- true
-		conn.dispatchEvent(&Line{Cmd: "DISCONNECTED"})
+		conn.Dispatcher.Dispatch("disconnected")
 		// reinit datastructures ready for next connection
 		// do this here rather than after runLoop()'s for due to race
 		conn.initialise()

@@ -36,6 +36,10 @@ func NewHandler(h func(...interface{})) Handler {
 	return &basicHandler{h, NewHandlerID()}
 }
 
+type EventDispatcher interface {
+	Dispatch(name string, ev...interface{})
+}
+
 type EventRegistry interface {
 	AddHandler(name string, h Handler)
 	DelHandler(h Handler)
