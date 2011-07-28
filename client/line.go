@@ -17,6 +17,14 @@ type Line struct {
 	Time                   *time.Time
 }
 
+// NOTE: this doesn't copy l.Time (this should be read-only anyway)
+func (l *Line) Copy() *Line {
+	nl := *line
+	nl.Args = make([]string, len(line.Args))
+	copy(nl.Args, line.Args)
+	return &nl
+}
+
 func parseLine(s string) *Line {
 	line := &Line{Raw: s}
 	if s[0] == ':' {
