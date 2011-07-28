@@ -19,9 +19,9 @@ type Line struct {
 
 // NOTE: this doesn't copy l.Time (this should be read-only anyway)
 func (l *Line) Copy() *Line {
-	nl := *line
-	nl.Args = make([]string, len(line.Args))
-	copy(nl.Args, line.Args)
+	nl := *l
+	nl.Args = make([]string, len(l.Args))
+	copy(nl.Args, l.Args)
 	return &nl
 }
 
