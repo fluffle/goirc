@@ -41,7 +41,7 @@ func parseLine(s string) *Line {
 
 	// now we're here, we've parsed a :nick!user@host or :server off
 	// s should contain "cmd args[] :text"
-	args := strings.Split(s, " :", 2)
+	args := strings.SplitN(s, " :", 2)
 	if len(args) > 1 {
 		args = append(strings.Fields(args[0]), args[1])
 	} else {
