@@ -66,7 +66,7 @@ func TestParallelDispatch(t *testing.T) {
 
 func TestSerialDispatch(t *testing.T) {
 	r := NewRegistry()
-	r.Serial()
+	r.(*registry).Serial()
 	// ensure we have enough of a buffer that all sends complete
 	out := make(chan int, 5)
 	// handler factory :-)
