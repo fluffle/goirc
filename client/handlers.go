@@ -8,12 +8,10 @@ import (
 	"strings"
 )
 
+// An IRC handler looks like this:
+type IRCHandler func(*Conn, *Line)
+
 // AddHandler() adds an event handler for a specific IRC command.
-//
-// Handlers take the form of an anonymous function (currently):
-//	func(conn *irc.Conn, line *irc.Line) {
-//		// handler code here
-//	}
 //
 // Handlers are triggered on incoming Lines from the server, with the handler
 // "name" being equivalent to Line.Cmd. Read the RFCs for details on what
@@ -21,12 +19,12 @@ import (
 // "PRIVMSG", "JOIN", etc. but all the numeric replies are left as ascii
 // strings of digits like "332" (mainly because I really didn't feel like 
 // putting massive constant tables in).
-func (conn *Conn) AddHandler(name string, f func(*Conn, *Line)) {
-	conn.Registry.AddHandler(name, IRCHandler(f))
+func (conn *Conn) AddHandler(name string, f IRCHandler) {
+	conn.Registry.AddHandler(name, NewHandler(f))
 }
 
 // Wrap f in an anonymous unboxing function
-func IRCHandler(f func(*Conn, *Line)) event.Handler {
+func NewHandler(f IRCHandler) event.Handler {
 	return event.NewHandler(func(ev ...interface{}) {
 		f(ev[0].(*Conn), ev[1].(*Line))
 	})
