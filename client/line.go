@@ -42,7 +42,7 @@ func parseLine(s string) *Line {
 		nidx, uidx := strings.Index(line.Src, "!"), strings.Index(line.Src, "@")
 		if uidx != -1 && nidx != -1 {
 			line.Nick = line.Src[:nidx]
-			line.Ident = line.Src[nidx+1:uidx]
+			line.Ident = line.Src[nidx+1 : uidx]
 			line.Host = line.Src[uidx+1:]
 		}
 	}
@@ -68,7 +68,7 @@ func parseLine(s string) *Line {
 		strings.HasPrefix(line.Args[1], "\001") &&
 		strings.HasSuffix(line.Args[1], "\001") {
 		// WOO, it's a CTCP message
-		t := strings.Split(strings.Trim(line.Args[1], "\001"), " ", 2)
+		t := strings.SplitN(strings.Trim(line.Args[1], "\001"), " ", 2)
 		if len(t) > 1 {
 			// Replace the line with the unwrapped CTCP
 			line.Args[1] = t[1]
@@ -85,4 +85,3 @@ func parseLine(s string) *Line {
 	}
 	return line
 }
-
