@@ -73,7 +73,7 @@ func (conn *Conn) Ctcp(t, ctcp string, arg ...string) {
 	if msg != "" {
 		msg = " " + msg
 	}
-	conn.Privmsg(t, "\001"+ctcp+msg+"\001")
+	conn.Privmsg(t, "\001"+strings.ToUpper(ctcp)+msg+"\001")
 }
 
 // CtcpReply() sends a generic CTCP reply to the target t
@@ -83,7 +83,7 @@ func (conn *Conn) CtcpReply(t, ctcp string, arg ...string) {
 	if msg != "" {
 		msg = " " + msg
 	}
-	conn.Notice(t, "\001"+ctcp+msg+"\001")
+	conn.Notice(t, "\001"+strings.ToUpper(ctcp)+msg+"\001")
 }
 
 // Version() sends a CTCP "VERSION" to the target t
