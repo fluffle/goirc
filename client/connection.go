@@ -143,24 +143,27 @@ func (conn *Conn) Connect(host string, pass ...string) os.Error {
 			return err
 		}
 	}
-
 	conn.Host = host
-	conn.io = bufio.NewReadWriter(
-		bufio.NewReader(conn.sock),
-		bufio.NewWriter(conn.sock))
-	conn.sock.SetTimeout(conn.Timeout * second)
 	conn.connected = true
-	go conn.send()
-	go conn.recv()
+	conn.postConnect()
 
 	if len(pass) > 0 {
 		conn.Pass(pass[0])
 	}
 	conn.Nick(conn.Me.Nick)
 	conn.User(conn.Me.Ident, conn.Me.Name)
-
-	go conn.runLoop()
 	return nil
+}
+
+// Post-connection setup (for ease of testing)
+func (conn *Conn) postConnect() {
+	conn.io = bufio.NewReadWriter(
+		bufio.NewReader(conn.sock),
+		bufio.NewWriter(conn.sock))
+	conn.sock.SetTimeout(conn.Timeout * second)
+	go conn.send()
+	go conn.recv()
+	go conn.runLoop()
 }
 
 // dispatch a nicely formatted os.Error to the error channel
