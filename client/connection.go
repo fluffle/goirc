@@ -15,8 +15,8 @@ const (
 	second = int64(1e9)
 )
 
-// An IRC connection is represented by this struct. Once connected, any errors
-// encountered are piped down *Conn.Err; this channel is closed on disconnect.
+// An IRC connection is represented by this struct.
+// Once connected, any errors encountered are piped down *Conn.Err.
 type Conn struct {
 	// Connection Hostname and Nickname
 	Host    string
