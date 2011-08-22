@@ -45,7 +45,11 @@ func MockNetConn(t *testing.T) (*mockNetConn) {
 	return m
 }
 
-// Test helper
+// Test helpers
+func (m *mockNetConn) Send(s string) {
+	m.In <- s + "\r\n"
+}
+
 func (m *mockNetConn) Expect(e string) {
 	s := <-m.Out
 	if e + "\r\n" != s {
@@ -56,12 +60,18 @@ func (m *mockNetConn) Expect(e string) {
 
 // Implement net.Conn interface
 func (m *mockNetConn) Read(b []byte) (int, os.Error) {
+	if m.closed {
+		return 0, os.NewError("EOF")
+	}
 	s := <-m.in
 	copy(b, s)
 	return len(s), nil
 }
 
 func (m *mockNetConn) Write(s []byte) (int, os.Error) {
+	if m.closed {
+		return 0, os.NewError("Can't write to closed socket.")
+	}
 	b := make([]byte, len(s))
 	copy(b, s)
 	m.out <- b
