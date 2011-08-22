@@ -27,10 +27,9 @@ Synopsis:
         c.SSL = true
 
 		// Add handlers to do things here!
-		// e.g. watching for disconnection from the server.
-		connected := true
-		c.AddHandler("disconnected",
-			func(conn *irc.Conn, line *irc.Line) { connected = false })
+		// e.g. join a channel on connect.
+		c.AddHandler("connected",
+			func(conn *irc.Conn, line *irc.Line) { conn.Join("#channel") })
 	    
 		// Tell client to connect
 		if err := c.Connect("irc.freenode.net"); err != nil {
@@ -38,7 +37,7 @@ Synopsis:
 	    }
 
 		// Loop until client gets disconnected, printing any errors
-        for connected {
+        for c.Connected {
             if err := <-c.Err; err != nil {
                 fmt.Printf("goirc error: %s", err.String())
             }
