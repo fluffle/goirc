@@ -10,3 +10,10 @@ func setUp(t *testing.T) (*mockNetConn, *Conn) {
 	c.postConnect()
 	return m, c
 }
+
+// Mock dispatcher to verify that events are triggered successfully
+type mockDispatcher func(string, ...interface{})
+
+func (d mockDispatcher) Dispatch(name string, ev ...interface{}) {
+	d(name, ev...)
+}
