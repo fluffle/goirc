@@ -41,7 +41,7 @@ type Conn struct {
 	io        *bufio.ReadWriter
 	in        chan *Line
 	out       chan string
-	connected bool
+	Connected bool
 
 	// Control channels to goroutines
 	cSend, cLoop chan bool
@@ -118,7 +118,7 @@ func (conn *Conn) initialise() {
 // Connect(). The port will default to 6697 if ssl is enabled, and 6667
 // otherwise. You can also provide an optional connect password.
 func (conn *Conn) Connect(host string, pass ...string) os.Error {
-	if conn.connected {
+	if conn.Connected {
 		return os.NewError(fmt.Sprintf(
 			"irc.Connect(): already connected to %s, cannot connect to %s",
 			conn.Host, host))
@@ -144,7 +144,7 @@ func (conn *Conn) Connect(host string, pass ...string) os.Error {
 		}
 	}
 	conn.Host = host
-	conn.connected = true
+	conn.Connected = true
 	conn.postConnect()
 
 	if len(pass) > 0 {
@@ -264,8 +264,8 @@ func (conn *Conn) rateLimit(chars int64) {
 func (conn *Conn) shutdown() {
 	// Guard against double-call of shutdown() if we get an error in send()
 	// as calling sock.Close() will cause recv() to recieve EOF in readstring()
-	if conn.connected {
-		conn.connected = false
+	if conn.Connected {
+		conn.Connected = false
 		conn.sock.Close()
 		conn.cSend <- true
 		conn.cLoop <- true
@@ -281,7 +281,7 @@ func (conn *Conn) shutdown() {
 func (conn *Conn) String() string {
 	str := "GoIRC Connection\n"
 	str += "----------------\n\n"
-	if conn.connected {
+	if conn.Connected {
 		str += "Connected to " + conn.Host + "\n\n"
 	} else {
 		str += "Not currently connected!\n\n"
