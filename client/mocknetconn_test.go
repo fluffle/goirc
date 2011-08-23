@@ -88,6 +88,17 @@ func (m *mockNetConn) Expect(e string) {
 	}
 }
 
+func (m *mockNetConn) ExpectNothing() {
+	t := time.NewTimer(5e6)
+	select {
+	case <-t.C:
+	case s := <-m.Out:
+		t.Stop()
+		m.Errorf("Mock connection received unexpected output.\n\t" +
+			"Expected nothing, got: '%s'", s)
+	}
+}
+
 // Implement net.Conn interface
 func (m *mockNetConn) Read(b []byte) (int, os.Error) {
 	if m.closed {
