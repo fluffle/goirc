@@ -20,12 +20,8 @@ func Test001(t *testing.T) {
 	_, c := setUp(t)
 
 	// Setup a mock event dispatcher to test correct triggering of "connected"
-	connected := false
-	c.Dispatcher = mockDispatcher(func(name string, ev ...interface{}) {
-		if name == "connected" {
-			connected = true
-		}
-	})
+	flag := false
+	c.Dispatcher = WasEventDispatched("connected", &flag)
 
 	// Assert that the "Host" field of c.Me hasn't been set yet
 	if c.Me.Host != "" {
@@ -36,7 +32,7 @@ func Test001(t *testing.T) {
 	c.h_001(parseLine(":irc.server.org 001 test :Welcome to IRC test!ident@somehost.com"))
 	
 	// Check that the event was dispatched correctly
-	if !connected {
+	if !flag {
 		t.Errorf("Sending 001 didn't result in dispatch of connected event.")
 	}
 
