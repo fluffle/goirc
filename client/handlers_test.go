@@ -17,7 +17,7 @@ func TestPING(t *testing.T) {
 
 // Test the handler for 001 / RPL_WELCOME
 func Test001(t *testing.T) {
-	_, c := setUp(t)
+	m, c := setUp(t)
 
 	// Setup a mock event dispatcher to test correct triggering of "connected"
 	flag := false
@@ -30,6 +30,8 @@ func Test001(t *testing.T) {
 	
 	// Call handler with a valid 001 line
 	c.h_001(parseLine(":irc.server.org 001 test :Welcome to IRC test!ident@somehost.com"))
+	// Should result in no response to server
+	m.ExpectNothing()
 	
 	// Check that the event was dispatched correctly
 	if !flag {
@@ -74,7 +76,7 @@ func Test433(t *testing.T) {
 
 // Test the handler for NICK messages
 func TestNICK(t *testing.T) {
-	_, c := setUp(t)
+	m, c := setUp(t)
 	c.Debug = true
 
 	// Assert that the nick set in setUp() is still "test" (just in case)
@@ -84,6 +86,10 @@ func TestNICK(t *testing.T) {
 
 	// Call handler with a NICK line changing "our" nick to test1.
 	c.h_NICK(parseLine(":test!test@somehost.com NICK :test1"))
+	// Should generate no response to server
+	m.ExpectNothing()
+
+	// Verify that our Nick has changed
 	if c.Me.Nick != "test1" {
 		t.Errorf("NICK did not result in changing our nick.")
 	}
