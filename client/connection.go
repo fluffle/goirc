@@ -265,11 +265,11 @@ func (conn *Conn) shutdown() {
 	// Guard against double-call of shutdown() if we get an error in send()
 	// as calling sock.Close() will cause recv() to recieve EOF in readstring()
 	if conn.Connected {
+		conn.Dispatcher.Dispatch("disconnected", conn, &Line{})
 		conn.Connected = false
 		conn.sock.Close()
 		conn.cSend <- true
 		conn.cLoop <- true
-		conn.Dispatcher.Dispatch("disconnected", conn, &Line{})
 		// reinit datastructures ready for next connection
 		// do this here rather than after runLoop()'s for due to race
 		conn.initialise()
