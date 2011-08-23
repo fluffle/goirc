@@ -10,7 +10,8 @@ import (
 // in this file will call their respective handlers synchronously, otherwise
 // testing becomes more difficult.
 func TestPING(t *testing.T) {
-	m, _ := setUp(t)
+	m, c := setUp(t)
+	defer tearDown(m, c)
 	m.Send("PING :1234567890")
 	m.Expect("PONG :1234567890")
 }
@@ -18,6 +19,7 @@ func TestPING(t *testing.T) {
 // Test the handler for 001 / RPL_WELCOME
 func Test001(t *testing.T) {
 	m, c := setUp(t)
+	defer tearDown(m, c)
 
 	// Setup a mock event dispatcher to test correct triggering of "connected"
 	flag := false
@@ -47,6 +49,7 @@ func Test001(t *testing.T) {
 // Test the handler for 433 / ERR_NICKNAMEINUSE
 func Test433(t *testing.T) {
 	m, c := setUp(t)
+	defer tearDown(m, c)
 	
 	// Assert that the nick set in setUp() is still "test" (just in case)
 	if c.Me.Nick != "test" {
@@ -77,7 +80,7 @@ func Test433(t *testing.T) {
 // Test the handler for NICK messages
 func TestNICK(t *testing.T) {
 	m, c := setUp(t)
-	c.Debug = true
+	defer tearDown(m, c)
 
 	// Assert that the nick set in setUp() is still "test" (just in case)
 	if c.Me.Nick != "test" {
@@ -122,6 +125,7 @@ func TestNICK(t *testing.T) {
 
 func TestCTCP(t *testing.T) {
 	m, c := setUp(t)
+	defer tearDown(m, c)
 
 	// Call handler with CTCP VERSION
 	c.h_CTCP(parseLine(":blah!moo@cows.com PRIVMSG test :\001VERSION\001"))

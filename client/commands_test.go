@@ -4,6 +4,7 @@ import "testing"
 
 func TestClientCommands(t *testing.T) {
 	m, c := setUp(t)
+	defer tearDown(m, c)
 
 	c.Pass("password")
 	m.Expect("PASS password")
