@@ -91,7 +91,7 @@ func (m *mockNetConn) Expect(e string) {
 // Implement net.Conn interface
 func (m *mockNetConn) Read(b []byte) (int, os.Error) {
 	if m.closed {
-		return 0, os.NewError("EOF")
+		return 0, os.EINVAL
 	}
 	select {
 	case s := <-m.in:
@@ -104,7 +104,7 @@ func (m *mockNetConn) Read(b []byte) (int, os.Error) {
 
 func (m *mockNetConn) Write(s []byte) (int, os.Error) {
 	if m.closed {
-		return 0, os.NewError("Can't write to closed socket.")
+		return 0, os.EINVAL
 	}
 	b := make([]byte, len(s))
 	copy(b, s)
