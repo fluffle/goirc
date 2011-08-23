@@ -119,3 +119,25 @@ func TestNICK(t *testing.T) {
 		timer.Stop()
 	}
 }
+
+func TestCTCP(t *testing.T) {
+	m, c := setUp(t)
+
+	// Call handler with CTCP VERSION
+	c.h_CTCP(parseLine(":blah!moo@cows.com PRIVMSG test :\001VERSION\001"))
+
+	// Expect a version reply
+	m.Expect("NOTICE blah :\001VERSION powered by goirc...\001")
+
+	// Call handler with CTCP PING
+	c.h_CTCP(parseLine(":blah!moo@cows.com PRIVMSG test :\001PING 1234567890\001"))
+
+	// Expect a ping reply
+	m.Expect("NOTICE blah :\001PING 1234567890\001")
+
+	// Call handler with CTCP UNKNOWN
+	c.h_CTCP(parseLine(":blah!moo@cows.com PRIVMSG test :\001UNKNOWN ctcp\001"))
+
+	// Expect nothing in reply
+	m.ExpectNothing()
+}
