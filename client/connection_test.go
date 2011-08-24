@@ -10,10 +10,31 @@ func setUp(t *testing.T) (*mockNetConn, *Conn) {
 	c := New("test", "test", "Testing IRC")
 	c.State = t
 
+	// Assert some basic things about the initial state of the Conn struct
+	if c.Me.Nick != "test" ||
+		c.Me.Ident != "test" ||
+		c.Me.Name != "Testing IRC" ||
+		c.Me.Host != "" {
+		t.Errorf("Conn.Me not correctly initialised.")
+	}
+	if len(c.chans) != 0 {
+		t.Errorf("Some channels are already known:")
+		for _, ch := range c.chans {
+			t.Logf(ch.String())
+		}
+	}
+	if len(c.nicks) != 1 {
+		t.Errorf("Other Nicks than ourselves exist:")
+		for _, n := range c.nicks {
+			t.Logf(n.String())
+		}
+	}
+
 	m := MockNetConn(t)
 	c.sock = m
-	c.Flood = true // Tests can take a while otherwise
 	c.postConnect()
+	c.Flood = true // Tests can take a while otherwise
+	c.Connected = true
 	return m, c
 }
 
@@ -49,9 +70,6 @@ func (conn *Conn) ExpectNoErrors() {
 
 func TestShutdown(t *testing.T) {
 	_, c := setUp(t)
-
-	// Shutdown won't clean things up unless we're "connected" already
-	c.Connected = true
 
 	// Setup a mock event dispatcher to test correct triggering of "disconnected"
 	flag := false
@@ -90,9 +108,6 @@ func TestShutdown(t *testing.T) {
 // by recv() getting an EOF from the mock connection.
 func TestEOF(t *testing.T) {
 	m, c := setUp(t)
-
-	// Shutdown won't clean things up unless we're "connected" already
-	c.Connected = true
 
 	// Setup a mock event dispatcher to test correct triggering of "disconnected"
 	flag := false

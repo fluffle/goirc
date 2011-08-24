@@ -24,11 +24,6 @@ func Test001(t *testing.T) {
 	flag := false
 	c.Dispatcher = WasEventDispatched("connected", &flag)
 
-	// Assert that the "Host" field of c.Me hasn't been set yet
-	if c.Me.Host != "" {
-		t.Errorf("Host field contains unexpected value '%s'.", c.Me.Host)
-	}
-	
 	// Call handler with a valid 001 line
 	c.h_001(parseLine(":irc.server.org 001 test :Welcome to IRC test!ident@somehost.com"))
 	// Should result in no response to server
@@ -50,11 +45,6 @@ func Test433(t *testing.T) {
 	m, c := setUp(t)
 	defer tearDown(m, c)
 	
-	// Assert that the nick set in setUp() is still "test" (just in case)
-	if c.Me.Nick != "test" {
-		t.Errorf("Tests will fail because Nick != 'test'.")
-	}
-
 	// Call handler with a 433 line, not triggering c.Me.Renick()
 	c.h_433(parseLine(":irc.server.org 433 test new :Nickname is already in use."))
 	m.Expect("NICK new_")
@@ -80,11 +70,6 @@ func Test433(t *testing.T) {
 func TestNICK(t *testing.T) {
 	m, c := setUp(t)
 	defer tearDown(m, c)
-
-	// Assert that the nick set in setUp() is still "test" (just in case)
-	if c.Me.Nick != "test" {
-		t.Errorf("Tests will fail because Nick != 'test'.")
-	}
 
 	// Call handler with a NICK line changing "our" nick to test1.
 	c.h_NICK(parseLine(":test!test@somehost.com NICK :test1"))
