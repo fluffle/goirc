@@ -3,6 +3,7 @@ package client
 import (
 	"net"
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -81,7 +82,8 @@ func (m *mockNetConn) Expect(e string) {
 			"Expected: '%s', got nothing.", e)
 	case s := <-m.Out:
 		t.Stop()
-		if e + "\r\n" != s {
+		s = strings.Trim(s, "\r\n")
+		if e != s {
 			m.Errorf("Mock connection received unexpected value.\n\t" +
 				"Expected: '%s'\n\tGot: '%s'", e, s)
 		}
@@ -94,6 +96,7 @@ func (m *mockNetConn) ExpectNothing() {
 	case <-t.C:
 	case s := <-m.Out:
 		t.Stop()
+		s = strings.Trim(s, "\r\n")
 		m.Errorf("Mock connection received unexpected output.\n\t" +
 			"Expected nothing, got: '%s'", s)
 	}
