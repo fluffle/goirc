@@ -123,6 +123,7 @@ func TestNICK(t *testing.T) {
 	}
 }
 
+// Test the handler for CTCP messages
 func TestCTCP(t *testing.T) {
 	m, c := setUp(t)
 	defer tearDown(m, c)
@@ -143,5 +144,108 @@ func TestCTCP(t *testing.T) {
 	c.h_CTCP(parseLine(":blah!moo@cows.com PRIVMSG test :\001UNKNOWN ctcp\001"))
 
 	// Expect nothing in reply
+	m.ExpectNothing()
+}
+
+// Test the handler for JOIN messages
+func TestJOIN(t *testing.T) {
+	// TODO(fluffle): This tests a lot of extraneous functionality that should
+	// be tested in nickchan_test. However, without mocking to ensure that
+	// those functions are called correctly, we have to check they work by
+	// verifying their expected side-effects instead. Fixing this requires
+	// significant effort to move Conn to being a mockable interface type
+	// instead of a concrete struct. I'm not sure how feasible this is :-/
+
+	m, c := setUp(t)
+	defer tearDown(m, c)
+
+	// Assert that the nick set in setUp() is still "test" (just in case)
+	if c.Me.Nick != "test" {
+		t.Errorf("Tests will fail because Nick != 'test'.")
+	}
+
+	// Assert that we don't already know about our test channels
+	if len(c.chans) != 0 {
+		t.Errorf("Some channels are already known:")
+		for _, ch := range c.chans {
+			t.Logf(ch.String())
+		}
+	}
+
+	// Use #test1 to test expected behaviour
+	// Call handler with JOIN by test to #test1
+	c.h_JOIN(parseLine(":test!test@somehost.com JOIN :#test1"))
+
+	// Verify that we now know about #test1
+	test1 := c.GetChannel("#test1")
+	if test1 == nil || len(c.chans) != 1 {
+		t.Errorf("Channel #test1 not tracked correctly:")
+		for _, ch := range c.chans {
+			t.Logf(ch.String())
+		}
+	}
+
+	 // Verify we still only know about our own Nick
+	if len(c.nicks) != 1 {
+		t.Errorf("Other Nicks than ourselves exist:")
+		for _, n := range c.nicks {
+			t.Logf(n.String())
+		}
+	}
+
+	// Verify that the channel has us and only in it
+	if _, ok := test1.Nicks[c.Me]; !ok || len(test1.Nicks) != 1 {
+		t.Errorf("Channel #test1 contains wrong nicks [1].")
+	}
+
+	// Verify that we're in the channel, and only that channel
+	if _, ok := c.Me.Channels[test1]; !ok || len(c.Me.Channels) != 1 {
+		t.Errorf("Nick (me) contains wrong channels.")
+	}
+
+	// Verify that the MODE and WHO commands are sent correctly
+	m.Expect("MODE #test1")
+	m.Expect("WHO #test1")
+
+	// OK, now #test1 exists, JOIN another user we don't know about
+	c.h_JOIN(parseLine(":user1!ident1@host1.com JOIN :#test1"))
+
+	// Verify we created a new Nick for user1
+	user1 := c.GetNick("user1")
+	if user1 == nil || len(c.nicks) != 2 {
+		t.Errorf("Unexpected number of known Nicks (wanted 2):")
+		for _, n := range c.nicks {
+			t.Logf(n.String())
+		}
+	}
+
+	// Verify that test1 has us and user1 in, and that user1 is in test1.
+	if _, ok := test1.Nicks[user1]; !ok || len(test1.Nicks) != 2 {
+		t.Errorf("Channel #test1 contains wrong nicks [2].")
+	}
+
+	if _, ok := user1.Channels[test1]; !ok || len(user1.Channels) != 1 {
+		t.Errorf("Nick user1 contains wrong channels.")
+	}
+
+	// Verify that the WHO command is sent correctly
+	m.Expect("WHO user1")
+
+	// Now, JOIN a nick we *do* know about.
+	user2 := c.NewNick("user2", "ident2", "name two", "host2.com")
+
+	// Ensure that user2 is in no channels beforehand, etc.
+	if _, ok := test1.Nicks[user2]; ok || len(user2.Channels) != 0 {
+		t.Errorf("Nick user2 in unexpected channels.")
+	}
+
+	c.h_JOIN(parseLine(":user2!ident2@host2.com JOIN :#test1"))
+	if _, ok := test1.Nicks[user2]; !ok || len(test1.Nicks) != 3 {
+		t.Errorf("Channel #test1 contains wrong nicks [3].")
+	}
+	if _, ok := user2.Channels[test1]; !ok || len(user2.Channels) != 1 {
+		t.Errorf("Nick user2 contains wrong channels.")
+	}
+	// We already know about this user and channel, so nothing should be sent
 	m.ExpectNothing()
 }
