@@ -2,7 +2,6 @@ package client
 
 import (
 	"testing"
-	"time"
 )
 
 // This test performs a simple end-to-end verification of correct line parsing
@@ -89,7 +88,8 @@ func TestNICK(t *testing.T) {
 
 	// Call handler with a NICK line changing "our" nick to test1.
 	c.h_NICK(parseLine(":test!test@somehost.com NICK :test1"))
-	// Should generate no response to server
+	// Should generate no errors and no response to server
+	c.ExpectNoErrors()
 	m.ExpectNothing()
 
 	// Verify that our Nick has changed
@@ -102,6 +102,9 @@ func TestNICK(t *testing.T) {
 
 	// Call handler with a NICK line changing user1 to somebody
 	c.h_NICK(parseLine(":user1!ident1@host1.com NICK :somebody"))
+	c.ExpectNoErrors()
+	m.ExpectNothing()
+
 	if c.GetNick("user1") != nil {
 		t.Errorf("Still have a valid Nick for 'user1'.")
 	}
@@ -111,16 +114,8 @@ func TestNICK(t *testing.T) {
 
 	// Send a NICK line for an unknown nick.
 	c.h_NICK(parseLine(":blah!moo@cows.com NICK :milk"))
-
-	// With the current error handling, we could block on reading the Err
-	// channel, so ensure we don't wait forever with a 5ms timeout.
-	timer := time.NewTimer(5e6)
-	select {
-	case <-timer.C:
-		t.Errorf("No error received for bad NICK line.")
-	case <-c.Err:
-		timer.Stop()
-	}
+	c.ExpectError()
+	m.ExpectNothing()
 }
 
 // Test the handler for CTCP messages

@@ -8,6 +8,8 @@ import (
 
 func setUp(t *testing.T) (*mockNetConn, *Conn) {
 	c := New("test", "test", "Testing IRC")
+	c.State = t
+
 	m := MockNetConn(t)
 	c.sock = m
 	c.Flood = true // Tests can take a while otherwise
@@ -19,6 +21,30 @@ func tearDown(m *mockNetConn, c *Conn) {
 	// This is enough to cause all the associated goroutines in m and c stop
 	// (tested below in TestShutdown to make sure this is the case)
 	m.Close()
+}
+
+func (conn *Conn) ExpectError() {
+	// With the current error handling, we could block on reading the Err
+	// channel, so ensure we don't wait forever with a 5ms timeout.
+	t := conn.State.(*testing.T)
+	timer := time.NewTimer(5e6)
+	select {
+	case <-timer.C:
+		t.Errorf("Error expected on Err channel, none received.")
+	case <-conn.Err:
+		timer.Stop()
+	}
+}
+
+func (conn *Conn) ExpectNoErrors() {
+	t := conn.State.(*testing.T)
+	timer := time.NewTimer(5e6)
+	select {
+	case <-timer.C:
+	case err := <-conn.Err:
+		timer.Stop()
+		t.Errorf("No error expected on Err channel, received:\n\t%s", err)
+	}
 }
 
 func TestShutdown(t *testing.T) {
