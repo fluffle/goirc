@@ -197,3 +197,54 @@ func TestJOIN(t *testing.T) {
 	c.ExpectError()
 	m.ExpectNothing()
 }
+
+// Test the handler for PART messages
+func TestPART(t *testing.T) {
+	m, c := setUp(t)
+	defer tearDown(m, c)
+
+	// Create user1 and add them to #test1 and #test2
+	user1 := c.NewNick("user1", "ident1", "name one", "host1.com")
+	test1 := c.NewChannel("#test1")
+	test2 := c.NewChannel("#test2")
+	test1.AddNick(user1)
+	test2.AddNick(user1)
+
+	// Add Me to both channels (not strictly necessary)
+	test1.AddNick(c.Me)
+	test2.AddNick(c.Me)
+
+	// Then make them PART
+	c.h_PART(parseLine(":user1!ident1@host1.com PART #test1 :Bye!"))
+
+	// Expect no errors or output
+	c.ExpectNoErrors()
+	m.ExpectNothing()
+
+	// Quick check of tracking code
+	if len(test1.Nicks) != 1 {
+		t.Errorf("PART failed to remove user1 from #test1.")
+	}
+
+	// Test error states.
+	// TODO(fluffle): BUG?
+	// user1 is still a known Nick (on #test2), but receiving another PART
+	// for user1 from #test1 (or, in fact, a PART on any known Channel, whether
+	// they are on it or not) won't cause an error because h_PART doesn't
+	// check whether the Nick is on the Channel before calling DelNick().
+	// The Nick and Channel structs should expose more of the state info.
+	c.h_PART(parseLine(":user1!ident1@host1.com PART #test1 :Bye!"))
+	c.ExpectNoErrors()
+
+	// Part an unknown user from a known channel.
+	c.h_PART(parseLine(":user2!ident2@host2.com PART #test1 :Bye!"))
+	c.ExpectError()
+
+	// Part a known user from an unknown channel.
+	c.h_PART(parseLine(":user1!ident1@host1.com PART #test3 :Bye!"))
+	c.ExpectError()
+
+	// Part an unknown user from an unknown channel.
+	c.h_PART(parseLine(":user2!ident2@host2.com PART #test3 :Bye!"))
+	c.ExpectError()
+}
