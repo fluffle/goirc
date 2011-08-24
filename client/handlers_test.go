@@ -83,7 +83,7 @@ func TestNICK(t *testing.T) {
 	}
 
 	// Create a "known" nick other than ours
-	c.NewNick("user1", "ident1", "name one", "host1.com")
+	user1 := c.NewNick("user1", "ident1", "name one", "host1.com")
 
 	// Call handler with a NICK line changing user1 to somebody
 	c.h_NICK(parseLine(":user1!ident1@host1.com NICK :somebody"))
@@ -93,8 +93,8 @@ func TestNICK(t *testing.T) {
 	if c.GetNick("user1") != nil {
 		t.Errorf("Still have a valid Nick for 'user1'.")
 	}
-	if n := c.GetNick("somebody"); n == nil {
-		t.Errorf("No Nick for 'somebody' found.")
+	if n := c.GetNick("somebody"); n != user1 {
+		t.Errorf("GetNick(somebody) didn't result in correct Nick.")
 	}
 
 	// Send a NICK line for an unknown nick.
