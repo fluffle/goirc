@@ -125,7 +125,12 @@ func (conn *Conn) h_PART(line *Line) {
 	ch := conn.GetChannel(line.Args[0])
 	n := conn.GetNick(line.Nick)
 	if ch != nil && n != nil {
-		ch.DelNick(n)
+		if _, ok := ch.Nicks[n]; ok {
+			ch.DelNick(n)
+		} else {
+			conn.error("irc.PART(): nick %s is not on channel %s",
+				line.Nick, line.Args[0])
+		}
 	} else {
 		conn.error("irc.PART(): buh? PART of channel %s by nick %s",
 			line.Args[0], line.Nick)

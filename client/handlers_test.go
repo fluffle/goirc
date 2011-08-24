@@ -227,14 +227,9 @@ func TestPART(t *testing.T) {
 	}
 
 	// Test error states.
-	// TODO(fluffle): BUG?
-	// user1 is still a known Nick (on #test2), but receiving another PART
-	// for user1 from #test1 (or, in fact, a PART on any known Channel, whether
-	// they are on it or not) won't cause an error because h_PART doesn't
-	// check whether the Nick is on the Channel before calling DelNick().
-	// The Nick and Channel structs should expose more of the state info.
+	// Part a known user from a known channel they are not on.
 	c.h_PART(parseLine(":user1!ident1@host1.com PART #test1 :Bye!"))
-	c.ExpectNoErrors()
+	c.ExpectError()
 
 	// Part an unknown user from a known channel.
 	c.h_PART(parseLine(":user2!ident2@host2.com PART #test1 :Bye!"))
