@@ -144,7 +144,12 @@ func (conn *Conn) h_KICK(line *Line) {
 	ch := conn.GetChannel(line.Args[0])
 	n := conn.GetNick(line.Args[1])
 	if ch != nil && n != nil {
-		ch.DelNick(n)
+		if _, ok := ch.Nicks[n]; ok {
+			ch.DelNick(n)
+		} else {
+			conn.error("irc.KICK(): nick %s is not on channel %s",
+				line.Nick, line.Args[0])
+		}
 	} else {
 		conn.error("irc.KICK(): buh? KICK from channel %s of nick %s",
 			line.Args[0], line.Args[1])
