@@ -243,3 +243,50 @@ func TestPART(t *testing.T) {
 	c.h_PART(parseLine(":user2!ident2@host2.com PART #test3 :Bye!"))
 	c.ExpectError()
 }
+
+// Test the handler for KICK messages
+// (this is very similar to the PART message test)
+func TestKICK(t *testing.T) {
+	m, c := setUp(t)
+	defer tearDown(m, c)
+
+	// Create user1 and add them to #test1 and #test2
+	user1 := c.NewNick("user1", "ident1", "name one", "host1.com")
+	test1 := c.NewChannel("#test1")
+	test2 := c.NewChannel("#test2")
+	test1.AddNick(user1)
+	test2.AddNick(user1)
+
+	// Add Me to both channels (not strictly necessary)
+	test1.AddNick(c.Me)
+	test2.AddNick(c.Me)
+
+	// Then kick them!
+	c.h_KICK(parseLine(":test!test@somehost.com KICK #test1 user1 :Bye!"))
+
+	// Expect no errors or output
+	c.ExpectNoErrors()
+	m.ExpectNothing()
+
+	// Quick check of tracking code
+	if len(test1.Nicks) != 1 {
+		t.Errorf("PART failed to remove user1 from #test1.")
+	}
+
+	// Test error states.
+	// Kick a known user from a known channel they are not on.
+	c.h_KICK(parseLine(":test!test@somehost.com KICK #test1 user1 :Bye!"))
+	c.ExpectError()
+
+	// Kick an unknown user from a known channel.
+	c.h_KICK(parseLine(":test!test@somehost.com KICK #test2 user2 :Bye!"))
+	c.ExpectError()
+
+	// Kick a known user from an unknown channel.
+	c.h_KICK(parseLine(":test!test@somehost.com KICK #test3 user1 :Bye!"))
+	c.ExpectError()
+
+	// Kick an unknown user from an unknown channel.
+	c.h_KICK(parseLine(":test!test@somehost.com KICK #test4 user2 :Bye!"))
+	c.ExpectError()
+}
