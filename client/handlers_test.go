@@ -290,3 +290,45 @@ func TestKICK(t *testing.T) {
 	c.h_KICK(parseLine(":test!test@somehost.com KICK #test4 user2 :Bye!"))
 	c.ExpectError()
 }
+
+// Test the handler for QUIT messages
+func TestQUIT(t *testing.T) {
+	m, c := setUp(t)
+	defer tearDown(m, c)
+
+	// Create user1 and add them to #test1 and #test2
+	user1 := c.NewNick("user1", "ident1", "name one", "host1.com")
+	test1 := c.NewChannel("#test1")
+	test2 := c.NewChannel("#test2")
+	test1.AddNick(user1)
+	test2.AddNick(user1)
+
+	// Add Me to both channels (not strictly necessary)
+	test1.AddNick(c.Me)
+	test2.AddNick(c.Me)
+
+	// Have user1 QUIT
+	c.h_QUIT(parseLine(":user1!ident1@host1.com QUIT :Bye!"))
+
+	// Expect no errors or output
+	c.ExpectNoErrors()
+	m.ExpectNothing()
+
+	// Quick check of tracking code
+	if len(test1.Nicks) != 1 || len(test2.Nicks) != 1 {
+		t.Errorf("QUIT failed to remove user1 from channels.")
+	}
+
+	// Ensure user1 is no longer a known nick
+	if c.GetNick("user1") != nil {
+		t.Errorf("QUIT failed to remove user1 from state tracking completely.")
+	}
+
+	// Have user1 QUIT again, expect ERRORS!
+	c.h_QUIT(parseLine(":user1!ident1@host1.com QUIT :Bye!"))
+	c.ExpectError()
+
+	// Have a previously unmentioned user quit, expect an error
+	c.h_QUIT(parseLine(":user2!ident2@host2.com QUIT :Bye!"))
+	c.ExpectError()
+}
