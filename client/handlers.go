@@ -176,7 +176,7 @@ func (conn *Conn) h_MODE(line *Line) {
 			conn.error("irc.MODE(): buh? recieved MODE %s for (non-me) nick %s", line.Args[0], n.Nick)
 			return
 		}
-		conn.ParseNickModes(n, line.Args[0])
+		conn.ParseNickModes(n, line.Args[1])
 	} else {
 		conn.error("irc.MODE(): buh? not sure what to do with MODE %s", strings.Join(line.Args, " "))
 	}
