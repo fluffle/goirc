@@ -445,3 +445,33 @@ func Test311(t *testing.T) {
 	m.ExpectNothing()
 	c.ExpectError()
 }
+
+// Test the handler for 324 / RPL_CHANNELMODEIS
+func Test324(t *testing.T) {
+	m, c := setUp(t)
+	defer tearDown(m, c)
+
+	// Create #test1, whose modes we don't know
+	test1 := c.NewChannel("#test1")
+	cm := test1.Modes
+
+	// Make sure modes are unset first
+	if cm.Secret || cm.NoExternalMsg || cm.Moderated || cm.Key != "" {
+		t.Errorf("Channel modes unexpectedly set before 324 reply.")
+	}
+
+	// Send a 324 reply
+	c.h_324(parseLine(":irc.server.org 324 test #test1 +snk somekey"))
+	m.ExpectNothing()
+	c.ExpectNoErrors()
+
+	// Make sure the modes we expected to be set were set and vice versa
+	if !cm.Secret || !cm.NoExternalMsg || cm.Moderated || cm.Key != "somekey" {
+		t.Errorf("Channel modes unexpectedly set before 324 reply.")
+	}
+
+	// Check unknown channel causes an error
+	c.h_324(parseLine(":irc.server.org 324 test #test2 +pmt"))
+	m.ExpectNothing()
+	c.ExpectError()
+}
