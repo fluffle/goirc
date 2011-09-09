@@ -475,3 +475,32 @@ func Test324(t *testing.T) {
 	m.ExpectNothing()
 	c.ExpectError()
 }
+
+// Test the handler for 332 / RPL_TOPIC
+func Test332(t *testing.T) {
+	m, c := setUp(t)
+	defer tearDown(m, c)
+
+	// Create #test1, whose topic we don't know
+	test1 := c.NewChannel("#test1")
+
+	// Assert that it has no topic originally
+	if test1.Topic != "" {
+		t.Errorf("Test channel already has a topic.")
+	}
+
+	// Send a 332 reply
+	c.h_332(parseLine(":irc.server.org 332 test #test1 :something something"))
+	m.ExpectNothing()
+	c.ExpectNoErrors()
+
+	// Make sure the channel's topic has been changed
+	if test1.Topic != "something something" {
+		t.Errorf("Topic of test channel not set correctly.")
+	}
+
+	// Check unknown channel causes an error
+	c.h_324(parseLine(":irc.server.org 332 test #test2 :dark side"))
+	m.ExpectNothing()
+	c.ExpectError()
+}
