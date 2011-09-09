@@ -332,3 +332,61 @@ func TestQUIT(t *testing.T) {
 	c.h_QUIT(parseLine(":user2!ident2@host2.com QUIT :Bye!"))
 	c.ExpectError()
 }
+
+// Test the handler for MODE messages
+func TestMODE(t *testing.T) {
+	m, c := setUp(t)
+	defer tearDown(m, c)
+
+	// Create user1 and add them to #test1
+	user1 := c.NewNick("user1", "ident1", "name one", "host1.com")
+	test1 := c.NewChannel("#test1")
+	test1.AddNick(user1)
+	test1.AddNick(c.Me)
+	cm := test1.Modes
+
+	// Verify the ChanPrivs exists and modes we're testing aren't set
+	if cp, ok := user1.Channels[test1]; (!ok || c.Me.Channels[test1].Voice ||
+		cp.Op || cm.Key != "" || cm.InviteOnly || cm.Secret) {
+		t.Errorf("Channel privileges in unexpected state before MODE.")
+	}
+
+	// Send a channel mode line
+	c.h_MODE(parseLine(":user1!ident1@host1.com MODE #test1 +kisvo somekey test user1"))
+
+	// Shouldn't get any errors or output
+	m.ExpectNothing()
+	c.ExpectNoErrors()
+
+	// Verify expected state afterwards.
+	if cp := user1.Channels[test1]; !(cp.Op || c.Me.Channels[test1].Voice ||
+		cm.Key != "somekey" || cm.InviteOnly || cm.Secret) {
+		t.Errorf("Channel privileges in unexpected state after MODE.")
+	}
+
+	// Verify our nick modes are what we expect before test
+	nm := c.Me.Modes
+	if nm.Invisible || nm.WallOps || nm.HiddenHost {
+		t.Errorf("Our nick privileges in unexpected state before MODE.")
+	}
+
+	// Send a nick mode line
+	c.h_MODE(parseLine(":test!test@somehost.com MODE test +ix"))
+	m.ExpectNothing()
+	c.ExpectNoErrors()
+
+	// Verify the two modes we expect to change did so
+	if !nm.Invisible || nm.WallOps || !nm.HiddenHost {
+		t.Errorf("Our nick privileges in unexpected state after MODE.")
+	}
+
+	// Check error paths -- send a valid user mode that's not us
+	c.h_MODE(parseLine(":user1!ident1@host1.com MODE user1 +w"))
+	m.ExpectNothing()
+	c.ExpectError()
+
+	// Send a random mode for an unknown channel
+	c.h_MODE(parseLine(":user1!ident1@host1.com MODE #test2 +is"))
+	m.ExpectNothing()
+	c.ExpectError()
+}
