@@ -419,3 +419,29 @@ func TestTOPIC(t *testing.T) {
 	m.ExpectNothing()
 	c.ExpectError()
 }
+
+// Test the handler for 311 / RPL_WHOISUSER
+func Test311(t *testing.T) {
+	m, c := setUp(t)
+	defer tearDown(m, c)
+
+	// Create user1, who we know little about
+	user1 := c.NewNick("user1", "", "", "")
+
+	// Send a 311 reply
+	c.h_311(parseLine(":irc.server.org 311 test user1 ident1 host1.com * :name"))
+	m.ExpectNothing()
+	c.ExpectNoErrors()
+
+	// Verify we now know more about user1
+	if user1.Ident != "ident1" ||
+		user1.Host != "host1.com" ||
+		user1.Name != "name" {
+		t.Errorf("WHOIS info of user1 not set correctly.")
+	}
+
+	// Check error paths -- send a 311 for an unknown nick
+	c.h_311(parseLine(":irc.server.org 311 test user2 ident2 host2.com * :dongs"))
+	m.ExpectNothing()
+	c.ExpectError()
+}
