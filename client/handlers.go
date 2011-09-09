@@ -196,7 +196,7 @@ func (conn *Conn) h_311(line *Line) {
 	if n := conn.GetNick(line.Args[1]); n != nil {
 		n.Ident = line.Args[2]
 		n.Host = line.Args[3]
-		n.Name = line.Args[4]
+		n.Name = line.Args[5]
 	} else {
 		conn.error("irc.311(): buh? received WHOIS info for unknown nick %s", line.Args[1])
 	}
