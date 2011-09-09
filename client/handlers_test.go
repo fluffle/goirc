@@ -44,7 +44,7 @@ func Test001(t *testing.T) {
 func Test433(t *testing.T) {
 	m, c := setUp(t)
 	defer tearDown(m, c)
-	
+
 	// Call handler with a 433 line, not triggering c.Me.Renick()
 	c.h_433(parseLine(":irc.server.org 433 test new :Nickname is already in use."))
 	m.Expect("NICK new_")
