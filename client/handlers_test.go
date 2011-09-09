@@ -390,3 +390,32 @@ func TestMODE(t *testing.T) {
 	m.ExpectNothing()
 	c.ExpectError()
 }
+
+// Test the handler for TOPIC messages
+func TestTOPIC(t *testing.T) {
+	m, c := setUp(t)
+	defer tearDown(m, c)
+
+	// Create #test1 so we have a channel to set the topic of
+	test1 := c.NewChannel("#test1")
+
+	// Assert that it has no topic originally
+	if test1.Topic != "" {
+		t.Errorf("Test channel already has a topic.")
+	}
+
+	// Send a TOPIC line
+	c.h_TOPIC(parseLine(":user1!ident1@host1.com TOPIC #test1 :something something"))
+	m.ExpectNothing()
+	c.ExpectNoErrors()
+
+	// Make sure the channel's topic has been changed
+	if test1.Topic != "something something" {
+		t.Errorf("Topic of test channel not set correctly.")
+	}
+
+	// Check error paths -- send a topic for an unknown channel
+	c.h_TOPIC(parseLine(":user1!ident1@host1.com TOPIC #test2 :dark side"))
+	m.ExpectNothing()
+	c.ExpectError()
+}
