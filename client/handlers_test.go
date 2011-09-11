@@ -504,3 +504,40 @@ func Test332(t *testing.T) {
 	m.ExpectNothing()
 	c.ExpectError()
 }
+
+// Test the handler for 352 / RPL_WHOREPLY
+func Test352(t *testing.T) {
+	m, c := setUp(t)
+	defer tearDown(m, c)
+
+	// Create user1, who we know little about
+	user1 := c.NewNick("user1", "", "", "")
+
+	// Send a 352 reply
+	c.h_352(parseLine(":irc.server.org 352 test #test1 ident1 host1.com irc.server.org user1 G :0 name"))
+	m.ExpectNothing()
+	c.ExpectNoErrors()
+
+	// Verify we now know more about user1
+	if user1.Ident != "ident1" ||
+		user1.Host != "host1.com" ||
+		user1.Name != "name" ||
+		user1.Modes.Invisible ||
+		user1.Modes.Oper {
+		t.Errorf("WHO info of user1 not set correctly.")
+	}
+
+	// Check that modes are set correctly from WHOREPLY
+	c.h_352(parseLine(":irc.server.org 352 test #test1 ident1 host1.com irc.server.org user1 H* :0 name"))
+	m.ExpectNothing()
+	c.ExpectNoErrors()
+
+	if !user1.Modes.Invisible || !user1.Modes.Oper {
+		t.Errorf("WHO modes of user1 not set correctly.")
+	}
+
+	// Check error paths -- send a 352 for an unknown nick
+	c.h_352(parseLine(":irc.server.org 352 test #test2 ident2 host2.com irc.server.org user2 G :0 fooo"))
+	m.ExpectNothing()
+	c.ExpectError()
+}
