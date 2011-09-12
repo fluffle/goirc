@@ -260,9 +260,8 @@ func (conn *Conn) h_353(line *Line) {
 					// we don't know this nick yet!
 					n = conn.NewNick(nick, "", "", "")
 				}
-				if n != conn.Me {
-					// we will be in the names list, but should also be in
-					// the channel's nick list from the JOIN handler above
+				if _, ok := ch.Nicks[n]; !ok {
+					// This nick isn't associated with this channel yet!
 					ch.AddNick(n)
 				}
 				p := ch.Nicks[n]
