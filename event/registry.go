@@ -8,6 +8,7 @@ import (
 )
 
 type HandlerID uint32
+
 var hidCounter uint32 = 0
 
 func NewHandlerID() HandlerID {
@@ -20,8 +21,8 @@ type Handler interface {
 }
 
 type basicHandler struct {
-	fn  func(...interface{})
-	id	HandlerID
+	fn func(...interface{})
+	id HandlerID
 }
 
 func (h *basicHandler) Run(ev ...interface{}) {
@@ -37,7 +38,7 @@ func NewHandler(h func(...interface{})) Handler {
 }
 
 type EventDispatcher interface {
-	Dispatch(name string, ev...interface{})
+	Dispatch(name string, ev ...interface{})
 }
 
 type EventRegistry interface {
@@ -50,9 +51,9 @@ type EventRegistry interface {
 type registry struct {
 	// Event registry as a lockable map of linked-lists
 	sync.RWMutex
-	events	   map[string]*list.List
+	events     map[string]*list.List
 	dispatcher func(r *registry, name string, ev ...interface{})
-}	
+}
 
 func NewRegistry() EventRegistry {
 	r := &registry{events: make(map[string]*list.List)}

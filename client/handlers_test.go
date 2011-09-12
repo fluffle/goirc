@@ -28,7 +28,7 @@ func Test001(t *testing.T) {
 	c.h_001(parseLine(":irc.server.org 001 test :Welcome to IRC test!ident@somehost.com"))
 	// Should result in no response to server
 	m.ExpectNothing()
-	
+
 	// Check that the event was dispatched correctly
 	if !flag {
 		t.Errorf("Sending 001 didn't result in dispatch of connected event.")
@@ -54,7 +54,7 @@ func Test433(t *testing.T) {
 		t.Errorf("ReNick() called unexpectedly, Nick == '%s'.", c.Me.Nick)
 	}
 
-	// Send a line that will trigger a renick. This happens when our wanted 
+	// Send a line that will trigger a renick. This happens when our wanted
 	// nick is unavailable during initial negotiation, so we must choose a
 	// different one before the connection can proceed. No NICK line will be
 	// sent by the server to confirm nick change in this case.
@@ -346,8 +346,8 @@ func TestMODE(t *testing.T) {
 	cm := test1.Modes
 
 	// Verify the ChanPrivs exists and modes we're testing aren't set
-	if cp, ok := user1.Channels[test1]; (!ok || c.Me.Channels[test1].Voice ||
-		cp.Op || cm.Key != "" || cm.InviteOnly || cm.Secret) {
+	if cp, ok := user1.Channels[test1]; !ok || c.Me.Channels[test1].Voice ||
+		cp.Op || cm.Key != "" || cm.InviteOnly || cm.Secret {
 		t.Errorf("Channel privileges in unexpected state before MODE.")
 	}
 
@@ -589,8 +589,7 @@ func Test353(t *testing.T) {
 		t.Errorf("353 handler failed to op known nick user1.")
 	}
 
-	if p := get("user2");
-		p == nil || p.Voice || p.HalfOp || p.Op || p.Admin || p.Owner {
+	if p := get("user2"); p == nil || p.Voice || p.HalfOp || p.Op || p.Admin || p.Owner {
 		t.Errorf("353 handler set modes on new nick user2.")
 	}
 

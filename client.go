@@ -40,7 +40,7 @@ func main() {
 			}
 			// no point in sending empty lines down the channel
 			if len(s) > 2 {
-				in <- s[0:len(s)-1]
+				in <- s[0 : len(s)-1]
 			}
 		}
 	}()

@@ -14,13 +14,13 @@ type mockNetConn struct {
 	In, Out chan string
 	in, out chan []byte
 	closers []chan bool
-	rc chan bool
+	rc      chan bool
 
 	closed bool
 	rt, wt int64
 }
 
-func MockNetConn(t *testing.T) (*mockNetConn) {
+func MockNetConn(t *testing.T) *mockNetConn {
 	// Our mock connection is a testing object
 	m := &mockNetConn{T: t}
 	m.closers = make([]chan bool, 0, 3)
@@ -78,13 +78,13 @@ func (m *mockNetConn) Expect(e string) {
 	t := time.NewTimer(5e6)
 	select {
 	case <-t.C:
-		m.Errorf("Mock connection did not receive expected output.\n\t" +
+		m.Errorf("Mock connection did not receive expected output.\n\t"+
 			"Expected: '%s', got nothing.", e)
 	case s := <-m.Out:
 		t.Stop()
 		s = strings.Trim(s, "\r\n")
 		if e != s {
-			m.Errorf("Mock connection received unexpected value.\n\t" +
+			m.Errorf("Mock connection received unexpected value.\n\t"+
 				"Expected: '%s'\n\tGot: '%s'", e, s)
 		}
 	}
@@ -97,7 +97,7 @@ func (m *mockNetConn) ExpectNothing() {
 	case s := <-m.Out:
 		t.Stop()
 		s = strings.Trim(s, "\r\n")
-		m.Errorf("Mock connection received unexpected output.\n\t" +
+		m.Errorf("Mock connection received unexpected output.\n\t"+
 			"Expected nothing, got: '%s'", s)
 	}
 }
@@ -140,11 +140,11 @@ func (m *mockNetConn) Close() os.Error {
 }
 
 func (m *mockNetConn) LocalAddr() net.Addr {
-	return &net.IPAddr{net.IPv4(127,0,0,1)}
+	return &net.IPAddr{net.IPv4(127, 0, 0, 1)}
 }
 
 func (m *mockNetConn) RemoteAddr() net.Addr {
-	return &net.IPAddr{net.IPv4(127,0,0,1)}
+	return &net.IPAddr{net.IPv4(127, 0, 0, 1)}
 }
 
 func (m *mockNetConn) SetTimeout(ns int64) os.Error {

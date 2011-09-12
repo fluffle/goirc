@@ -10,7 +10,7 @@ import (
 func TestSimpleDispatch(t *testing.T) {
 	r := NewRegistry()
 	out := make(chan bool)
-	
+
 	h := NewHandler(func(ev ...interface{}) {
 		out <- ev[0].(bool)
 	})
@@ -41,7 +41,7 @@ func TestParallelDispatch(t *testing.T) {
 	}
 
 	// create some handlers and send an event to them
-	for _, t := range []int{5,11,2,15,8} {
+	for _, t := range []int{5, 11, 2, 15, 8} {
 		r.AddHandler("send", factory(t))
 	}
 	r.Dispatch("send")
@@ -79,7 +79,7 @@ func TestSerialDispatch(t *testing.T) {
 	}
 
 	// create some handlers and send an event to them
-	for _, t := range []int{5,11,2,15,8} {
+	for _, t := range []int{5, 11, 2, 15, 8} {
 		r.AddHandler("send", factory(t))
 	}
 	r.Dispatch("send")
@@ -101,4 +101,3 @@ func TestSerialDispatch(t *testing.T) {
 		t.Fail()
 	}
 }
-

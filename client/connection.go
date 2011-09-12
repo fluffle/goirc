@@ -24,7 +24,7 @@ type Conn struct {
 	Network string
 
 	// Event handler registry and dispatcher
-	Registry event.EventRegistry
+	Registry   event.EventRegistry
 	Dispatcher event.EventDispatcher
 
 	// Map of channels we're on
@@ -76,21 +76,21 @@ type Conn struct {
 func New(nick, user, name string) *Conn {
 	reg := event.NewRegistry()
 	conn := &Conn{
-		Registry: reg,
+		Registry:   reg,
 		Dispatcher: reg,
-		in: make(chan *Line, 32),
-		out: make(chan string, 32),
-		Err: make(chan os.Error, 4),
-		cSend: make(chan bool),
-		cLoop: make(chan bool),
-		SSL: false,
-		SSLConfig: nil,
-		Timeout: 300,
-		Flood: false,
-		badness: 0,
-		lastsent: 0,
-		Timestamp: time.LocalTime,
-		TSFormat: "15:04:05",
+		in:         make(chan *Line, 32),
+		out:        make(chan string, 32),
+		Err:        make(chan os.Error, 4),
+		cSend:      make(chan bool),
+		cLoop:      make(chan bool),
+		SSL:        false,
+		SSLConfig:  nil,
+		Timeout:    300,
+		Flood:      false,
+		badness:    0,
+		lastsent:   0,
+		Timestamp:  time.LocalTime,
+		TSFormat:   "15:04:05",
 	}
 	conn.initialise()
 	conn.SetupHandlers()
