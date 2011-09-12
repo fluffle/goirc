@@ -541,3 +541,81 @@ func Test352(t *testing.T) {
 	m.ExpectNothing()
 	c.ExpectError()
 }
+
+// Test the handler for 353 / RPL_NAMREPLY
+func Test353(t *testing.T) {
+	m, c := setUp(t)
+	defer tearDown(m, c)
+
+	// Create #test1, whose user list we're mostly unfamiliar with
+	test1 := c.NewChannel("#test1")
+	user1 := c.NewNick("user1", "ident1", "name one", "host1.com")
+	test1.AddNick(user1)
+	test1.AddNick(c.Me)
+
+	// lazy lazy lazy ;-)
+	get := func(n string) *ChanPrivs {
+		if p, ok := test1.Nicks[c.GetNick(n)]; ok {
+			return p
+		}
+		return nil
+	}
+
+	// Verify the lack of nicks
+	if len(test1.Nicks) != 2 {
+		t.Errorf("Unexpected number of nicks in test channel before 353.")
+	}
+
+	// Verify that user1 isn't opped yet
+	if p := get("user1"); p == nil || p.Op {
+		t.Errorf("Unexpected permissions for user1 before 353.")
+	}
+
+	// Send a couple of names replies (complete with trailing space), expect no errors
+	c.h_353(parseLine(":irc.server.org 353 test = #test1 :test @user1 user2 +voice "))
+	c.h_353(parseLine(":irc.server.org 353 test = #test1 :%halfop @op &admin ~owner "))
+	m.ExpectNothing()
+	c.ExpectNoErrors()
+
+	if len(test1.Nicks) != 8 {
+		t.Errorf("Unexpected number of nicks in test channel after 353.")
+	}
+
+	// TODO(fluffle): Testing side-effects is starting to get on my tits.
+	// As a result, this makes some assumptions about the implementation of
+	// h_353 that may or may not be valid in the future. Hopefully, I will have
+	// time to rewrite the nick / channel handling soon.
+	if p := get("user1"); p == nil || !p.Op {
+		t.Errorf("353 handler failed to op known nick user1.")
+	}
+
+	if p := get("user2");
+		p == nil || p.Voice || p.HalfOp || p.Op || p.Admin || p.Owner {
+		t.Errorf("353 handler set modes on new nick user2.")
+	}
+
+	if p := get("voice"); p == nil || !p.Voice {
+		t.Errorf("353 handler failed to parse voice correctly.")
+	}
+
+	if p := get("halfop"); p == nil || !p.HalfOp {
+		t.Errorf("353 handler failed to parse halfop correctly.")
+	}
+
+	if p := get("op"); p == nil || !p.Op {
+		t.Errorf("353 handler failed to parse op correctly.")
+	}
+
+	if p := get("admin"); p == nil || !p.Admin {
+		t.Errorf("353 handler failed to parse admin correctly.")
+	}
+
+	if p := get("owner"); p == nil || !p.Owner {
+		t.Errorf("353 handler failed to parse owner correctly.")
+	}
+
+	// Check unknown channel causes an error
+	c.h_324(parseLine(":irc.server.org 353 test = #test2 :test ~user3"))
+	m.ExpectNothing()
+	c.ExpectError()
+}
