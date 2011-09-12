@@ -619,3 +619,30 @@ func Test353(t *testing.T) {
 	m.ExpectNothing()
 	c.ExpectError()
 }
+
+// Test the handler for 671 (unreal specific)
+func Test671(t *testing.T) {
+	m, c := setUp(t)
+	defer tearDown(m, c)
+
+	// Create user1, who should not be secure
+	user1 := c.NewNick("user1", "ident1", "name one", "host1.com")
+	if user1.Modes.SSL {
+		t.Errorf("Test nick user1 is already using SSL?")
+	}
+
+	// Send a 671 reply
+	c.h_671(parseLine(":irc.server.org 671 test user1 :some ignored text"))
+	m.ExpectNothing()
+	c.ExpectNoErrors()
+
+	// Ensure user1 is now known to be on an SSL connection
+	if !user1.Modes.SSL {
+		t.Errorf("Test nick user1 not using SSL?")
+	}
+
+	// Check error paths -- send a 671 for an unknown nick
+	c.h_671(parseLine(":irc.server.org 671 test user2 :some ignored text"))
+	m.ExpectNothing()
+	c.ExpectError()
+}
