@@ -27,10 +27,8 @@ type Conn struct {
 	Registry   event.EventRegistry
 	Dispatcher event.EventDispatcher
 
-	// Map of channels we're on
-	chans map[string]*Channel
-	// Map of nicks we know about
-	nicks map[string]*Nick
+	// State tracker for nicks and channels
+	Tracker StateTracker
 
 	// Use the State field to store external state that handlers might need.
 	// Remember ... you might need locking for this ;-)

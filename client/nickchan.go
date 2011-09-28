@@ -5,16 +5,41 @@ package client
 
 import (
 	"fmt"
+	"os"
 	"reflect"
 	"strconv"
 )
+
+// The state manager interface
+type StateTracker interface {
+	NewNick(nick string) *Nick
+	GetNick(nick string) *Nick
+	NewChannel(channel string) *Channel
+	GetChannel(channel string) *Channel
+	IsOn(channel, nick string) bool
+}
+
+// ... and a struct to implement it
+type stateTracker struct {
+	// Map of channels we're on
+	chans map[string]*Channel
+	// Map of nicks we know about
+	nicks map[string]*Nick
+
+	// A pointer to the connection whose state this tracks
+	conn *Conn
+
+	// Logging interface
+	l Logger
+}
+
 
 // A struct representing an IRC channel
 type Channel struct {
 	Name, Topic string
 	Modes       *ChanMode
 	Nicks       map[*Nick]*ChanPrivs
-	conn        *Conn
+	st          StateTracker
 }
 
 // A struct representing an IRC nick
@@ -22,7 +47,7 @@ type Nick struct {
 	Nick, Ident, Host, Name string
 	Modes                   *NickMode
 	Channels                map[*Channel]*ChanPrivs
-	conn                    *Conn
+	st                      StateTracker
 }
 
 // A struct representing the modes of an IRC Channel
@@ -60,45 +85,46 @@ type ChanPrivs struct {
 }
 
 /******************************************************************************\
- * Conn methods to create/look up nicks/channels
+ * tracker methods to create/look up nicks/channels
 \******************************************************************************/
 
-// Creates a new *irc.Nick, initialises it, and stores it in *irc.Conn so it
+// Creates a new *irc.Nick, initialises it, and stores it so it
 // can be properly tracked for state management purposes.
-func (conn *Conn) NewNick(nick, ident, name, host string) *Nick {
-	n := &Nick{Nick: nick, Ident: ident, Name: name, Host: host, conn: conn}
+func (st *stateTracker) NewNick(nick string) *Nick {
+	n := &Nick{Nick: nick, st: st}
 	n.initialise()
-	conn.nicks[n.Nick] = n
+	st.nicks[nick] = n
 	return n
 }
 
 // Returns an *irc.Nick for the nick n, if we're tracking it.
-func (conn *Conn) GetNick(n string) *Nick {
-	if nick, ok := conn.nicks[n]; ok {
+func (st *stateTracker) GetNick(n string) *Nick {
+	if nick, ok := st.nicks[n]; ok {
 		return nick
 	}
 	return nil
 }
 
-// Creates a new *irc.Channel, initialises it, and stores it in *irc.Conn so it
+// Creates a new *irc.Channel, initialises it, and stores it so it
 // can be properly tracked for state management purposes.
-func (conn *Conn) NewChannel(c string) *Channel {
-	ch := &Channel{Name: c, conn: conn}
+func (st *stateTracker) NewChannel(c string) *Channel {
+	ch := &Channel{Name: c, st: st}
 	ch.initialise()
-	conn.chans[ch.Name] = ch
+	st.chans[c] = ch
 	return ch
 }
 
 // Returns an *irc.Channel for the channel c, if we're tracking it.
-func (conn *Conn) GetChannel(c string) *Channel {
-	if ch, ok := conn.chans[c]; ok {
+func (st *stateTracker) GetChannel(c string) *Channel {
+	if ch, ok := st.chans[c]; ok {
 		return ch
 	}
 	return nil
 }
 
+
 // Parses mode strings for a channel
-func (conn *Conn) ParseChannelModes(ch *Channel, modes string, modeargs []string) {
+func (ch *Channel) ParseModes(modes string, modeargs []string) os.Error {
 	var modeop bool // true => add mode, false => remove mode
 	var modestr string
 	for i := 0; i < len(modes); i++ {
@@ -126,21 +152,29 @@ func (conn *Conn) ParseChannelModes(ch *Channel, modes string, modeargs []string
 		case 'O':
 			ch.Modes.OperOnly = modeop
 		case 'k':
-			if len(modeargs) != 0 {
+			if modeop && len(modeargs) != 0 {
 				ch.Modes.Key, modeargs = modeargs[0], modeargs[1:]
+			} else if !modeop {
+				ch.Modes.Key = ""
 			} else {
-				conn.error("irc.ParseChanModes(): buh? not enough arguments to process MODE %s %s%s", ch.Name, modestr, m)
+				return os.NewError(fmt.Sprintf(
+					"irc.ParseChanModes(): buh? not enough arguments to process MODE %s %s%s",
+					ch.Name, modestr, m))
 			}
 		case 'l':
-			if len(modeargs) != 0 {
+			if modeop && len(modeargs) != 0 {
 				ch.Modes.Limit, _ = strconv.Atoi(modeargs[0])
 				modeargs = modeargs[1:]
-			} else {
-				conn.error("irc.ParseChanModes(): buh? not enough arguments to process MODE %s %s%s", ch.Name, modestr, m)
+			} else if !modeop {
+				ch.Modes.Limit = 0
+			}
+				return os.NewError(fmt.Sprintf(
+					"Channel.ParseModes(): buh? not enough arguments to process MODE %s %s%s",
+					ch.Name, modestr, m))
 			}
 		case 'q', 'a', 'o', 'h', 'v':
 			if len(modeargs) != 0 {
-				n := conn.GetNick(modeargs[0])
+				n := ch.st.GetNick(modeargs[0])
 				if p, ok := ch.Nicks[n]; ok && n != nil {
 					switch m {
 					case 'q':
@@ -156,17 +190,20 @@ func (conn *Conn) ParseChannelModes(ch *Channel, modes string, modeargs []string
 					}
 					modeargs = modeargs[1:]
 				} else {
-					conn.error("irc.ParseChanModes(): MODE %s %s%s %s: buh? state tracking failure.", ch.Name, modestr, m, modeargs[0])
+					return os.NewError(fmt.Sprintf(
+						"Channel.ParseModes(): MODE %s %s%s %s: buh? state tracking failure.",
+						ch.Name, modestr, m, modeargs[0]))
 				}
 			} else {
-				conn.error("irc.ParseChanModes(): buh? not enough arguments to process MODE %s %s%s", ch.Name, modestr, m)
+				conn.error("Channel.ParseModes(): buh? not enough arguments to process MODE %s %s%s", ch.Name, modestr, m)
 			}
 		}
 	}
+	return nil
 }
 
 // Parse mode strings for a nick 
-func (conn *Conn) ParseNickModes(n *Nick, modes string) {
+func (n *Nick) ParseModes(modes string) {
 	var modeop bool // true => add mode, false => remove mode
 	for i := 0; i < len(modes); i++ {
 		switch m := modes[i]; m {
