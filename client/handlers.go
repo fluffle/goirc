@@ -97,7 +97,7 @@ func (conn *Conn) h_JOIN(line *Line) {
 		// first we've seen of this channel, so should be us joining it
 		// NOTE this will also take care of n == nil && ch == nil
 		if n != conn.Me {
-			logging.Warn("irc.JOIN(): JOIN to unknown channel %s recieved " +
+			logging.Warn("irc.JOIN(): JOIN to unknown channel %s recieved "+
 				"from (non-me) nick %s", line.Args[0], line.Nick)
 			return
 		}

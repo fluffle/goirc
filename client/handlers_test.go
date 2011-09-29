@@ -131,7 +131,7 @@ func TestJOIN(t *testing.T) {
 	// verifying their expected side-effects instead. Fixing this requires
 	// significant effort to move Conn to being a mockable interface type
 	// instead of a concrete struct. I'm not sure how feasible this is :-/
-	// 
+	//
 	// Soon, we'll find out :-)
 
 	m, c := setUp(t)

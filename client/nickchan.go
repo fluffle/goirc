@@ -130,7 +130,7 @@ func (conn *Conn) ParseChannelModes(ch *Channel, modes string, modeargs []string
 			if len(modeargs) != 0 {
 				ch.Modes.Key, modeargs = modeargs[0], modeargs[1:]
 			} else {
-				logging.Warn("irc.ParseChanModes(): not enough arguments to " +
+				logging.Warn("irc.ParseChanModes(): not enough arguments to "+
 					"process MODE %s %s%s", ch.Name, modestr, m)
 			}
 		case 'l':
@@ -138,7 +138,7 @@ func (conn *Conn) ParseChannelModes(ch *Channel, modes string, modeargs []string
 				ch.Modes.Limit, _ = strconv.Atoi(modeargs[0])
 				modeargs = modeargs[1:]
 			} else {
-				logging.Warn("irc.ParseChanModes(): not enough arguments to " +
+				logging.Warn("irc.ParseChanModes(): not enough arguments to "+
 					"process MODE %s %s%s", ch.Name, modestr, m)
 			}
 		case 'q', 'a', 'o', 'h', 'v':
@@ -159,11 +159,11 @@ func (conn *Conn) ParseChannelModes(ch *Channel, modes string, modeargs []string
 					}
 					modeargs = modeargs[1:]
 				} else {
-					logging.Warn("irc.ParseChanModes(): untracked nick %s " +
+					logging.Warn("irc.ParseChanModes(): untracked nick %s "+
 						"recieved MODE on channel %s", modeargs[0], ch.Name)
 				}
 			} else {
-				logging.Warn("irc.ParseChanModes(): not enough arguments to " +
+				logging.Warn("irc.ParseChanModes(): not enough arguments to "+
 					"process MODE %s %s%s", ch.Name, modestr, m)
 			}
 		}
@@ -208,7 +208,7 @@ func (ch *Channel) AddNick(n *Nick) {
 		ch.Nicks[n] = new(ChanPrivs)
 		n.Channels[ch] = ch.Nicks[n]
 	} else {
-		logging.Warn("irc.Channel.AddNick(): trying to add already-present " +
+		logging.Warn("irc.Channel.AddNick(): trying to add already-present "+
 			"nick %s to channel %s", n.Nick, ch.Name)
 	}
 }
@@ -257,7 +257,7 @@ func (n *Nick) AddChannel(ch *Channel) {
 		ch.Nicks[n] = new(ChanPrivs)
 		n.Channels[ch] = ch.Nicks[n]
 	} else {
-		logging.Warn("irc.Nick.AddChannel(): trying to add already-present " +
+		logging.Warn("irc.Nick.AddChannel(): trying to add already-present "+
 			"channel %s to nick %s", ch.Name, n.Nick)
 	}
 }
