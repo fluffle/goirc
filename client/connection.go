@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"crypto/tls"
 	"github.com/fluffle/goirc/event"
+	"github.com/fluffle/goirc/logging"
 	"fmt"
 	"net"
 	"os"
@@ -16,7 +17,6 @@ const (
 )
 
 // An IRC connection is represented by this struct.
-// Once connected, any errors encountered are piped down *Conn.Err.
 type Conn struct {
 	// Connection Hostname and Nickname
 	Host    string
@@ -46,9 +46,6 @@ type Conn struct {
 	// Control channels to goroutines
 	cSend, cLoop chan bool
 
-	// Error channel to transmit any fail back to the user
-	Err chan os.Error
-
 	// Misc knobs to tweak client behaviour:
 	// Are we connecting via SSL? Do we care about certificate validity?
 	SSL       bool
@@ -62,13 +59,6 @@ type Conn struct {
 
 	// Internal counters for flood protection
 	badness, lastsent int64
-
-	// Function which returns a *time.Time for use as a timestamp
-	Timestamp func() *time.Time
-
-	// Enable debugging? Set format for timestamps on debug output.
-	Debug    bool
-	TSFormat string
 }
 
 // Creates a new IRC connection object, but doesn't connect to anything so
@@ -80,7 +70,6 @@ func New(nick, user, name string) *Conn {
 		Dispatcher: reg,
 		in:         make(chan *Line, 32),
 		out:        make(chan string, 32),
-		Err:        make(chan os.Error, 4),
 		cSend:      make(chan bool),
 		cLoop:      make(chan bool),
 		SSL:        false,
@@ -89,8 +78,6 @@ func New(nick, user, name string) *Conn {
 		Flood:      false,
 		badness:    0,
 		lastsent:   0,
-		Timestamp:  time.LocalTime,
-		TSFormat:   "15:04:05",
 	}
 	conn.initialise()
 	conn.SetupHandlers()
@@ -128,6 +115,7 @@ func (conn *Conn) Connect(host string, pass ...string) os.Error {
 		if !hasPort(host) {
 			host += ":6697"
 		}
+		logging.Info("irc.Connect(): Connecting to %s with SSL.", host)
 		if s, err := tls.Dial("tcp", host, conn.SSLConfig); err == nil {
 			conn.sock = s
 		} else {
@@ -137,6 +125,7 @@ func (conn *Conn) Connect(host string, pass ...string) os.Error {
 		if !hasPort(host) {
 			host += ":6667"
 		}
+		logging.Info("irc.Connect(): Connecting to %s without SSL.", host)
 		if s, err := net.Dial("tcp", host); err == nil {
 			conn.sock = s
 		} else {
@@ -166,11 +155,6 @@ func (conn *Conn) postConnect() {
 	go conn.runLoop()
 }
 
-// dispatch a nicely formatted os.Error to the error channel
-func (conn *Conn) error(s string, a ...interface{}) {
-	conn.Err <- os.NewError(fmt.Sprintf(s, a...))
-}
-
 // copied from http.client for great justice
 func hasPort(s string) bool {
 	return strings.LastIndex(s, ":") > strings.LastIndex(s, "]")
@@ -194,18 +178,15 @@ func (conn *Conn) recv() {
 	for {
 		s, err := conn.io.ReadString('\n')
 		if err != nil {
-			conn.error("irc.recv(): %s", err.String())
+			logging.Error("irc.recv(): %s", err.String())
 			conn.shutdown()
-			break
+			return
 		}
 		s = strings.Trim(s, "\r\n")
-		t := conn.Timestamp()
-		if conn.Debug {
-			fmt.Println(t.Format(conn.TSFormat) + " <- " + s)
-		}
+		logging.Debug("<- %s", s)
 
 		if line := parseLine(s); line != nil {
-			line.Time = t
+			line.Time = time.LocalTime()
 			conn.in <- line
 		}
 	}
@@ -232,14 +213,12 @@ func (conn *Conn) write(line string) {
 	}
 
 	if _, err := conn.io.WriteString(line + "\r\n"); err != nil {
-		conn.error("irc.send(): %s", err.String())
+		logging.Error("irc.send(): %s", err.String())
 		conn.shutdown()
 		return
 	}
 	conn.io.Flush()
-	if conn.Debug {
-		fmt.Println(conn.Timestamp().Format(conn.TSFormat) + " -> " + line)
-	}
+	logging.Debug("-> %s", line)
 }
 
 // Implement Hybrid's flood control algorithm to rate-limit outgoing lines.
@@ -257,6 +236,8 @@ func (conn *Conn) rateLimit(chars int64) {
 	// calculation above, then we're at risk of "Excess Flood".
 	if conn.badness > 10*second && !conn.Flood {
 		// so sleep for the current line's time value before sending it
+		logging.Debug("irc.rateLimit(): Flood! Sleeping for %.2f secs.",
+			float64(linetime)/float64(second))
 		time.Sleep(linetime)
 	}
 }
@@ -265,6 +246,7 @@ func (conn *Conn) shutdown() {
 	// Guard against double-call of shutdown() if we get an error in send()
 	// as calling sock.Close() will cause recv() to recieve EOF in readstring()
 	if conn.Connected {
+		logging.Info("irc.shutdown(): Disconnected from server.")
 		conn.Dispatcher.Dispatch("disconnected", conn, &Line{})
 		conn.Connected = false
 		conn.sock.Close()

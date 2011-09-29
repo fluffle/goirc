@@ -1,6 +1,7 @@
 package client
 
 import (
+	"github.com/fluffle/goirc/logging"
 	"strings"
 	"time"
 )
@@ -33,6 +34,7 @@ func parseLine(s string) *Line {
 			line.Src, s = s[1:idx], s[idx+1:]
 		} else {
 			// pretty sure we shouldn't get here ...
+			logging.Warn("Parsing of line '%s' didn't go well.", s)
 			line.Src = s[1:]
 			return line
 		}

@@ -5,6 +5,7 @@ package client
 
 import (
 	"fmt"
+	"github.com/fluffle/goirc/logging"
 	"reflect"
 	"strconv"
 )
@@ -129,14 +130,16 @@ func (conn *Conn) ParseChannelModes(ch *Channel, modes string, modeargs []string
 			if len(modeargs) != 0 {
 				ch.Modes.Key, modeargs = modeargs[0], modeargs[1:]
 			} else {
-				conn.error("irc.ParseChanModes(): buh? not enough arguments to process MODE %s %s%s", ch.Name, modestr, m)
+				logging.Warn("irc.ParseChanModes(): not enough arguments to " +
+					"process MODE %s %s%s", ch.Name, modestr, m)
 			}
 		case 'l':
 			if len(modeargs) != 0 {
 				ch.Modes.Limit, _ = strconv.Atoi(modeargs[0])
 				modeargs = modeargs[1:]
 			} else {
-				conn.error("irc.ParseChanModes(): buh? not enough arguments to process MODE %s %s%s", ch.Name, modestr, m)
+				logging.Warn("irc.ParseChanModes(): not enough arguments to " +
+					"process MODE %s %s%s", ch.Name, modestr, m)
 			}
 		case 'q', 'a', 'o', 'h', 'v':
 			if len(modeargs) != 0 {
@@ -156,10 +159,12 @@ func (conn *Conn) ParseChannelModes(ch *Channel, modes string, modeargs []string
 					}
 					modeargs = modeargs[1:]
 				} else {
-					conn.error("irc.ParseChanModes(): MODE %s %s%s %s: buh? state tracking failure.", ch.Name, modestr, m, modeargs[0])
+					logging.Warn("irc.ParseChanModes(): untracked nick %s " +
+						"recieved MODE on channel %s", modeargs[0], ch.Name)
 				}
 			} else {
-				conn.error("irc.ParseChanModes(): buh? not enough arguments to process MODE %s %s%s", ch.Name, modestr, m)
+				logging.Warn("irc.ParseChanModes(): not enough arguments to " +
+					"process MODE %s %s%s", ch.Name, modestr, m)
 			}
 		}
 	}
@@ -203,7 +208,8 @@ func (ch *Channel) AddNick(n *Nick) {
 		ch.Nicks[n] = new(ChanPrivs)
 		n.Channels[ch] = ch.Nicks[n]
 	} else {
-		ch.conn.error("irc.Channel.AddNick() warning: trying to add already-present nick %s to channel %s", n.Nick, ch.Name)
+		logging.Warn("irc.Channel.AddNick(): trying to add already-present " +
+			"nick %s to channel %s", n.Nick, ch.Name)
 	}
 }
 
@@ -251,7 +257,8 @@ func (n *Nick) AddChannel(ch *Channel) {
 		ch.Nicks[n] = new(ChanPrivs)
 		n.Channels[ch] = ch.Nicks[n]
 	} else {
-		n.conn.error("irc.Nick.AddChannel() warning: trying to add already-present channel %s to nick %s", ch.Name, n.Nick)
+		logging.Warn("irc.Nick.AddChannel(): trying to add already-present " +
+			"channel %s to nick %s", ch.Name, n.Nick)
 	}
 }
 
@@ -401,7 +408,7 @@ func (n *Nick) String() string {
 //	+npk key
 func (cm *ChanMode) String() string {
 	str := "+"
-	a := make([]string, 2)
+	a := make([]string, 0)
 	v := reflect.Indirect(reflect.ValueOf(cm))
 	t := v.Type()
 	for i := 0; i < v.NumField(); i++ {
@@ -413,12 +420,12 @@ func (cm *ChanMode) String() string {
 		case reflect.String:
 			if f.String() != "" {
 				str += ChanModeToString[t.Field(i).Name]
-				a[0] = f.String()
+				a = append(a, f.String())
 			}
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 			if f.Int() != 0 {
 				str += ChanModeToString[t.Field(i).Name]
-				a[1] = fmt.Sprintf("%d", f.Int())
+				a = append(a, fmt.Sprintf("%d", f.Int()))
 			}
 		}
 	}

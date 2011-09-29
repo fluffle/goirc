@@ -73,8 +73,7 @@ func TestNICK(t *testing.T) {
 
 	// Call handler with a NICK line changing "our" nick to test1.
 	c.h_NICK(parseLine(":test!test@somehost.com NICK :test1"))
-	// Should generate no errors and no response to server
-	c.ExpectNoErrors()
+	// Should generate no response to server
 	m.ExpectNothing()
 
 	// Verify that our Nick has changed
@@ -87,7 +86,6 @@ func TestNICK(t *testing.T) {
 
 	// Call handler with a NICK line changing user1 to somebody
 	c.h_NICK(parseLine(":user1!ident1@host1.com NICK :somebody"))
-	c.ExpectNoErrors()
 	m.ExpectNothing()
 
 	if c.GetNick("user1") != nil {
@@ -99,7 +97,6 @@ func TestNICK(t *testing.T) {
 
 	// Send a NICK line for an unknown nick.
 	c.h_NICK(parseLine(":blah!moo@cows.com NICK :milk"))
-	c.ExpectError()
 	m.ExpectNothing()
 }
 
@@ -134,10 +131,8 @@ func TestJOIN(t *testing.T) {
 	// verifying their expected side-effects instead. Fixing this requires
 	// significant effort to move Conn to being a mockable interface type
 	// instead of a concrete struct. I'm not sure how feasible this is :-/
-	//
-	// Instead, in this test we (so far) just verify the correct code paths
-	// are followed and trust that the unit tests for the various methods
-	// ensure that they do the right thing.
+	// 
+	// Soon, we'll find out :-)
 
 	m, c := setUp(t)
 	defer tearDown(m, c)
@@ -145,9 +140,6 @@ func TestJOIN(t *testing.T) {
 	// Use #test1 to test expected behaviour
 	// Call handler with JOIN by test to #test1
 	c.h_JOIN(parseLine(":test!test@somehost.com JOIN :#test1"))
-
-	// Ensure we aren't triggering an error here
-	c.ExpectNoErrors()
 
 	// Verify that the MODE and WHO commands are sent correctly
 	m.Expect("MODE #test1")
@@ -161,9 +153,6 @@ func TestJOIN(t *testing.T) {
 
 	// OK, now #test1 exists, JOIN another user we don't know about
 	c.h_JOIN(parseLine(":user1!ident1@host1.com JOIN :#test1"))
-
-	// Again, expect no errors
-	c.ExpectNoErrors()
 
 	// Verify that the WHO command is sent correctly
 	m.Expect("WHO user1")
@@ -179,7 +168,6 @@ func TestJOIN(t *testing.T) {
 	c.h_JOIN(parseLine(":user2!ident2@host2.com JOIN :#test1"))
 
 	// We already know about this user and channel, so nothing should be sent
-	c.ExpectNoErrors()
 	m.ExpectNothing()
 
 	// Simple verification that the state tracking has actually been done
@@ -189,12 +177,10 @@ func TestJOIN(t *testing.T) {
 
 	// Test error paths -- unknown channel, unknown nick
 	c.h_JOIN(parseLine(":blah!moo@cows.com JOIN :#test2"))
-	c.ExpectError()
 	m.ExpectNothing()
 
 	// unknown channel, known nick that isn't Me.
 	c.h_JOIN(parseLine(":user2!ident2@host2.com JOIN :#test2"))
-	c.ExpectError()
 	m.ExpectNothing()
 }
 
@@ -217,8 +203,7 @@ func TestPART(t *testing.T) {
 	// Then make them PART
 	c.h_PART(parseLine(":user1!ident1@host1.com PART #test1 :Bye!"))
 
-	// Expect no errors or output
-	c.ExpectNoErrors()
+	// Expect no output
 	m.ExpectNothing()
 
 	// Quick check of tracking code
@@ -229,19 +214,15 @@ func TestPART(t *testing.T) {
 	// Test error states.
 	// Part a known user from a known channel they are not on.
 	c.h_PART(parseLine(":user1!ident1@host1.com PART #test1 :Bye!"))
-	c.ExpectError()
 
 	// Part an unknown user from a known channel.
 	c.h_PART(parseLine(":user2!ident2@host2.com PART #test1 :Bye!"))
-	c.ExpectError()
 
 	// Part a known user from an unknown channel.
 	c.h_PART(parseLine(":user1!ident1@host1.com PART #test3 :Bye!"))
-	c.ExpectError()
 
 	// Part an unknown user from an unknown channel.
 	c.h_PART(parseLine(":user2!ident2@host2.com PART #test3 :Bye!"))
-	c.ExpectError()
 }
 
 // Test the handler for KICK messages
@@ -264,8 +245,7 @@ func TestKICK(t *testing.T) {
 	// Then kick them!
 	c.h_KICK(parseLine(":test!test@somehost.com KICK #test1 user1 :Bye!"))
 
-	// Expect no errors or output
-	c.ExpectNoErrors()
+	// Expect no output
 	m.ExpectNothing()
 
 	// Quick check of tracking code
@@ -276,19 +256,15 @@ func TestKICK(t *testing.T) {
 	// Test error states.
 	// Kick a known user from a known channel they are not on.
 	c.h_KICK(parseLine(":test!test@somehost.com KICK #test1 user1 :Bye!"))
-	c.ExpectError()
 
 	// Kick an unknown user from a known channel.
 	c.h_KICK(parseLine(":test!test@somehost.com KICK #test2 user2 :Bye!"))
-	c.ExpectError()
 
 	// Kick a known user from an unknown channel.
 	c.h_KICK(parseLine(":test!test@somehost.com KICK #test3 user1 :Bye!"))
-	c.ExpectError()
 
 	// Kick an unknown user from an unknown channel.
 	c.h_KICK(parseLine(":test!test@somehost.com KICK #test4 user2 :Bye!"))
-	c.ExpectError()
 }
 
 // Test the handler for QUIT messages
@@ -310,8 +286,7 @@ func TestQUIT(t *testing.T) {
 	// Have user1 QUIT
 	c.h_QUIT(parseLine(":user1!ident1@host1.com QUIT :Bye!"))
 
-	// Expect no errors or output
-	c.ExpectNoErrors()
+	// Expect no output
 	m.ExpectNothing()
 
 	// Quick check of tracking code
@@ -326,11 +301,9 @@ func TestQUIT(t *testing.T) {
 
 	// Have user1 QUIT again, expect ERRORS!
 	c.h_QUIT(parseLine(":user1!ident1@host1.com QUIT :Bye!"))
-	c.ExpectError()
 
 	// Have a previously unmentioned user quit, expect an error
 	c.h_QUIT(parseLine(":user2!ident2@host2.com QUIT :Bye!"))
-	c.ExpectError()
 }
 
 // Test the handler for MODE messages
@@ -354,9 +327,8 @@ func TestMODE(t *testing.T) {
 	// Send a channel mode line
 	c.h_MODE(parseLine(":user1!ident1@host1.com MODE #test1 +kisvo somekey test user1"))
 
-	// Shouldn't get any errors or output
+	// Expect no output
 	m.ExpectNothing()
-	c.ExpectNoErrors()
 
 	// Verify expected state afterwards.
 	if cp := user1.Channels[test1]; !(cp.Op || c.Me.Channels[test1].Voice ||
@@ -373,7 +345,6 @@ func TestMODE(t *testing.T) {
 	// Send a nick mode line
 	c.h_MODE(parseLine(":test!test@somehost.com MODE test +ix"))
 	m.ExpectNothing()
-	c.ExpectNoErrors()
 
 	// Verify the two modes we expect to change did so
 	if !nm.Invisible || nm.WallOps || !nm.HiddenHost {
@@ -383,12 +354,10 @@ func TestMODE(t *testing.T) {
 	// Check error paths -- send a valid user mode that's not us
 	c.h_MODE(parseLine(":user1!ident1@host1.com MODE user1 +w"))
 	m.ExpectNothing()
-	c.ExpectError()
 
 	// Send a random mode for an unknown channel
 	c.h_MODE(parseLine(":user1!ident1@host1.com MODE #test2 +is"))
 	m.ExpectNothing()
-	c.ExpectError()
 }
 
 // Test the handler for TOPIC messages
@@ -407,7 +376,6 @@ func TestTOPIC(t *testing.T) {
 	// Send a TOPIC line
 	c.h_TOPIC(parseLine(":user1!ident1@host1.com TOPIC #test1 :something something"))
 	m.ExpectNothing()
-	c.ExpectNoErrors()
 
 	// Make sure the channel's topic has been changed
 	if test1.Topic != "something something" {
@@ -417,7 +385,6 @@ func TestTOPIC(t *testing.T) {
 	// Check error paths -- send a topic for an unknown channel
 	c.h_TOPIC(parseLine(":user1!ident1@host1.com TOPIC #test2 :dark side"))
 	m.ExpectNothing()
-	c.ExpectError()
 }
 
 // Test the handler for 311 / RPL_WHOISUSER
@@ -431,7 +398,6 @@ func Test311(t *testing.T) {
 	// Send a 311 reply
 	c.h_311(parseLine(":irc.server.org 311 test user1 ident1 host1.com * :name"))
 	m.ExpectNothing()
-	c.ExpectNoErrors()
 
 	// Verify we now know more about user1
 	if user1.Ident != "ident1" ||
@@ -443,7 +409,6 @@ func Test311(t *testing.T) {
 	// Check error paths -- send a 311 for an unknown nick
 	c.h_311(parseLine(":irc.server.org 311 test user2 ident2 host2.com * :dongs"))
 	m.ExpectNothing()
-	c.ExpectError()
 }
 
 // Test the handler for 324 / RPL_CHANNELMODEIS
@@ -463,7 +428,6 @@ func Test324(t *testing.T) {
 	// Send a 324 reply
 	c.h_324(parseLine(":irc.server.org 324 test #test1 +snk somekey"))
 	m.ExpectNothing()
-	c.ExpectNoErrors()
 
 	// Make sure the modes we expected to be set were set and vice versa
 	if !cm.Secret || !cm.NoExternalMsg || cm.Moderated || cm.Key != "somekey" {
@@ -473,7 +437,6 @@ func Test324(t *testing.T) {
 	// Check unknown channel causes an error
 	c.h_324(parseLine(":irc.server.org 324 test #test2 +pmt"))
 	m.ExpectNothing()
-	c.ExpectError()
 }
 
 // Test the handler for 332 / RPL_TOPIC
@@ -492,7 +455,6 @@ func Test332(t *testing.T) {
 	// Send a 332 reply
 	c.h_332(parseLine(":irc.server.org 332 test #test1 :something something"))
 	m.ExpectNothing()
-	c.ExpectNoErrors()
 
 	// Make sure the channel's topic has been changed
 	if test1.Topic != "something something" {
@@ -502,7 +464,6 @@ func Test332(t *testing.T) {
 	// Check unknown channel causes an error
 	c.h_324(parseLine(":irc.server.org 332 test #test2 :dark side"))
 	m.ExpectNothing()
-	c.ExpectError()
 }
 
 // Test the handler for 352 / RPL_WHOREPLY
@@ -516,7 +477,6 @@ func Test352(t *testing.T) {
 	// Send a 352 reply
 	c.h_352(parseLine(":irc.server.org 352 test #test1 ident1 host1.com irc.server.org user1 G :0 name"))
 	m.ExpectNothing()
-	c.ExpectNoErrors()
 
 	// Verify we now know more about user1
 	if user1.Ident != "ident1" ||
@@ -530,7 +490,6 @@ func Test352(t *testing.T) {
 	// Check that modes are set correctly from WHOREPLY
 	c.h_352(parseLine(":irc.server.org 352 test #test1 ident1 host1.com irc.server.org user1 H* :0 name"))
 	m.ExpectNothing()
-	c.ExpectNoErrors()
 
 	if !user1.Modes.Invisible || !user1.Modes.Oper {
 		t.Errorf("WHO modes of user1 not set correctly.")
@@ -539,7 +498,6 @@ func Test352(t *testing.T) {
 	// Check error paths -- send a 352 for an unknown nick
 	c.h_352(parseLine(":irc.server.org 352 test #test2 ident2 host2.com irc.server.org user2 G :0 fooo"))
 	m.ExpectNothing()
-	c.ExpectError()
 }
 
 // Test the handler for 353 / RPL_NAMREPLY
@@ -575,7 +533,6 @@ func Test353(t *testing.T) {
 	c.h_353(parseLine(":irc.server.org 353 test = #test1 :test @user1 user2 +voice "))
 	c.h_353(parseLine(":irc.server.org 353 test = #test1 :%halfop @op &admin ~owner "))
 	m.ExpectNothing()
-	c.ExpectNoErrors()
 
 	if len(test1.Nicks) != 8 {
 		t.Errorf("Unexpected number of nicks in test channel after 353.")
@@ -616,7 +573,6 @@ func Test353(t *testing.T) {
 	// Check unknown channel causes an error
 	c.h_324(parseLine(":irc.server.org 353 test = #test2 :test ~user3"))
 	m.ExpectNothing()
-	c.ExpectError()
 }
 
 // Test the handler for 671 (unreal specific)
@@ -633,7 +589,6 @@ func Test671(t *testing.T) {
 	// Send a 671 reply
 	c.h_671(parseLine(":irc.server.org 671 test user1 :some ignored text"))
 	m.ExpectNothing()
-	c.ExpectNoErrors()
 
 	// Ensure user1 is now known to be on an SSL connection
 	if !user1.Modes.SSL {
@@ -643,5 +598,4 @@ func Test671(t *testing.T) {
 	// Check error paths -- send a 671 for an unknown nick
 	c.h_671(parseLine(":irc.server.org 671 test user2 :some ignored text"))
 	m.ExpectNothing()
-	c.ExpectError()
 }
