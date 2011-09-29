@@ -66,7 +66,7 @@ type logger struct {
 	*sync.Mutex // to ensure changing levels/flags is atomic
 }
 
-var internal Logger
+var internal *logger
 
 func init() {
 	/// Hopefully this won't cause pain and suffering
@@ -106,12 +106,13 @@ func init() {
 	internal = New(out, lv, *only)
 }
 
-func New(out io.Writer, level int, only bool) Logger {
+func New(out io.Writer, level int, only bool) *logger {
 	l := log.New(out, "", log.LstdFlags)
 	return &logger{l, level, only, &sync.Mutex{}}
 }
 
-func (l *logger) Log(lv int, fm string, v ...interface{}) {
+// Internal function all others call to ensure identical call depth
+func (l *logger) write(lv int, fm string, v ...interface{}) {
 	if lv > l.level {
 		// Your logs are not important to us, goodnight
 		return
@@ -127,56 +128,60 @@ func (l *logger) Log(lv int, fm string, v ...interface{}) {
 		l.log.SetFlags(log.LstdFlags)
 	}
 	// Writing the log is deceptively simple
-	l.log.Output(2, fmt.Sprintf(fm, v...))
+	l.log.Output(3, fmt.Sprintf(fm, v...))
 	if lv == LogFatal {
 		// Always fatal to stderr too.
 		log.Fatalf(fm, v...)
 	}
 }
 
+func (l *logger) Log(lv int, fm string, v ...interface{}) {
+	l.write(lv, fm, v...)
+}
+
 func Log(lv int, fm string, v ...interface{}) {
-	internal.Log(lv, fm, v...)
+	internal.write(lv, fm, v...)
 }
 
 // Helper functions for specific levels
 func (l *logger) Debug(fm string, v ...interface{}) {
-	l.Log(LogDebug, fm, v...)
+	l.write(LogDebug, fm, v...)
 }
 
 func Debug(fm string, v ...interface{}) {
-	internal.Debug(fm, v...)
+	internal.write(LogDebug, fm, v...)
 }
 
 func (l *logger) Info(fm string, v ...interface{}) {
-	l.Log(LogInfo, fm, v...)
+	l.write(LogInfo, fm, v...)
 }
 
 func Info(fm string, v ...interface{}) {
-	internal.Info(fm, v...)
+	internal.write(LogInfo, fm, v...)
 }
 
 func (l *logger) Warn(fm string, v ...interface{}) {
-	l.Log(LogWarn, fm, v...)
+	l.write(LogWarn, fm, v...)
 }
 
 func Warn(fm string, v ...interface{}) {
-	internal.Warn(fm, v...)
+	internal.write(LogWarn, fm, v...)
 }
 
 func (l *logger) Error(fm string, v ...interface{}) {
-	l.Log(LogError, fm, v...)
+	l.write(LogError, fm, v...)
 }
 
 func Error(fm string, v ...interface{}) {
-	internal.Error(fm, v...)
+	internal.write(LogError, fm, v...)
 }
 
 func (l *logger) Fatal(fm string, v ...interface{}) {
-	l.Log(LogFatal, fm, v...)
+	l.write(LogFatal, fm, v...)
 }
 
 func Fatal(fm string, v ...interface{}) {
-	internal.Fatal(fm, v...)
+	internal.write(LogFatal, fm, v...)
 }
 
 func (l *logger) SetLogLevel(lv int) {
