@@ -20,25 +20,22 @@ const (
 	LogDebug
 )
 
-// These flags control the internal logger created here
-var fs = flag.NewFlagSet("logging", flag.ExitOnError)
-
 var (
-	file = fs.String("log_file", "",
+	file = flag.String("log.file", "",
 		"Log to this file rather than STDERR")
-	level = fs.Int("log_level", LogError,
+	level = flag.Int("log.level", LogError,
 		"Level of logging to be output")
-	only = fs.Bool("log_only", false,
+	only = flag.Bool("log.only", false,
 		"Only log output at the selected level")
 
 	// Shortcut flags for great justice
-	quiet = fs.Bool("log_quiet", false,
+	quiet = flag.Bool("log.quiet", false,
 		"Only fatal output (equivalent to -v -1)")
-	warn = fs.Bool("log_warn", false,
+	warn = flag.Bool("log.warn", false,
 		"Warning output (equivalent to -v 1)")
-	info = fs.Bool("log_info", false,
+	info = flag.Bool("log.info", false,
 		"Info output (equivalent to -v 2)")
-	debug = fs.Bool("log_debug", false,
+	debug = flag.Bool("log.debug", false,
 		"Debug output (equivalent to -v 3)")
 )
 
@@ -72,9 +69,8 @@ type logger struct {
 var internal Logger
 
 func init() {
-	// Make sure we parse logging flags, handle them separately
-	// to the standard flag package to avoid treading on toes
-	fs.Parse(os.Args[1:])
+	/// Hopefully this won't cause pain and suffering
+	flag.Parse()
 
 	// Where are we logging to?
 	var out io.Writer
