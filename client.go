@@ -20,12 +20,6 @@ func main() {
 	c.AddHandler("disconnected",
 		func(conn *irc.Conn, line *irc.Line) { quit <- true })
 
-	// connect to server
-	if err := c.Connect("irc.freenode.net"); err != nil {
-		fmt.Printf("Connection error: %s\n", err)
-		return
-	}
-
 	// set up a goroutine to read commands from stdin
 	in := make(chan string, 4)
 	reallyquit := false
@@ -80,17 +74,13 @@ func main() {
 	}()
 
 	for !reallyquit {
-		select {
-		case err := <-c.Err:
-			fmt.Printf("goirc error: %s\n", err)
-		case <-quit:
-			if !reallyquit {
-				fmt.Println("Reconnecting...")
-				if err := c.Connect("irc.freenode.net"); err != nil {
-					fmt.Printf("Connection error: %s\n", err)
-					reallyquit = true
-				}
-			}
+		// connect to server
+		if err := c.Connect("irc.freenode.net"); err != nil {
+			fmt.Printf("Connection error: %s\n", err)
+			return
 		}
+
+		// wait on quit channel
+		<-quit
 	}
 }
