@@ -28,10 +28,7 @@ type stateTracker struct {
 	chans map[string]*Channel
 	// Map of nicks we know about
 	nicks map[string]*Nick
-	// When tracking state, it helps to know who we are.
-	Me *Nick
 }
-
 
 // A struct representing an IRC channel
 type Channel struct {
@@ -46,6 +43,7 @@ type Nick struct {
 	Nick, Ident, Host, Name string
 	Modes                   *NickMode
 	chans                   map[*Channel]*ChanPrivs
+	me                      bool
 	st                      StateTracker
 }
 
@@ -70,7 +68,7 @@ type ChanMode struct {
 // A struct representing the modes of an IRC Nick (User Modes)
 // (again, only the ones we care about)
 //
-// This is only really useful for conn.Me, as we can't see other people's modes
+// This is only really useful for me, as we can't see other people's modes
 // without IRC operator privileges (and even then only on some IRCd's).
 type NickMode struct {
 	// MODE +i, +o, +w, +x, +z
@@ -174,9 +172,9 @@ func (ch *Channel) AddNick(n *Nick) {
 	}
 }
 
-// Returns true if the *irc.Nick n is associated with the *irc.Channel
+// Returns true if the *irc.Nick is associated with the *irc.Channel
 func (ch *Channel) IsOn(n *Nick) bool {
-	_, ok := ch.nicks[nk]
+	_, ok := ch.nicks[n]
 	return ok
 }
 
@@ -185,7 +183,7 @@ func (ch *Channel) IsOn(n *Nick) bool {
 // n.DelChannel(ch) to remove the association from the perspective of *irc.Nick.
 func (ch *Channel) DelNick(n *Nick) {
 	if _, ok := ch.nicks[n]; ok {
-		if n == n.st.Me {
+		if n.me {
 			// we're leaving the channel, so remove all state we have about it
 			ch.Delete()
 		} else {
@@ -306,6 +304,17 @@ func (n *Nick) AddChannel(ch *Channel) {
 	}
 }
 
+// Returns true if the *irc.Nick is associated with the *irc.Channel
+func (n *Nick) IsOn(ch *Channel) bool {
+	_, ok := n.chans[ch]
+	return ok
+}
+
+// Returns true if the *irc.Nick is Me!
+func (n *Nick) IsMe() bool {
+	return n.me
+}
+
 // Disassociates an *irc.Channel from an *irc.Nick. Will call n.Delete() if
 // the *irc.Nick is no longer on any channels we are tracking. Will also call
 // ch.DelNick(n) to remove the association from the perspective of *irc.Channel.
@@ -324,7 +333,7 @@ func (n *Nick) DelChannel(ch *Channel) {
 // ch.DelNick(n) for all nicks that are associated with the channel.
 func (n *Nick) Delete() {
 	// we don't ever want to remove *our* nick from st.nicks...
-	if n != n.st.Me {
+	if !n.me {
 		for ch, _ := range n.chans {
 			ch.DelNick(n)
 		}
@@ -456,6 +465,9 @@ func (n *Nick) String() string {
 	str += "Hostmask: " + n.Ident + "@" + n.Host + "\n\t"
 	str += "Real Name: " + n.Name + "\n\t"
 	str += "Modes: " + n.Modes.String() + "\n\t"
+	if n.me {
+		str += "I think this is ME!\n\t"
+	}
 	str += "Channels: \n"
 	for ch, p := range n.chans {
 		str += "\t\t" + ch.Name + ": " + p.String() + "\n"
