@@ -11,7 +11,6 @@ import (
 func main() {
 	// create new IRC connection
 	c := irc.New("GoTest", "gotest", "GoBot")
-	c.Debug = true
 	c.AddHandler("connected",
 		func(conn *irc.Conn, line *irc.Line) { conn.Join("#go-nuts") })
 
