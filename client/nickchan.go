@@ -5,7 +5,7 @@ package client
 
 import (
 	"fmt"
-	"os"
+	"github.com/fluffle/goirc/logging"
 	"reflect"
 	"strconv"
 )
@@ -25,12 +25,6 @@ type stateTracker struct {
 	chans map[string]*Channel
 	// Map of nicks we know about
 	nicks map[string]*Nick
-
-	// A pointer to the connection whose state this tracks
-	conn *Conn
-
-	// Logging interface
-	l Logger
 }
 
 
@@ -122,9 +116,54 @@ func (st *stateTracker) GetChannel(c string) *Channel {
 	return nil
 }
 
+/******************************************************************************\
+ * Channel methods for state management
+\******************************************************************************/
+
+func (ch *Channel) initialise() {
+	ch.Modes = new(ChanMode)
+	ch.Nicks = make(map[*Nick]*ChanPrivs)
+}
+
+// Associates an *irc.Nick with an *irc.Channel using a shared *irc.ChanPrivs
+func (ch *Channel) AddNick(n *Nick) {
+	if _, ok := ch.Nicks[n]; !ok {
+		ch.Nicks[n] = new(ChanPrivs)
+		n.Channels[ch] = ch.Nicks[n]
+	} else {
+		logging.Warn("irc.Channel.AddNick(): trying to add already-present "+
+			"nick %s to channel %s", n.Nick, ch.Name)
+	}
+}
+
+// Disassociates an *irc.Nick from an *irc.Channel. Will call ch.Delete() if
+// the *irc.Nick being removed is the connection's nick. Will also call
+// n.DelChannel(ch) to remove the association from the perspective of *irc.Nick.
+func (ch *Channel) DelNick(n *Nick) {
+	if _, ok := ch.Nicks[n]; ok {
+		if n == n.conn.Me {
+			// we're leaving the channel, so remove all state we have about it
+			ch.Delete()
+		} else {
+			ch.Nicks[n] = nil, false
+			n.DelChannel(ch)
+		}
+	} // no else here ...
+	// we call Channel.DelNick() and Nick.DelChan() from each other to ensure
+	// consistency, and this would mean spewing an error message every delete
+}
+
+// Stops the channel from being tracked by state tracking handlers. Also calls
+// n.DelChannel(ch) for all nicks that are associated with the channel.
+func (ch *Channel) Delete() {
+	for n, _ := range ch.Nicks {
+		n.DelChannel(ch)
+	}
+	ch.conn.chans[ch.Name] = nil, false
+}
 
 // Parses mode strings for a channel
-func (ch *Channel) ParseModes(modes string, modeargs []string) os.Error {
+func (ch *Channel) ParseModes(modes string, modeargs []string) {
 	var modeop bool // true => add mode, false => remove mode
 	var modestr string
 	for i := 0; i < len(modes); i++ {
@@ -157,9 +196,8 @@ func (ch *Channel) ParseModes(modes string, modeargs []string) os.Error {
 			} else if !modeop {
 				ch.Modes.Key = ""
 			} else {
-				return os.NewError(fmt.Sprintf(
-					"irc.ParseChanModes(): buh? not enough arguments to process MODE %s %s%s",
-					ch.Name, modestr, m))
+				logging.Warn("Channel.ParseModes(): not enough arguments to "+
+					"process MODE %s %s%s", ch.Name, modestr, m)
 			}
 		case 'l':
 			if modeop && len(modeargs) != 0 {
@@ -167,10 +205,9 @@ func (ch *Channel) ParseModes(modes string, modeargs []string) os.Error {
 				modeargs = modeargs[1:]
 			} else if !modeop {
 				ch.Modes.Limit = 0
-			}
-				return os.NewError(fmt.Sprintf(
-					"Channel.ParseModes(): buh? not enough arguments to process MODE %s %s%s",
-					ch.Name, modestr, m))
+			} else {
+				logging.Warn("Channel.ParseModes(): not enough arguments to "+
+					"process MODE %s %s%s", ch.Name, modestr, m)
 			}
 		case 'q', 'a', 'o', 'h', 'v':
 			if len(modeargs) != 0 {
@@ -190,84 +227,16 @@ func (ch *Channel) ParseModes(modes string, modeargs []string) os.Error {
 					}
 					modeargs = modeargs[1:]
 				} else {
-					return os.NewError(fmt.Sprintf(
-						"Channel.ParseModes(): MODE %s %s%s %s: buh? state tracking failure.",
-						ch.Name, modestr, m, modeargs[0]))
+					logging.Warn("Channel.ParseModes(): untracked nick %s "+
+						"recieved MODE on channel %s", modeargs[0], ch.Name)
 				}
 			} else {
-				conn.error("Channel.ParseModes(): buh? not enough arguments to process MODE %s %s%s", ch.Name, modestr, m)
+				logging.Warn("Channel.ParseModes(): not enough arguments to "+
+					"process MODE %s %s%s", ch.Name, modestr, m)
 			}
 		}
 	}
 	return nil
-}
-
-// Parse mode strings for a nick 
-func (n *Nick) ParseModes(modes string) {
-	var modeop bool // true => add mode, false => remove mode
-	for i := 0; i < len(modes); i++ {
-		switch m := modes[i]; m {
-		case '+':
-			modeop = true
-		case '-':
-			modeop = false
-		case 'i':
-			n.Modes.Invisible = modeop
-		case 'o':
-			n.Modes.Oper = modeop
-		case 'w':
-			n.Modes.WallOps = modeop
-		case 'x':
-			n.Modes.HiddenHost = modeop
-		case 'z':
-			n.Modes.SSL = modeop
-		}
-	}
-}
-
-/******************************************************************************\
- * Channel methods for state management
-\******************************************************************************/
-
-func (ch *Channel) initialise() {
-	ch.Modes = new(ChanMode)
-	ch.Nicks = make(map[*Nick]*ChanPrivs)
-}
-
-// Associates an *irc.Nick with an *irc.Channel using a shared *irc.ChanPrivs
-func (ch *Channel) AddNick(n *Nick) {
-	if _, ok := ch.Nicks[n]; !ok {
-		ch.Nicks[n] = new(ChanPrivs)
-		n.Channels[ch] = ch.Nicks[n]
-	} else {
-		ch.conn.error("irc.Channel.AddNick() warning: trying to add already-present nick %s to channel %s", n.Nick, ch.Name)
-	}
-}
-
-// Disassociates an *irc.Nick from an *irc.Channel. Will call ch.Delete() if
-// the *irc.Nick being removed is the connection's nick. Will also call
-// n.DelChannel(ch) to remove the association from the perspective of *irc.Nick.
-func (ch *Channel) DelNick(n *Nick) {
-	if _, ok := ch.Nicks[n]; ok {
-		if n == n.conn.Me {
-			// we're leaving the channel, so remove all state we have about it
-			ch.Delete()
-		} else {
-			ch.Nicks[n] = nil, false
-			n.DelChannel(ch)
-		}
-	} // no else here ...
-	// we call Channel.DelNick() and Nick.DelChan() from each other to ensure
-	// consistency, and this would mean spewing an error message every delete
-}
-
-// Stops the channel from being tracked by state tracking handlers. Also calls
-// n.DelChannel(ch) for all nicks that are associated with the channel.
-func (ch *Channel) Delete() {
-	for n, _ := range ch.Nicks {
-		n.DelChannel(ch)
-	}
-	ch.conn.chans[ch.Name] = nil, false
 }
 
 /******************************************************************************\
@@ -282,13 +251,14 @@ func (n *Nick) initialise() {
 //
 // Very slightly different to irc.Channel.AddNick() in that it tests for a
 // pre-existing association within the *irc.Nick object rather than the
-// *irc.Channel object before associating the two. 
+// *irc.Channel object before associating the two.
 func (n *Nick) AddChannel(ch *Channel) {
 	if _, ok := n.Channels[ch]; !ok {
 		ch.Nicks[n] = new(ChanPrivs)
 		n.Channels[ch] = ch.Nicks[n]
 	} else {
-		n.conn.error("irc.Nick.AddChannel() warning: trying to add already-present channel %s to nick %s", ch.Name, n.Nick)
+		logging.Warn("irc.Nick.AddChannel(): trying to add already-present "+
+			"channel %s to nick %s", ch.Name, n.Nick)
 	}
 }
 
@@ -323,6 +293,29 @@ func (n *Nick) Delete() {
 			ch.DelNick(n)
 		}
 		n.conn.nicks[n.Nick] = nil, false
+	}
+}
+
+// Parse mode strings for a nick
+func (n *Nick) ParseModes(modes string) {
+	var modeop bool // true => add mode, false => remove mode
+	for i := 0; i < len(modes); i++ {
+		switch m := modes[i]; m {
+		case '+':
+			modeop = true
+		case '-':
+			modeop = false
+		case 'i':
+			n.Modes.Invisible = modeop
+		case 'o':
+			n.Modes.Oper = modeop
+		case 'w':
+			n.Modes.WallOps = modeop
+		case 'x':
+			n.Modes.HiddenHost = modeop
+		case 'z':
+			n.Modes.SSL = modeop
+		}
 	}
 }
 
@@ -438,7 +431,7 @@ func (n *Nick) String() string {
 //	+npk key
 func (cm *ChanMode) String() string {
 	str := "+"
-	a := make([]string, 2)
+	a := make([]string, 0)
 	v := reflect.Indirect(reflect.ValueOf(cm))
 	t := v.Type()
 	for i := 0; i < v.NumField(); i++ {
@@ -450,12 +443,12 @@ func (cm *ChanMode) String() string {
 		case reflect.String:
 			if f.String() != "" {
 				str += ChanModeToString[t.Field(i).Name]
-				a[0] = f.String()
+				a = append(a, f.String())
 			}
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 			if f.Int() != 0 {
 				str += ChanModeToString[t.Field(i).Name]
-				a[1] = fmt.Sprintf("%d", f.Int())
+				a = append(a, fmt.Sprintf("%d", f.Int()))
 			}
 		}
 	}

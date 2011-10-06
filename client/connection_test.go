@@ -1,10 +1,17 @@
 package client
 
 import (
+	"github.com/fluffle/goirc/logging"
 	"strings"
 	"testing"
 	"time"
 )
+
+func init() {
+	// We have Error level logging that is printed on socket shutdown
+	// which we don't care too much about when testing with a mock conn...
+	logging.SetLogLevel(logging.LogFatal)
+}
 
 func setUp(t *testing.T) (*mockNetConn, *Conn) {
 	c := New("test", "test", "Testing IRC")
@@ -39,33 +46,7 @@ func setUp(t *testing.T) (*mockNetConn, *Conn) {
 }
 
 func tearDown(m *mockNetConn, c *Conn) {
-	// This is enough to cause all the associated goroutines in m and c stop
-	// (tested below in TestShutdown to make sure this is the case)
-	m.Close()
-}
-
-func (conn *Conn) ExpectError() {
-	// With the current error handling, we could block on reading the Err
-	// channel, so ensure we don't wait forever with a 5ms timeout.
-	t := conn.State.(*testing.T)
-	timer := time.NewTimer(5e6)
-	select {
-	case <-timer.C:
-		t.Errorf("Error expected on Err channel, none received.")
-	case <-conn.Err:
-		timer.Stop()
-	}
-}
-
-func (conn *Conn) ExpectNoErrors() {
-	t := conn.State.(*testing.T)
-	timer := time.NewTimer(5e6)
-	select {
-	case <-timer.C:
-	case err := <-conn.Err:
-		timer.Stop()
-		t.Errorf("No error expected on Err channel, received:\n\t%s", err)
-	}
+	c.shutdown()
 }
 
 func TestShutdown(t *testing.T) {
@@ -77,18 +58,6 @@ func TestShutdown(t *testing.T) {
 
 	// Call shutdown manually
 	c.shutdown()
-
-	// Check that we get an EOF from Read()
-	timer := time.NewTimer(5e6)
-	select {
-	case <-timer.C:
-		t.Errorf("No error received for shutdown.")
-	case err := <-c.Err:
-		timer.Stop()
-		if err.String() != "irc.recv(): EOF" {
-			t.Errorf("Expected EOF, got: %s", err)
-		}
-	}
 
 	// Verify that the connection no longer thinks it's connected
 	if c.Connected {
@@ -116,17 +85,9 @@ func TestEOF(t *testing.T) {
 	// Simulate EOF from server
 	m.Close()
 
-	// Check that we get an EOF from Read()
-	timer := time.NewTimer(5e6)
-	select {
-	case <-timer.C:
-		t.Errorf("No error received for shutdown.")
-	case err := <-c.Err:
-		timer.Stop()
-		if err.String() != "irc.recv(): EOF" {
-			t.Errorf("Expected EOF, got: %s", err)
-		}
-	}
+	// Since things happen in different internal goroutines, we need to wait
+	// 1 ms should be enough :-)
+	time.Sleep(1e6)
 
 	// Verify that the connection no longer thinks it's connected
 	if c.Connected {
