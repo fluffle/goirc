@@ -18,31 +18,31 @@ This will connect to freenode and join `#go-nuts` by default, so be careful ;-)
 
 Synopsis:
 
-    import irc "github.com/fluffle/goirc/client"
-    func main() {
-        c := irc.New("nick", "ident", "real name")
-        // Optionally, turn on debugging
-        c.Debug = true
-        // Optionally, enable SSL
-        c.SSL = true
+	import irc "github.com/fluffle/goirc/client"
+	func main() {
+		c := irc.New("nick", "ident", "real name")
+		// Optionally, turn on debugging
+		c.Debug = true
+		// Optionally, enable SSL
+		c.SSL = true
 
 		// Add handlers to do things here!
 		// e.g. join a channel on connect.
 		c.AddHandler("connected",
 			func(conn *irc.Conn, line *irc.Line) { conn.Join("#channel") })
-	    
+		// And a signal on disconnect
+		quit := make(chan bool)
+		c.AddHandler("disconnected),
+			func(conn *irc.Conn, line *irc.Line) { quit <- true }
+
 		// Tell client to connect
 		if err := c.Connect("irc.freenode.net"); err != nil {
-		    fmt.Printf("Connection error: %s\n", err.String())
-	    }
+			fmt.Printf("Connection error: %s\n", err.String())
+		}
 
-		// Loop until client gets disconnected, printing any errors
-        for c.Connected {
-            if err := <-c.Err; err != nil {
-                fmt.Printf("goirc error: %s", err.String())
-            }
-        }
-    }
+		// Wait for disconnect
+		<-quit
+	}
 
 The test client provides a good (if basic) example of how to use the framework.
 Reading `client/handlers.go` gives a more in-depth look at how handlers can be
