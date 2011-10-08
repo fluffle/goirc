@@ -1,4 +1,4 @@
-package client
+package state
 
 // Here you'll find the Channel and Nick structs
 // as well as the internal state maintenance code for the handlers
@@ -85,12 +85,17 @@ type ChanPrivs struct {
  * tracker methods to create/look up nicks/channels
 \******************************************************************************/
 
+func NewTracker() StateTracker {
+	st := &stateTracker{}
+	st.initialise()
+}
+
 func (st *stateTracker) initialise() {
 	st.nicks = make(map[string]*Nick)
 	st.chans = make(map[string]*Channel)
 }
 
-// Creates a new *irc.Nick, initialises it, and stores it so it
+// Creates a new Nick, initialises it, and stores it so it
 // can be properly tracked for state management purposes.
 func (st *stateTracker) NewNick(nick string) *Nick {
 	n := &Nick{Nick: nick, st: st}
@@ -99,7 +104,7 @@ func (st *stateTracker) NewNick(nick string) *Nick {
 	return n
 }
 
-// Returns an *irc.Nick for the nick n, if we're tracking it.
+// Returns a Nick for the nick n, if we're tracking it.
 func (st *stateTracker) GetNick(n string) *Nick {
 	if nick, ok := st.nicks[n]; ok {
 		return nick
@@ -107,7 +112,7 @@ func (st *stateTracker) GetNick(n string) *Nick {
 	return nil
 }
 
-// Signals to the tracking code that the *irc.Nick object should be tracked
+// Signals to the tracker that a Nick should be tracked
 // under a "neu" nick rather than the old one.
 func (st *stateTracker) ReNick(old, neu string) {
 	if n, ok := st.nicks[old]; ok {
@@ -117,14 +122,14 @@ func (st *stateTracker) ReNick(old, neu string) {
 	}
 }
 
-// Removes a nick from being tracked.
+// Removes a Nick from being tracked.
 func (st *stateTracker) DelNick(n string) {
 	if _, ok := st.nicks[n]; ok {
 		st.nicks[n] = nil, false
 	}
 }
 
-// Creates a new *irc.Channel, initialises it, and stores it so it
+// Creates a new Channel, initialises it, and stores it so it
 // can be properly tracked for state management purposes.
 func (st *stateTracker) NewChannel(c string) *Channel {
 	ch := &Channel{Name: c, st: st}
@@ -133,7 +138,7 @@ func (st *stateTracker) NewChannel(c string) *Channel {
 	return ch
 }
 
-// Returns an *irc.Channel for the channel c, if we're tracking it.
+// Returns a Channel for the channel c, if we're tracking it.
 func (st *stateTracker) GetChannel(c string) *Channel {
 	if ch, ok := st.chans[c]; ok {
 		return ch
@@ -141,13 +146,15 @@ func (st *stateTracker) GetChannel(c string) *Channel {
 	return nil
 }
 
-// Removes a channel from being tracked.
+// Removes a Channel from being tracked.
 func (st *stateTracker) DelChannel(c string) {
 	if _, ok := st.chans[c]; ok {
 		st.chans[c] = nil, false
 	}
 }
 
+// Returns true if both the channel c and the nick n are tracked
+// and the nick is associated with the channel.
 func (st *stateTracker) IsOn(c, n string) bool {
 	nk := st.GetNick(n)
 	ch := st.GetChannel(c)
@@ -166,7 +173,7 @@ func (ch *Channel) initialise() {
 	ch.nicks = make(map[*Nick]*ChanPrivs)
 }
 
-// Associates an *irc.Nick with an *irc.Channel using a shared *irc.ChanPrivs
+// Associates a Nick with a Channel using a shared set of ChanPrivs
 func (ch *Channel) AddNick(n *Nick) {
 	if _, ok := ch.nicks[n]; !ok {
 		ch.nicks[n] = new(ChanPrivs)
@@ -177,15 +184,15 @@ func (ch *Channel) AddNick(n *Nick) {
 	}
 }
 
-// Returns true if the *irc.Nick is associated with the *irc.Channel
+// Returns true if the Nick is associated with the Channel
 func (ch *Channel) IsOn(n *Nick) bool {
 	_, ok := ch.nicks[n]
 	return ok
 }
 
-// Disassociates an *irc.Nick from an *irc.Channel. Will call ch.Delete() if
-// the *irc.Nick being removed is the connection's nick. Will also call
-// n.DelChannel(ch) to remove the association from the perspective of *irc.Nick.
+// Disassociates a Nick from a Channel. Will call ch.Delete() if the Nick being
+// removed is the connection's nick. Will also call n.DelChannel(ch) to remove
+// the association from the perspective of the Nick.
 func (ch *Channel) DelNick(n *Nick) {
 	if _, ok := ch.nicks[n]; ok {
 		if n.me {
@@ -195,12 +202,12 @@ func (ch *Channel) DelNick(n *Nick) {
 			ch.nicks[n] = nil, false
 			n.DelChannel(ch)
 		}
-	} // no else here ...
+	}
 	// we call Channel.DelNick() and Nick.DelChannel() from each other to ensure
 	// consistency, and this would mean spewing an error message every delete
 }
 
-// Stops the channel from being tracked by state tracking handlers. Also calls
+// Stops the Channel from being tracked by state tracking handlers. Also calls
 // n.DelChannel(ch) for all nicks that are associated with the channel.
 func (ch *Channel) Delete() {
 	for n, _ := range ch.nicks {
@@ -209,7 +216,7 @@ func (ch *Channel) Delete() {
 	ch.st.DelChannel(ch.Name)
 }
 
-// Parses mode strings for a channel
+// Parses mode strings for a channel.
 func (ch *Channel) ParseModes(modes string, modeargs []string) {
 	var modeop bool // true => add mode, false => remove mode
 	var modestr string
@@ -289,16 +296,17 @@ func (ch *Channel) ParseModes(modes string, modeargs []string) {
 /******************************************************************************\
  * Nick methods for state management
 \******************************************************************************/
+
 func (n *Nick) initialise() {
 	n.Modes = new(NickMode)
 	n.chans = make(map[*Channel]*ChanPrivs)
 }
 
-// Associates an *irc.Channel with an *irc.Nick using a shared *irc.ChanPrivs
+// Associates a Channel with a Nick using a shared ChanPrivs
 //
-// Very slightly different to irc.Channel.AddNick() in that it tests for a
-// pre-existing association within the *irc.Nick object rather than the
-// *irc.Channel object before associating the two.
+// Very slightly different to Channel.AddNick() in that it tests for a
+// pre-existing association within the Nick object rather than the
+// Channel object before associating the two.
 func (n *Nick) AddChannel(ch *Channel) {
 	if _, ok := n.chans[ch]; !ok {
 		ch.nicks[n] = new(ChanPrivs)
@@ -309,20 +317,20 @@ func (n *Nick) AddChannel(ch *Channel) {
 	}
 }
 
-// Returns true if the *irc.Nick is associated with the *irc.Channel
+// Returns true if the Nick is associated with the Channel.
 func (n *Nick) IsOn(ch *Channel) bool {
 	_, ok := n.chans[ch]
 	return ok
 }
 
-// Returns true if the *irc.Nick is Me!
+// Returns true if the Nick is Me!
 func (n *Nick) IsMe() bool {
 	return n.me
 }
 
-// Disassociates an *irc.Channel from an *irc.Nick. Will call n.Delete() if
-// the *irc.Nick is no longer on any channels we are tracking. Will also call
-// ch.DelNick(n) to remove the association from the perspective of *irc.Channel.
+// Disassociates a Channel from a Nick. Will call n.Delete() if the Nick is no
+// longer on any channels we are tracking. Will also call ch.DelNick(n) to
+// remove the association from the perspective of the Channel.
 func (n *Nick) DelChannel(ch *Channel) {
 	if _, ok := n.chans[ch]; ok {
 		n.chans[ch] = nil, false
@@ -334,8 +342,8 @@ func (n *Nick) DelChannel(ch *Channel) {
 	}
 }
 
-// Stops the nick from being tracked by state tracking handlers. Also calls
-// ch.DelNick(n) for all nicks that are associated with the channel.
+// Stops the Nick from being tracked by state tracking handlers. Also calls
+// ch.DelNick(n) for all Nicks that are associated with the Channel.
 func (n *Nick) Delete() {
 	// we don't ever want to remove *our* nick from st.nicks...
 	if !n.me {
@@ -346,7 +354,7 @@ func (n *Nick) Delete() {
 	}
 }
 
-// Parse mode strings for a nick
+// Parse mode strings for a Nick.
 func (n *Nick) ParseModes(modes string) {
 	var modeop bool // true => add mode, false => remove mode
 	for i := 0; i < len(modes); i++ {
@@ -373,7 +381,7 @@ func (n *Nick) ParseModes(modes string) {
  * String() methods for all structs in this file for ease of debugging.
 \******************************************************************************/
 
-// Map *irc.ChanMode fields to IRC mode characters
+// Map ChanMode fields to IRC mode characters
 var ChanModeToString = map[string]string{
 	"Private":        "p",
 	"Secret":         "s",
