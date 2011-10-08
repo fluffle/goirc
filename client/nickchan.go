@@ -85,6 +85,11 @@ type ChanPrivs struct {
  * tracker methods to create/look up nicks/channels
 \******************************************************************************/
 
+func (st *stateTracker) initialise() {
+	st.nicks = make(map[string]*Nick)
+	st.chans = make(map[string]*Channel)
+}
+
 // Creates a new *irc.Nick, initialises it, and stores it so it
 // can be properly tracked for state management purposes.
 func (st *stateTracker) NewNick(nick string) *Nick {
