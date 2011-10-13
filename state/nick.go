@@ -44,9 +44,12 @@ func init() {
  * Nick methods for state management
 \******************************************************************************/
 
-func (n *Nick) initialise() {
-	n.Modes = new(NickMode)
-	n.chans = make(map[*Channel]*ChanPrivs)
+func NewNick(nick string) *Nick {
+	return &Nick{
+		Nick: nick,
+		Modes: new(NickMode),
+		chans: make(map[*Channel]*ChanPrivs),
+	}
 }
 
 // Associates a Channel with a Nick using a shared ChanPrivs

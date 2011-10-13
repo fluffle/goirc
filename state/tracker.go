@@ -29,14 +29,10 @@ type stateTracker struct {
 \******************************************************************************/
 
 func NewTracker() *stateTracker {
-	st := &stateTracker{}
-	st.initialise()
-	return st
-}
-
-func (st *stateTracker) initialise() {
-	st.nicks = make(map[string]*Nick)
-	st.chans = make(map[string]*Channel)
+	return &stateTracker{
+		chans: make(map[string]*Channel),
+		nicks: make(map[string]*Nick),
+	}
 }
 
 // Creates a new Nick, initialises it, and stores it so it
@@ -46,10 +42,9 @@ func (st *stateTracker) NewNick(nick string) *Nick {
 		logging.Warn("StateTracker.NewNick(): %s already tracked.", nick)
 		return nil
 	}
-	n := &Nick{Nick: nick, st: st}
-	n.initialise()
-	st.nicks[nick] = n
-	return n
+	st.nicks[nick] = NewNick(nick)
+	st.nicks[nick].st = st
+	return st.nicks[nick]
 }
 
 // Returns a Nick for the nick n, if we're tracking it.
@@ -92,10 +87,9 @@ func (st *stateTracker) NewChannel(c string) *Channel {
 		logging.Warn("StateTracker.NewChannel(): %s already tracked", c)
 		return nil
 	}
-	ch := &Channel{Name: c, st: st}
-	ch.initialise()
-	st.chans[c] = ch
-	return ch
+	st.chans[c] = NewChannel(c)
+	st.chans[c].st = st
+	return st.chans[c]
 }
 
 // Returns a Channel for the channel c, if we're tracking it.
