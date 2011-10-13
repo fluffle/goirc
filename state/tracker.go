@@ -64,9 +64,13 @@ func (st *stateTracker) GetNick(n string) *Nick {
 // under a "neu" nick rather than the old one.
 func (st *stateTracker) ReNick(old, neu string) {
 	if n, ok := st.nicks[old]; ok {
-		st.nicks[old] = nil, false
-		n.Nick = neu
-		st.nicks[neu] = n
+		if _, ok := st.nicks[neu]; !ok {
+			st.nicks[old] = nil, false
+			n.Nick = neu
+			st.nicks[neu] = n
+		} else {
+			logging.Warn("StateTracker.ReNick(): %s already exists.", neu)
+		}
 	} else {
 		logging.Warn("StateTracker.ReNick(): %s not tracked.", old)
 	}
