@@ -88,6 +88,10 @@ func (st *stateTracker) DelNick(n string) {
 // Creates a new Channel, initialises it, and stores it so it
 // can be properly tracked for state management purposes.
 func (st *stateTracker) NewChannel(c string) *Channel {
+	if _, ok := st.chans[c]; ok {
+		logging.Warn("StateTracker.NewChannel(): %s already tracked", c)
+		return nil
+	}
 	ch := &Channel{Name: c, st: st}
 	ch.initialise()
 	st.chans[c] = ch
