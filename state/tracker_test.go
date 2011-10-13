@@ -28,7 +28,7 @@ func TestNewNick(t *testing.T) {
 func TestGetNick(t *testing.T) {
 	st := NewTracker()
 
-	test1 := &Nick{Nick: "test1", st: st}
+	test1 := NewNick("test1")
 	st.nicks["test1"] = test1
 
 	if n := st.GetNick("test1"); n != test1 {
@@ -45,7 +45,7 @@ func TestGetNick(t *testing.T) {
 func TestReNick(t *testing.T) {
 	st := NewTracker()
 
-	test1 := &Nick{Nick: "test1", st: st}
+	test1 := NewNick("test1")
 	st.nicks["test1"] = test1
 
 	st.ReNick("test1", "test2")
@@ -56,11 +56,14 @@ func TestReNick(t *testing.T) {
 	if n, ok := st.nicks["test2"]; !ok || n != test1 {
 		t.Errorf("Nick test2 doesn't exist after ReNick.")
 	}
+	if test1.Nick != "test2" {
+		t.Errorf("Nick test1 not changed correctly.")
+	}
 	if len(st.nicks) != 1 {
 		t.Errorf("Nick list changed size during ReNick.")
 	}
 
-	test2 := &Nick{Nick: "test2", st: st}
+	test2 := NewNick("test1")
 	st.nicks["test1"] = test2
 
 	st.ReNick("test1", "test2")
@@ -79,7 +82,7 @@ func TestReNick(t *testing.T) {
 func TestDelNick(t *testing.T) {
 	st := NewTracker()
 
-	test1 := &Nick{Nick: "test1", st: st}
+	test1 := NewNick("test1")
 	st.nicks["test1"] = test1
 
 	st.DelNick("test1")
@@ -124,7 +127,7 @@ func TestNewChannel(t *testing.T) {
 func TestGetChannel(t *testing.T) {
 	st := NewTracker()
 
-	test1 := &Channel{Name: "#test1", st: st}
+	test1 := NewChannel("#test1")
 	st.chans["#test1"] = test1
 
 	if c := st.GetChannel("#test1"); c != test1 {
@@ -141,7 +144,7 @@ func TestGetChannel(t *testing.T) {
 func TestDelChannel(t *testing.T) {
 	st := NewTracker()
 
-	test1 := &Channel{Name: "#test1", st: st}
+	test1 := NewChannel("#test1")
 	st.chans["#test1"] = test1
 
 	st.DelChannel("#test1")
@@ -165,8 +168,10 @@ func TestDelChannel(t *testing.T) {
 func TestIsOn(t *testing.T) {
 	st := NewTracker()
 
-	nick1 := st.NewNick("test1")
-	chan1 := st.NewChannel("#test1")
+	nick1 := NewNick("test1")
+	st.nicks["test1"] = nick1
+	chan1 := NewChannel("#test1")
+	st.chans["#test1"] = chan1
 
 	if st.IsOn("#test1", "test1") {
 		t.Errorf("test1 is not on #test1 (yet)")
