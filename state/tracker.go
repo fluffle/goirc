@@ -72,9 +72,15 @@ func (st *stateTracker) GetNick(n string) *Nick {
 func (st *stateTracker) ReNick(old, neu string) {
 	if nk, ok := st.nicks[old]; ok {
 		if _, ok := st.nicks[neu]; !ok {
-			st.nicks[old] = nil, false
 			nk.Nick = neu
+			st.nicks[old] = nil, false
 			st.nicks[neu] = nk
+			for ch, _ := range nk.chans {
+				// We also need to update the lookup maps of all the channels
+				// the nick is on, to keep things in sync.
+				ch.lookup[old] = nil, false
+				ch.lookup[neu] = nk
+			}
 		} else {
 			logging.Warn("StateTracker.ReNick(): %s already exists.", neu)
 		}
