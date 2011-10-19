@@ -9,9 +9,8 @@ import (
 type Nick struct {
 	Nick, Ident, Host, Name string
 	Modes                   *NickMode
+	lookup					map[string]*Channel
 	chans                   map[*Channel]*ChanPrivs
-	me                      bool
-	st                      StateTracker
 }
 
 // A struct representing the modes of an IRC Nick (User Modes)
@@ -44,68 +43,44 @@ func init() {
  * Nick methods for state management
 \******************************************************************************/
 
-func NewNick(nick string) *Nick {
+func NewNick(n string) *Nick {
 	return &Nick{
-		Nick: nick,
+		Nick: n,
 		Modes: new(NickMode),
 		chans: make(map[*Channel]*ChanPrivs),
-	}
-}
-
-// Associates a Channel with a Nick using a shared ChanPrivs
-//
-// Very slightly different to Channel.AddNick() in that it tests for a
-// pre-existing association within the Nick object rather than the
-// Channel object before associating the two.
-func (n *Nick) AddChannel(ch *Channel) {
-	if _, ok := n.chans[ch]; !ok {
-		ch.nicks[n] = new(ChanPrivs)
-		n.chans[ch] = ch.nicks[n]
-	} else {
-		logging.Warn("Nick.AddChannel(): trying to add already-present "+
-			"channel %s to nick %s", ch.Name, n.Nick)
+		lookup: make(map[string]*Channel),
 	}
 }
 
 // Returns true if the Nick is associated with the Channel.
-func (n *Nick) IsOn(ch *Channel) bool {
-	_, ok := n.chans[ch]
+func (nk *Nick) IsOn(ch *Channel) bool {
+	_, ok := nk.chans[ch]
 	return ok
 }
 
-// Returns true if the Nick is Me!
-func (n *Nick) IsMe() bool {
-	return n.me
+func (nk *Nick) IsOnStr(c string) bool {
+	_, ok := nk.lookup[c]
+	return ok
 }
 
-// Disassociates a Channel from a Nick. Will call n.Delete() if the Nick is no
-// longer on any channels we are tracking. Will also call ch.DelNick(n) to
-// remove the association from the perspective of the Channel.
-func (n *Nick) DelChannel(ch *Channel) {
-	if _, ok := n.chans[ch]; ok {
-		n.chans[ch] = nil, false
-		ch.DelNick(n)
-		if len(n.chans) == 0 {
-			// nick is no longer in any channels we inhabit, stop tracking it
-			n.Delete()
-		}
+// Associates a Channel with a Nick.
+func (nk *Nick) addChannel(ch *Channel, cp *ChanPrivs) {
+	if _, ok := nk.chans[ch]; !ok {
+		nk.chans[ch] = cp
+		nk.lookup[ch.Name] = ch
 	}
 }
 
-// Stops the Nick from being tracked by state tracking handlers. Also calls
-// ch.DelNick(n) for all Nicks that are associated with the Channel.
-func (n *Nick) Delete() {
-	// we don't ever want to remove *our* nick from st.nicks...
-	if !n.me {
-		for ch, _ := range n.chans {
-			ch.DelNick(n)
-		}
-		n.st.DelNick(n.Nick)
+// Disassociates a Channel from a Nick.
+func (nk *Nick) delChannel(ch *Channel) {
+	if _, ok := nk.chans[ch]; ok {
+		nk.chans[ch] = nil, false
+		nk.lookup[ch.Name] = nil, false
 	}
 }
 
 // Parse mode strings for a Nick.
-func (n *Nick) ParseModes(modes string) {
+func (nk *Nick) ParseModes(modes string) {
 	var modeop bool // true => add mode, false => remove mode
 	for i := 0; i < len(modes); i++ {
 		switch m := modes[i]; m {
@@ -114,15 +89,17 @@ func (n *Nick) ParseModes(modes string) {
 		case '-':
 			modeop = false
 		case 'i':
-			n.Modes.Invisible = modeop
+			nk.Modes.Invisible = modeop
 		case 'o':
-			n.Modes.Oper = modeop
+			nk.Modes.Oper = modeop
 		case 'w':
-			n.Modes.WallOps = modeop
+			nk.Modes.WallOps = modeop
 		case 'x':
-			n.Modes.HiddenHost = modeop
+			nk.Modes.HiddenHost = modeop
 		case 'z':
-			n.Modes.SSL = modeop
+			nk.Modes.SSL = modeop
+		default:
+			logging.Info("Nick.ParseModes(): unknown mode char %c", m)
 		}
 	}
 }
@@ -135,17 +112,14 @@ func (n *Nick) ParseModes(modes string) {
 //	Channels:
 //		<channel>: <privs> e.g. #moo: +o
 //		...
-func (n *Nick) String() string {
-	str := "Nick: " + n.Nick + "\n\t"
-	str += "Hostmask: " + n.Ident + "@" + n.Host + "\n\t"
-	str += "Real Name: " + n.Name + "\n\t"
-	str += "Modes: " + n.Modes.String() + "\n\t"
-	if n.me {
-		str += "I think this is ME!\n\t"
-	}
+func (nk *Nick) String() string {
+	str := "Nick: " + nk.Nick + "\n\t"
+	str += "Hostmask: " + nk.Ident + "@" + nk.Host + "\n\t"
+	str += "Real Name: " + nk.Name + "\n\t"
+	str += "Modes: " + nk.Modes.String() + "\n\t"
 	str += "Channels: \n"
-	for ch, p := range n.chans {
-		str += "\t\t" + ch.Name + ": " + p.String() + "\n"
+	for ch, cp := range nk.chans {
+		str += "\t\t" + ch.Name + ": " + cp.String() + "\n"
 	}
 	return str
 }

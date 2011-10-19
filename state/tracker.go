@@ -6,51 +6,63 @@ import (
 
 // The state manager interface
 type StateTracker interface {
+	// Nick methods
 	NewNick(nick string) *Nick
 	GetNick(nick string) *Nick
 	ReNick(old, neu string)
 	DelNick(nick string)
+	// Channel methods
 	NewChannel(channel string) *Channel
 	GetChannel(channel string) *Channel
 	DelChannel(channel string)
+	// Information about ME!
+	Me() *Nick
+	// And the tracking operations
 	IsOn(channel, nick string) bool
+	Associate(channel *Channel, nick *Nick)
+	Dissociate(channel *Channel, nick *Nick)
 }
 
-// ... and a struct to implement it
+// ... and a struct to implement it ...
 type stateTracker struct {
 	// Map of channels we're on
 	chans map[string]*Channel
 	// Map of nicks we know about
 	nicks map[string]*Nick
+
+	// We need to keep state on who we are :-)
+	me *Nick
+}
+
+// ... and finally a constructor to make it.
+func NewTracker(mynick string) *stateTracker {
+	st := &stateTracker{
+		chans: make(map[string]*Channel),
+		nicks: make(map[string]*Nick),
+	}
+	st.me = st.NewNick(mynick)
+	return st
 }
 
 /******************************************************************************\
  * tracker methods to create/look up nicks/channels
 \******************************************************************************/
 
-func NewTracker() *stateTracker {
-	return &stateTracker{
-		chans: make(map[string]*Channel),
-		nicks: make(map[string]*Nick),
-	}
-}
-
 // Creates a new Nick, initialises it, and stores it so it
 // can be properly tracked for state management purposes.
-func (st *stateTracker) NewNick(nick string) *Nick {
-	if _, ok := st.nicks[nick]; ok {
-		logging.Warn("StateTracker.NewNick(): %s already tracked.", nick)
+func (st *stateTracker) NewNick(n string) *Nick {
+	if _, ok := st.nicks[n]; ok {
+		logging.Warn("StateTracker.NewNick(): %s already tracked.", n)
 		return nil
 	}
-	st.nicks[nick] = NewNick(nick)
-	st.nicks[nick].st = st
-	return st.nicks[nick]
+	st.nicks[n] = NewNick(n)
+	return st.nicks[n]
 }
 
 // Returns a Nick for the nick n, if we're tracking it.
 func (st *stateTracker) GetNick(n string) *Nick {
-	if nick, ok := st.nicks[n]; ok {
-		return nick
+	if nk, ok := st.nicks[n]; ok {
+		return nk
 	}
 	return nil
 }
@@ -58,11 +70,11 @@ func (st *stateTracker) GetNick(n string) *Nick {
 // Signals to the tracker that a Nick should be tracked
 // under a "neu" nick rather than the old one.
 func (st *stateTracker) ReNick(old, neu string) {
-	if n, ok := st.nicks[old]; ok {
+	if nk, ok := st.nicks[old]; ok {
 		if _, ok := st.nicks[neu]; !ok {
 			st.nicks[old] = nil, false
-			n.Nick = neu
-			st.nicks[neu] = n
+			nk.Nick = neu
+			st.nicks[neu] = nk
 		} else {
 			logging.Warn("StateTracker.ReNick(): %s already exists.", neu)
 		}
@@ -73,10 +85,33 @@ func (st *stateTracker) ReNick(old, neu string) {
 
 // Removes a Nick from being tracked.
 func (st *stateTracker) DelNick(n string) {
-	if _, ok := st.nicks[n]; ok {
-		st.nicks[n] = nil, false
+	if nk, ok := st.nicks[n]; ok {
+		if nk != st.me {
+			st.delNick(nk)
+		} else {
+			logging.Warn("StateTracker.DelNick(): won't delete myself.")
+		}
 	} else {
 		logging.Warn("StateTracker.DelNick(): %s not tracked.", n)
+	}
+}
+
+func (st *stateTracker) delNick(nk *Nick) {
+	if nk == st.me {
+		// Shouldn't get here => internal state tracking code is fubar.
+		logging.Error("StateTracker.DelNick(): TRYING TO DELETE ME :-(")
+		return
+	}
+	st.nicks[nk.Nick] = nil, false
+	for ch, _ := range nk.chans {
+		nk.delChannel(ch)
+		ch.delNick(nk)
+		if len(ch.nicks) == 0 {
+			// Deleting a nick from tracking shouldn't empty any channels as
+			// *we* should be on the channel with them to be tracking them.
+			logging.Error("StateTracker.delNick(): deleting nick %s emptied "+
+				"channel %s, this shouldn't happen", nk.Nick, ch.Name)
+		}
 	}
 }
 
@@ -88,7 +123,6 @@ func (st *stateTracker) NewChannel(c string) *Channel {
 		return nil
 	}
 	st.chans[c] = NewChannel(c)
-	st.chans[c].st = st
 	return st.chans[c]
 }
 
@@ -102,9 +136,28 @@ func (st *stateTracker) GetChannel(c string) *Channel {
 
 // Removes a Channel from being tracked.
 func (st *stateTracker) DelChannel(c string) {
-	if _, ok := st.chans[c]; ok {
-		st.chans[c] = nil, false
+	if ch, ok := st.chans[c]; ok {
+		st.delChannel(ch)
+	} else {
+		logging.Warn("StateTracker.DelChannel(): %s not tracked.", c)
 	}
+}
+
+func (st *stateTracker) delChannel(ch *Channel) {
+	st.chans[ch.Name] = nil, false
+	for nk, _ := range ch.nicks {
+		ch.delNick(nk)
+		nk.delChannel(ch)
+		if len(nk.chans) == 0 && nk != st.me {
+			// We're no longer in any channels with this nick.
+			st.delNick(nk)
+		}
+	}
+}
+
+// Returns the Nick the state tracker thinks is Me.
+func (st *stateTracker) Me() *Nick {
+	return st.me
 }
 
 // Returns true if both the channel c and the nick n are tracked
@@ -116,4 +169,44 @@ func (st *stateTracker) IsOn(c, n string) bool {
 		return nk.IsOn(ch)
 	}
 	return false
+}
+
+// Associates an already known nick with an already known channel.
+func (st *stateTracker) Associate(ch *Channel, nk *Nick) {
+	if ch == nil || nk == nil {
+		logging.Error("StateTracker.Associate(): passed nil values :-(")
+		return
+	}
+	if nk.IsOn(ch) {
+		logging.Warn("StateTracker.Associate(): %s already on %s.",
+			nk.Nick, ch.Name)
+		return
+	}
+	cp := new(ChanPrivs)
+	ch.addNick(nk, cp)
+	nk.addChannel(ch, cp)
+}
+
+// Dissociates an already known nick from an already known channel.
+// Does some tidying up to stop tracking nicks we're no longer on
+// any common channels with, and channels we're no longer on.
+func (st *stateTracker) Dissociate(ch *Channel, nk *Nick) {
+	switch {
+	case ch == nil || nk == nil:
+		logging.Error("StateTracker.Dissociate(): passed nil values :-(")
+	case !nk.IsOn(ch):
+		logging.Warn("StateTracker.Dissociate(): %s not on %s.",
+			nk.Nick, ch.Name)
+	case nk == st.me:
+		// I'm leaving the channel for some reason, so it won't be tracked.
+		st.delChannel(ch)
+	default:
+		// Remove the nick from the channel and the channel from the nick.
+		ch.delNick(nk)
+		nk.delChannel(ch)
+		if len(nk.chans) == 0 {
+			// We're no longer in any channels with this nick.
+			st.delNick(nk)
+		}
+	}
 }

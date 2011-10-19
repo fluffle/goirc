@@ -11,8 +11,8 @@ import (
 type Channel struct {
 	Name, Topic string
 	Modes       *ChanMode
+	lookup		map[string]*Nick
 	nicks       map[*Nick]*ChanPrivs
-	st          StateTracker
 }
 
 // A struct representing the modes of an IRC Channel
@@ -95,50 +95,35 @@ func NewChannel(name string) *Channel {
 		Name: name,
 		Modes: new(ChanMode),
 		nicks: make(map[*Nick]*ChanPrivs),
-	}
-}
-
-// Associates a Nick with a Channel using a shared set of ChanPrivs
-func (ch *Channel) AddNick(n *Nick) {
-	if _, ok := ch.nicks[n]; !ok {
-		ch.nicks[n] = new(ChanPrivs)
-		n.chans[ch] = ch.nicks[n]
-	} else {
-		logging.Warn("Channel.AddNick(): trying to add already-present "+
-			"nick %s to channel %s", n.Nick, ch.Name)
+		lookup: make(map[string]*Nick),
 	}
 }
 
 // Returns true if the Nick is associated with the Channel
-func (ch *Channel) IsOn(n *Nick) bool {
-	_, ok := ch.nicks[n]
+func (ch *Channel) IsOn(nk *Nick) bool {
+	_, ok := ch.nicks[nk]
 	return ok
 }
 
-// Disassociates a Nick from a Channel. Will call ch.Delete() if the Nick being
-// removed is the connection's nick. Will also call n.DelChannel(ch) to remove
-// the association from the perspective of the Nick.
-func (ch *Channel) DelNick(n *Nick) {
-	if _, ok := ch.nicks[n]; ok {
-		if n.me {
-			// we're leaving the channel, so remove all state we have about it
-			ch.Delete()
-		} else {
-			ch.nicks[n] = nil, false
-			n.DelChannel(ch)
-		}
-	}
-	// we call Channel.DelNick() and Nick.DelChannel() from each other to ensure
-	// consistency, and this would mean spewing an error message every delete
+func (ch *Channel) IsOnStr(n string) bool {
+	_, ok := ch.lookup[n]
+	return ok
 }
 
-// Stops the Channel from being tracked by state tracking handlers. Also calls
-// n.DelChannel(ch) for all nicks that are associated with the channel.
-func (ch *Channel) Delete() {
-	for n, _ := range ch.nicks {
-		n.DelChannel(ch)
+// Associates a Nick with a Channel
+func (ch *Channel) addNick(nk *Nick, cp *ChanPrivs) {
+	if _, ok := ch.nicks[nk]; !ok {
+		ch.nicks[nk] = cp
+		ch.lookup[nk.Nick] = nk
 	}
-	ch.st.DelChannel(ch.Name)
+}
+
+// Disassociates a Nick from a Channel.
+func (ch *Channel) delNick(nk *Nick) {
+	if _, ok := ch.nicks[nk]; ok {
+		ch.nicks[nk] = nil, false
+		ch.lookup[nk.Nick] = nil, false
+	}
 }
 
 // Parses mode strings for a channel.
@@ -190,19 +175,19 @@ func (ch *Channel) ParseModes(modes string, modeargs []string) {
 			}
 		case 'q', 'a', 'o', 'h', 'v':
 			if len(modeargs) != 0 {
-				n := ch.st.GetNick(modeargs[0])
-				if p, ok := ch.nicks[n]; ok {
+				if nk, ok  := ch.lookup[modeargs[0]]; ok {
+					cp := ch.nicks[nk]
 					switch m {
 					case 'q':
-						p.Owner = modeop
+						cp.Owner = modeop
 					case 'a':
-						p.Admin = modeop
+						cp.Admin = modeop
 					case 'o':
-						p.Op = modeop
+						cp.Op = modeop
 					case 'h':
-						p.HalfOp = modeop
+						cp.HalfOp = modeop
 					case 'v':
-						p.Voice = modeop
+						cp.Voice = modeop
 					}
 					modeargs = modeargs[1:]
 				} else {
@@ -229,8 +214,8 @@ func (ch *Channel) String() string {
 	str += "Topic: " + ch.Topic + "\n\t"
 	str += "Modes: " + ch.Modes.String() + "\n\t"
 	str += "Nicks: \n"
-	for n, p := range ch.nicks {
-		str += "\t\t" + n.Nick + ": " + p.String() + "\n"
+	for nk, cp := range ch.nicks {
+		str += "\t\t" + nk.Nick + ": " + cp.String() + "\n"
 	}
 	return str
 }
@@ -273,9 +258,9 @@ func (cm *ChanMode) String() string {
 
 // Returns a string representing the channel privileges. Looks like:
 //	+o
-func (p *ChanPrivs) String() string {
+func (cp *ChanPrivs) String() string {
 	str := "+"
-	v := reflect.Indirect(reflect.ValueOf(p))
+	v := reflect.Indirect(reflect.ValueOf(cp))
 	t := v.Type()
 	for i := 0; i < v.NumField(); i++ {
 		switch f := v.Field(i); f.Kind() {

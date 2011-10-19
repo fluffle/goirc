@@ -5,18 +5,18 @@ import (
 )
 
 func TestNewNick(t *testing.T) {
-	st := NewTracker()
+	st := NewTracker("mynick")
 
-	if len(st.nicks) != 0 {
-		t.Errorf("Nick list of new tracker is non-zero length.")
+	if len(st.nicks) != 1 {
+		t.Errorf("Nick list of new tracker is not 1 (me!).")
 	}
 
-	nick := st.NewNick("test1")
+	test1 := st.NewNick("test1")
 
-	if nick == nil || nick.Nick != "test1" || nick.st != st {
+	if test1 == nil || test1.Nick != "test1" {
 		t.Errorf("Nick object created incorrectly by NewNick.")
 	}
-	if n, ok := st.nicks["test1"]; !ok || n != nick || len(st.nicks) != 1 {
+	if n, ok := st.nicks["test1"]; !ok || n != test1 || len(st.nicks) != 2 {
 		t.Errorf("Nick object stored incorrectly by NewNick.")
 	}
 
@@ -26,7 +26,7 @@ func TestNewNick(t *testing.T) {
 }
 
 func TestGetNick(t *testing.T) {
-	st := NewTracker()
+	st := NewTracker("mynick")
 
 	test1 := NewNick("test1")
 	st.nicks["test1"] = test1
@@ -37,13 +37,13 @@ func TestGetNick(t *testing.T) {
 	if n := st.GetNick("test2"); n != nil {
 		t.Errorf("Nick unexpectedly returned by GetNick.")
 	}
-	if len(st.nicks) != 1 {
+	if len(st.nicks) != 2 {
 		t.Errorf("Nick list changed size during GetNick.")
 	}
 }
 
 func TestReNick(t *testing.T) {
-	st := NewTracker()
+	st := NewTracker("mynick")
 
 	test1 := NewNick("test1")
 	st.nicks["test1"] = test1
@@ -59,7 +59,7 @@ func TestReNick(t *testing.T) {
 	if test1.Nick != "test2" {
 		t.Errorf("Nick test1 not changed correctly.")
 	}
-	if len(st.nicks) != 1 {
+	if len(st.nicks) != 2 {
 		t.Errorf("Nick list changed size during ReNick.")
 	}
 
@@ -73,14 +73,14 @@ func TestReNick(t *testing.T) {
 	if n, ok := st.nicks["test1"]; !ok || n != test2 {
 		t.Errorf("Nick test1 overwritten/deleted by ReNick.")
 	}
-	if len(st.nicks) != 2 {
+	if len(st.nicks) != 3 {
 		t.Errorf("Nick list changed size during ReNick.")
 	}
 
 }
 
 func TestDelNick(t *testing.T) {
-	st := NewTracker()
+	st := NewTracker("mynick")
 
 	test1 := NewNick("test1")
 	st.nicks["test1"] = test1
@@ -90,7 +90,7 @@ func TestDelNick(t *testing.T) {
 	if _, ok := st.nicks["test1"]; ok {
 		t.Errorf("Nick test1 still exists after DelNick.")
 	}
-	if len(st.nicks) != 0 {
+	if len(st.nicks) != 1 {
 		t.Errorf("Nick list still contains nicks after DelNick.")
 	}
 
@@ -98,13 +98,13 @@ func TestDelNick(t *testing.T) {
 
 	st.DelNick("test2")
 
-	if len(st.nicks) != 1 {
+	if len(st.nicks) != 2 {
 		t.Errorf("DelNick had unexpected side-effects.")
 	}
 }
 
 func TestNewChannel(t *testing.T) {
-	st := NewTracker()
+	st := NewTracker("mynick")
 
 	if len(st.chans) != 0 {
 		t.Errorf("Channel list of new tracker is non-zero length.")
@@ -112,7 +112,7 @@ func TestNewChannel(t *testing.T) {
 
 	test1 := st.NewChannel("#test1")
 
-	if test1 == nil || test1.Name != "#test1" || test1.st != st {
+	if test1 == nil || test1.Name != "#test1" {
 		t.Errorf("Channel object created incorrectly by NewChannel.")
 	}
 	if c, ok := st.chans["#test1"]; !ok || c != test1 || len(st.chans) != 1 {
@@ -125,7 +125,7 @@ func TestNewChannel(t *testing.T) {
 }
 
 func TestGetChannel(t *testing.T) {
-	st := NewTracker()
+	st := NewTracker("mynick")
 
 	test1 := NewChannel("#test1")
 	st.chans["#test1"] = test1
@@ -142,7 +142,7 @@ func TestGetChannel(t *testing.T) {
 }
 
 func TestDelChannel(t *testing.T) {
-	st := NewTracker()
+	st := NewTracker("mynick")
 
 	test1 := NewChannel("#test1")
 	st.chans["#test1"] = test1
@@ -166,7 +166,7 @@ func TestDelChannel(t *testing.T) {
 }
 
 func TestIsOn(t *testing.T) {
-	st := NewTracker()
+	st := NewTracker("mynick")
 
 	nick1 := NewNick("test1")
 	st.nicks["test1"] = nick1
@@ -176,7 +176,9 @@ func TestIsOn(t *testing.T) {
 	if st.IsOn("#test1", "test1") {
 		t.Errorf("test1 is not on #test1 (yet)")
 	}
-	chan1.AddNick(nick1)
+	cp := new(ChanPrivs)
+	chan1.addNick(nick1, cp)
+	nick1.addChannel(chan1, cp)
 	if !st.IsOn("#test1", "test1") {
 		t.Errorf("test1 is on #test1 (now)")
 	}
