@@ -57,9 +57,9 @@ func (m writerMap) CheckWrittenAtLevel(t *testing.T, lv LogLevel, exp string) {
 	} else {
 		w = m[lv]
 	}
-	if len(w.written) == 0 {
-		t.Errorf("No bytes logged at level %s, expected:", LogString(lv))
-		t.Errorf("\t%s", exp)
+	if len(w.written) < 32 {
+		t.Errorf("Not enough bytes logged at level %s:", LogString(lv))
+		t.Errorf("\tgot: %s", string(w.written))
 	}
 	// 32 bytes covers the date, time and filename up to the colon in
 	// 2011/10/22 10:22:57 log_test.go:<line no>: <level> <log message>
