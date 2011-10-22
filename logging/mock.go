@@ -59,10 +59,11 @@ func (m writerMap) CheckWrittenAtLevel(t *testing.T, lv LogLevel, exp string) {
 	}
 	// 32 bytes covers the date, time and filename up to the colon in
 	// 2011/10/22 10:22:57 log_test.go:<line no>: <level> <log message>
-//	if len(w.written) <= 33 {
+	if len(w.written) <= 33 {
 		t.Errorf("Not enough bytes logged at level %s:", LogString(lv))
 		t.Errorf("\tgot: %s", string(w.written))
-//	}
+		return
+	}
 	s := string(w.written[32:])
 	// 2 covers the : itself and the extra space
 	idx := strings.Index(s, ":") + 2
