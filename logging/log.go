@@ -70,7 +70,7 @@ var (
 
 type Logger interface {
 	// Log at a given level
-	Log(int, string, ...interface{})
+	Log(LogLevel, string, ...interface{})
 	// Log at level 3
 	Debug(string, ...interface{})
 	// Log at level 2
