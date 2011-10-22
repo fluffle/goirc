@@ -181,16 +181,15 @@ func (l *logger) write(lv LogLevel, fm string, v ...interface{}) {
 		return
 	}
 	fm = fmt.Sprintf(LogString(lv)+" "+fm, v...)
-	if _, ok := logString[lv]; !ok {
+	if lv > Debug || lv < Fatal {
 		// This is an unrecognised log level, so log it to Debug
 		lv = Debug
 	}
 
 	l.Lock()
 	defer l.Unlock()
-	_log := l.log[lv]
 	// Writing the log is deceptively simple
-	_log.Output(3, fm)
+	l.log[lv].Output(3, fm)
 	if lv == Fatal {
 		// Always fatal to stderr too. Use panic so (a) we get a backtrace,
 		// and (b) it's trappable for testing (and maybe other times too).
