@@ -32,13 +32,17 @@ type stateTracker struct {
 
 	// We need to keep state on who we are :-)
 	me *Nick
+
+	// For great logging justice.
+	l logging.Logger
 }
 
 // ... and finally a constructor to make it.
-func NewTracker(mynick string) *stateTracker {
+func NewTracker(mynick string, l logging.Logger) *stateTracker {
 	st := &stateTracker{
 		chans: make(map[string]*Channel),
 		nicks: make(map[string]*Nick),
+		l: l,
 	}
 	st.me = st.NewNick(mynick)
 	return st
@@ -52,10 +56,10 @@ func NewTracker(mynick string) *stateTracker {
 // can be properly tracked for state management purposes.
 func (st *stateTracker) NewNick(n string) *Nick {
 	if _, ok := st.nicks[n]; ok {
-		logging.Warn("StateTracker.NewNick(): %s already tracked.", n)
+		st.l.Warn("StateTracker.NewNick(): %s already tracked.", n)
 		return nil
 	}
-	st.nicks[n] = NewNick(n)
+	st.nicks[n] = NewNick(n, st.l)
 	return st.nicks[n]
 }
 
@@ -82,10 +86,10 @@ func (st *stateTracker) ReNick(old, neu string) {
 				ch.lookup[neu] = nk
 			}
 		} else {
-			logging.Warn("StateTracker.ReNick(): %s already exists.", neu)
+			st.l.Warn("StateTracker.ReNick(): %s already exists.", neu)
 		}
 	} else {
-		logging.Warn("StateTracker.ReNick(): %s not tracked.", old)
+		st.l.Warn("StateTracker.ReNick(): %s not tracked.", old)
 	}
 }
 
@@ -95,17 +99,17 @@ func (st *stateTracker) DelNick(n string) {
 		if nk != st.me {
 			st.delNick(nk)
 		} else {
-			logging.Warn("StateTracker.DelNick(): won't delete myself.")
+			st.l.Warn("StateTracker.DelNick(): won't delete myself.")
 		}
 	} else {
-		logging.Warn("StateTracker.DelNick(): %s not tracked.", n)
+		st.l.Warn("StateTracker.DelNick(): %s not tracked.", n)
 	}
 }
 
 func (st *stateTracker) delNick(nk *Nick) {
 	if nk == st.me {
 		// Shouldn't get here => internal state tracking code is fubar.
-		logging.Error("StateTracker.DelNick(): TRYING TO DELETE ME :-(")
+		st.l.Error("StateTracker.DelNick(): TRYING TO DELETE ME :-(")
 		return
 	}
 	st.nicks[nk.Nick] = nil, false
@@ -115,8 +119,8 @@ func (st *stateTracker) delNick(nk *Nick) {
 		if len(ch.nicks) == 0 {
 			// Deleting a nick from tracking shouldn't empty any channels as
 			// *we* should be on the channel with them to be tracking them.
-			logging.Error("StateTracker.delNick(): deleting nick %s emptied "+
-				"channel %s, this shouldn't happen", nk.Nick, ch.Name)
+			st.l.Error("StateTracker.delNick(): deleting nick %s emptied "+
+				"channel %s, this shouldn't happen!", nk.Nick, ch.Name)
 		}
 	}
 }
@@ -125,10 +129,10 @@ func (st *stateTracker) delNick(nk *Nick) {
 // can be properly tracked for state management purposes.
 func (st *stateTracker) NewChannel(c string) *Channel {
 	if _, ok := st.chans[c]; ok {
-		logging.Warn("StateTracker.NewChannel(): %s already tracked", c)
+		st.l.Warn("StateTracker.NewChannel(): %s already tracked.", c)
 		return nil
 	}
-	st.chans[c] = NewChannel(c)
+	st.chans[c] = NewChannel(c, st.l)
 	return st.chans[c]
 }
 
@@ -145,7 +149,7 @@ func (st *stateTracker) DelChannel(c string) {
 	if ch, ok := st.chans[c]; ok {
 		st.delChannel(ch)
 	} else {
-		logging.Warn("StateTracker.DelChannel(): %s not tracked.", c)
+		st.l.Warn("StateTracker.DelChannel(): %s not tracked.", c)
 	}
 }
 
@@ -180,11 +184,11 @@ func (st *stateTracker) IsOn(c, n string) bool {
 // Associates an already known nick with an already known channel.
 func (st *stateTracker) Associate(ch *Channel, nk *Nick) {
 	if ch == nil || nk == nil {
-		logging.Error("StateTracker.Associate(): passed nil values :-(")
+		st.l.Error("StateTracker.Associate(): passed nil values :-(")
 		return
 	}
 	if nk.IsOn(ch) {
-		logging.Warn("StateTracker.Associate(): %s already on %s.",
+		st.l.Warn("StateTracker.Associate(): %s already on %s.",
 			nk.Nick, ch.Name)
 		return
 	}
@@ -199,9 +203,9 @@ func (st *stateTracker) Associate(ch *Channel, nk *Nick) {
 func (st *stateTracker) Dissociate(ch *Channel, nk *Nick) {
 	switch {
 	case ch == nil || nk == nil:
-		logging.Error("StateTracker.Dissociate(): passed nil values :-(")
+		st.l.Error("StateTracker.Dissociate(): passed nil values :-(")
 	case !nk.IsOn(ch):
-		logging.Warn("StateTracker.Dissociate(): %s not on %s.",
+		st.l.Warn("StateTracker.Dissociate(): %s not on %s.",
 			nk.Nick, ch.Name)
 	case nk == st.me:
 		// I'm leaving the channel for some reason, so it won't be tracked.

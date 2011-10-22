@@ -13,6 +13,7 @@ type Channel struct {
 	Modes       *ChanMode
 	lookup		map[string]*Nick
 	nicks       map[*Nick]*ChanPrivs
+	l			logging.Logger
 }
 
 // A struct representing the modes of an IRC Channel
@@ -90,12 +91,13 @@ func init() {
  * Channel methods for state management
 \******************************************************************************/
 
-func NewChannel(name string) *Channel {
+func NewChannel(name string, l logging.Logger) *Channel {
 	return &Channel{
 		Name: name,
 		Modes: new(ChanMode),
 		nicks: make(map[*Nick]*ChanPrivs),
 		lookup: make(map[string]*Nick),
+		l: l,
 	}
 }
 
@@ -115,6 +117,8 @@ func (ch *Channel) addNick(nk *Nick, cp *ChanPrivs) {
 	if _, ok := ch.nicks[nk]; !ok {
 		ch.nicks[nk] = cp
 		ch.lookup[nk.Nick] = nk
+	} else {
+		ch.l.Warn("Channel.addNick(): %s already on %s.", nk.Nick, ch.Name)
 	}
 }
 
@@ -123,6 +127,8 @@ func (ch *Channel) delNick(nk *Nick) {
 	if _, ok := ch.nicks[nk]; ok {
 		ch.nicks[nk] = nil, false
 		ch.lookup[nk.Nick] = nil, false
+	} else {
+		ch.l.Warn("Channel.delNick(): %s not on %s.", nk.Nick, ch.Name)
 	}
 }
 
@@ -160,7 +166,7 @@ func (ch *Channel) ParseModes(modes string, modeargs []string) {
 			} else if !modeop {
 				ch.Modes.Key = ""
 			} else {
-				logging.Warn("Channel.ParseModes(): not enough arguments to "+
+				ch.l.Warn("Channel.ParseModes(): not enough arguments to "+
 					"process MODE %s %s%s", ch.Name, modestr, m)
 			}
 		case 'l':
@@ -170,7 +176,7 @@ func (ch *Channel) ParseModes(modes string, modeargs []string) {
 			} else if !modeop {
 				ch.Modes.Limit = 0
 			} else {
-				logging.Warn("Channel.ParseModes(): not enough arguments to "+
+				ch.l.Warn("Channel.ParseModes(): not enough arguments to "+
 					"process MODE %s %s%s", ch.Name, modestr, m)
 			}
 		case 'q', 'a', 'o', 'h', 'v':
@@ -191,13 +197,15 @@ func (ch *Channel) ParseModes(modes string, modeargs []string) {
 					}
 					modeargs = modeargs[1:]
 				} else {
-					logging.Warn("Channel.ParseModes(): untracked nick %s "+
+					ch.l.Warn("Channel.ParseModes(): untracked nick %s "+
 						"recieved MODE on channel %s", modeargs[0], ch.Name)
 				}
 			} else {
-				logging.Warn("Channel.ParseModes(): not enough arguments to "+
+				ch.l.Warn("Channel.ParseModes(): not enough arguments to "+
 					"process MODE %s %s%s", ch.Name, modestr, m)
 			}
+		default:
+			ch.l.Info("Channel.ParseModes(): unknown mode char %c", m)
 		}
 	}
 }
