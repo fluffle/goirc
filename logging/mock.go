@@ -36,7 +36,8 @@ func NewMock() (*logger, writerMap) {
 	for lv, w := range wMap {
 		logMap[lv] = makeLogger(w)
 	}
-	return New(logMap, Error, false), wMap
+	// Set the default log level high enough that everything will get logged
+	return New(logMap, (1 << 31) - 1, false), wMap
 }
 
 func (m writerMap) CheckNothingWritten(t *testing.T) {

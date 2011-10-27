@@ -16,6 +16,7 @@ func TestLogCorrectLineNumbers(t *testing.T) {
 
 func TestStandardLogging(t *testing.T) {
 	l, m := NewMock()
+	l.SetLogLevel(Error)
 
 	l.Log(4, "Nothing should be logged yet")
 	m.CheckNothingWritten(t)
