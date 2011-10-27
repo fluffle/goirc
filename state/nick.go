@@ -55,14 +55,14 @@ func NewNick(n string, l logging.Logger) *Nick {
 }
 
 // Returns true if the Nick is associated with the Channel.
-func (nk *Nick) IsOn(ch *Channel) bool {
-	_, ok := nk.chans[ch]
-	return ok
+func (nk *Nick) IsOn(ch *Channel) (*ChanPrivs, bool) {
+	cp, ok := nk.chans[ch]
+	return cp, ok
 }
 
-func (nk *Nick) IsOnStr(c string) bool {
-	_, ok := nk.lookup[c]
-	return ok
+func (nk *Nick) IsOnStr(c string) (*Channel, bool) {
+	ch, ok := nk.lookup[c]
+	return ch, ok
 }
 
 // Associates a Channel with a Nick.

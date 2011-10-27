@@ -18,8 +18,8 @@ type StateTracker interface {
 	// Information about ME!
 	Me() *Nick
 	// And the tracking operations
-	IsOn(channel, nick string) bool
-	Associate(channel *Channel, nick *Nick)
+	IsOn(channel, nick string) (*ChanPrivs, bool)
+	Associate(channel *Channel, nick *Nick) *ChanPrivs
 	Dissociate(channel *Channel, nick *Nick)
 }
 
@@ -172,45 +172,45 @@ func (st *stateTracker) Me() *Nick {
 
 // Returns true if both the channel c and the nick n are tracked
 // and the nick is associated with the channel.
-func (st *stateTracker) IsOn(c, n string) bool {
+func (st *stateTracker) IsOn(c, n string) (*ChanPrivs, bool) {
 	nk := st.GetNick(n)
 	ch := st.GetChannel(c)
 	if nk != nil && ch != nil {
 		return nk.IsOn(ch)
 	}
-	return false
+	return nil, false
 }
 
 // Associates an already known nick with an already known channel.
-func (st *stateTracker) Associate(ch *Channel, nk *Nick) {
+func (st *stateTracker) Associate(ch *Channel, nk *Nick) *ChanPrivs {
 	if ch == nil || nk == nil {
 		st.l.Error("StateTracker.Associate(): passed nil values :-(")
-		return
+		return nil
 	}
-	if nk.IsOn(ch) {
+	if _, ok := nk.IsOn(ch); ok {
 		st.l.Warn("StateTracker.Associate(): %s already on %s.",
 			nk.Nick, ch.Name)
-		return
+		return nil
 	}
 	cp := new(ChanPrivs)
 	ch.addNick(nk, cp)
 	nk.addChannel(ch, cp)
+	return cp
 }
 
 // Dissociates an already known nick from an already known channel.
 // Does some tidying up to stop tracking nicks we're no longer on
 // any common channels with, and channels we're no longer on.
 func (st *stateTracker) Dissociate(ch *Channel, nk *Nick) {
-	switch {
-	case ch == nil || nk == nil:
+	if ch == nil || nk == nil {
 		st.l.Error("StateTracker.Dissociate(): passed nil values :-(")
-	case !nk.IsOn(ch):
+	} else if _, ok := nk.IsOn(ch); !ok {
 		st.l.Warn("StateTracker.Dissociate(): %s not on %s.",
 			nk.Nick, ch.Name)
-	case nk == st.me:
+	} else if nk == st.me {
 		// I'm leaving the channel for some reason, so it won't be tracked.
 		st.delChannel(ch)
-	default:
+	} else {
 		// Remove the nick from the channel and the channel from the nick.
 		ch.delNick(nk)
 		nk.delChannel(ch)

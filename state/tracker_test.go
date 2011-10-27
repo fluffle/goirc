@@ -346,13 +346,13 @@ func TestSTIsOn(t *testing.T) {
 	chan1 := NewChannel("#test1", l)
 	st.chans["#test1"] = chan1
 
-	if st.IsOn("#test1", "test1") {
+	if priv, ok := st.IsOn("#test1", "test1"); ok || priv != nil {
 		t.Errorf("test1 is not on #test1 (yet)")
 	}
 	cp := new(ChanPrivs)
 	chan1.addNick(nick1, cp)
 	nick1.addChannel(chan1, cp)
-	if !st.IsOn("#test1", "test1") {
+	if priv, ok := st.IsOn("#test1", "test1"); !ok || priv != cp {
 		t.Errorf("test1 is on #test1 (now)")
 	}
 	m.CheckNothingWritten(t)
@@ -368,7 +368,7 @@ func TestSTAssociate(t *testing.T) {
 
 	st.Associate(chan1, nick1)
 	m.CheckNothingWritten(t)
-	if !st.IsOn("#test1", "test1") {
+	if _, ok := st.IsOn("#test1", "test1"); !ok {
 		t.Errorf("test1 was not associated with #test1.")
 	}
 
