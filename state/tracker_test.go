@@ -163,10 +163,15 @@ func TestSTDelNick(t *testing.T) {
 	}
 
 	// Test that deletion correctly dissociates nick from channels.
+	// NOTE: the two error states in delNick (as opposed to DelNick)
+	// are not tested for here, as they will only arise from programming
+	// errors in other methods. Using m.CheckNothingWritten() while
+	// testing these methods will catch those errors should they occur.
+
 	// Create a new channel for testing purposes
 	chan1 := NewChannel("#test1", l)
 	st.chans["#test1"] = chan1
-	
+
 	// Associate both "my" nick and test1 with the channel
 	p := new(ChanPrivs)
 	chan1.addNick(st.me, p)
@@ -174,15 +179,18 @@ func TestSTDelNick(t *testing.T) {
 	chan1.addNick(nick1, p)
 	nick1.addChannel(chan1, p)
 
-	// Test we have the expected starting state (at least vaguely
-	if len(chan1.nicks) != 2 || len(st.me.chans) != 1 || len(nick1.chans) != 1 {
+	// Test we have the expected starting state (at least vaguely)
+	if len(chan1.nicks) != 2 || len(st.nicks) != 2 ||
+		len(st.me.chans) != 1 || len(nick1.chans) != 1 || len(st.chans) != 1 {
 		t.Errorf("Bad initial state for test DelNick() channel dissociation.")
 	}
 
 	st.DelNick("test1")
+	m.CheckNothingWritten(t)
 
 	// Actual deletion tested above...
-	if len(chan1.nicks) != 1 || len(st.me.chans) != 1 || len(nick1.chans) != 0 {
+	if len(chan1.nicks) != 1 || len(st.chans) != 1 ||
+		len(st.me.chans) != 1 || len(nick1.chans) != 0 || len(st.chans) != 1 {
 		t.Errorf("Deleting nick didn't dissociate correctly from channels.")
 	}
 
@@ -190,7 +198,7 @@ func TestSTDelNick(t *testing.T) {
 		t.Errorf("Nick not removed from channel's nick map.")
 	}
 	if _, ok := chan1.lookup["test1"]; ok {
-		t.Errorf("Nick not removed from channels's lookup map.")
+		t.Errorf("Nick not removed from channel's lookup map.")
 	}
 }
 
@@ -244,8 +252,8 @@ func TestSTDelChannel(t *testing.T) {
 	l.SetLogLevel(logging.Debug)
 	st := NewTracker("mynick", l)
 
-	test1 := NewChannel("#test1", l)
-	st.chans["#test1"] = test1
+	chan1 := NewChannel("#test1", l)
+	st.chans["#test1"] = chan1
 
 	st.DelChannel("#test1")
 	m.CheckNothingWritten(t)
@@ -257,7 +265,7 @@ func TestSTDelChannel(t *testing.T) {
 		t.Errorf("Channel list still contains chans after DelChannel.")
 	}
 
-	st.chans["#test1"] = test1
+	st.chans["#test1"] = chan1
 
 	st.DelChannel("#test2")
 	m.CheckWrittenAtLevel(t, logging.Warn,
@@ -265,6 +273,66 @@ func TestSTDelChannel(t *testing.T) {
 
 	if len(st.chans) != 1 {
 		t.Errorf("DelChannel had unexpected side-effects.")
+	}
+
+	// Test that deletion correctly dissociates channel from tracked nicks.
+
+	// In order to test this thoroughly we need two channels (so that delNick()
+	// is not called internally in delChannel() when len(nick1.chans) == 0.
+	chan2 := NewChannel("#test2", l)
+	st.chans["#test2"] = chan2
+	nick1 := NewNick("test1", l)
+	st.nicks["test1"] = nick1
+
+	// Associate both "my" nick and test1 with the channels
+	p := new(ChanPrivs)
+	chan1.addNick(st.me, p)
+	st.me.addChannel(chan1, p)
+	chan1.addNick(nick1, p)
+	nick1.addChannel(chan1, p)
+	chan2.addNick(st.me, p)
+	st.me.addChannel(chan2, p)
+	chan2.addNick(nick1, p)
+	nick1.addChannel(chan2, p)
+
+	// Test we have the expected starting state (at least vaguely)
+	if len(chan1.nicks) != 2 || len(chan2.nicks) != 2 || len(st.nicks) != 2 ||
+		len(st.me.chans) != 2 || len(nick1.chans) != 2 || len(st.chans) != 2 {
+		t.Errorf("Bad initial state for test DelChannel() nick dissociation.")
+	}
+
+	st.DelChannel("#test1")
+	m.CheckNothingWritten(t)
+
+	// Test intermediate state. We're still on #test2 with test1, so test1
+	// shouldn't be deleted from state tracking itself just yet.
+	if len(chan1.nicks) != 0 || len(chan2.nicks) != 2 || len(st.nicks) != 2 ||
+		len(st.me.chans) != 1 || len(nick1.chans) != 1 || len(st.chans) != 1 {
+		t.Errorf("Deleting channel didn't dissociate correctly from nicks.")
+	}
+
+	if _, ok := nick1.chans[chan1]; ok {
+		t.Errorf("Channel not removed from nick's chans map.")
+	}
+	if _, ok := nick1.lookup["#test1"]; ok {
+		t.Errorf("Channel not removed from nick's lookup map.")
+	}
+
+	st.DelChannel("#test2")
+	m.CheckNothingWritten(t)
+
+	// Test final state. Deleting #test2 means that we're no longer on any
+	// common channels with test1, and thus it should be removed from tracking.
+	if len(chan1.nicks) != 0 || len(chan2.nicks) != 0 || len(st.nicks) != 1 ||
+		len(st.me.chans) != 0 || len(nick1.chans) != 0 || len(st.chans) != 0 {
+		t.Errorf("Deleting last channel didn't dissociate correctly from nicks.")
+	}
+
+	if _, ok := st.nicks["test1"]; ok {
+		t.Errorf("Nick not deleted correctly when on no channels.")
+	}
+	if _, ok := st.nicks["mynick"]; !ok {
+		t.Errorf("My nick deleted incorrectly when on no channels.")
 	}
 }
 
