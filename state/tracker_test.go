@@ -357,3 +357,31 @@ func TestSTIsOn(t *testing.T) {
 	}
 	m.CheckNothingWritten(t)
 }
+
+func TestSTAssociate(t *testing.T) {
+	l, m := logging.NewMock()
+	l.SetLogLevel(logging.Debug)
+	st := NewTracker("mynick", l)
+
+	nick1 := st.NewNick("test1")
+	chan1 := st.NewChannel("#test1")
+
+	st.Associate(chan1, nick1)
+	m.CheckNothingWritten(t)
+	if !st.IsOn("#test1", "test1") {
+		t.Errorf("test1 was not associated with #test1.")
+	}
+
+	// Test error cases
+	st.Associate(nil, nick1)
+	m.CheckWrittenAtLevel(t, logging.Error,
+		"StateTracker.Associate(): passed nil values :-(")
+
+	st.Associate(chan1, nil)
+	m.CheckWrittenAtLevel(t, logging.Error,
+		"StateTracker.Associate(): passed nil values :-(")
+
+	st.Associate(chan1, nick1)
+	m.CheckWrittenAtLevel(t, logging.Warn,
+		"StateTracker.Associate(): test1 already on #test1.")
+}
