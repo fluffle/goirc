@@ -186,8 +186,16 @@ func (st *stateTracker) Associate(ch *Channel, nk *Nick) *ChanPrivs {
 	if ch == nil || nk == nil {
 		st.l.Error("StateTracker.Associate(): passed nil values :-(")
 		return nil
-	}
-	if _, ok := nk.IsOn(ch); ok {
+	} else if _ch, ok := st.chans[ch.Name]; !ok || ch != _ch {
+		// As we can implicitly delete both nicks and channels from being
+		// tracked by dissociating one from the other, we should verify that
+		// we're not being passed an old Nick or Channel.
+		st.l.Error("StateTracker.Associate(): channel %s not found in "+
+			"(or differs from) internal state.", ch.Name)
+	} else if _nk, ok := st.nicks[nk.Nick]; !ok || nk != _nk {
+		st.l.Error("StateTracker.Associate(): nick %s not found in "+
+			"(or differs from) internal state.", nk.Nick)
+	} else if _, ok := nk.IsOn(ch); ok {
 		st.l.Warn("StateTracker.Associate(): %s already on %s.",
 			nk.Nick, ch.Name)
 		return nil
@@ -204,6 +212,15 @@ func (st *stateTracker) Associate(ch *Channel, nk *Nick) *ChanPrivs {
 func (st *stateTracker) Dissociate(ch *Channel, nk *Nick) {
 	if ch == nil || nk == nil {
 		st.l.Error("StateTracker.Dissociate(): passed nil values :-(")
+	} else if _ch, ok := st.chans[ch.Name]; !ok || ch != _ch {
+		// As we can implicitly delete both nicks and channels from being
+		// tracked by dissociating one from the other, we should verify that
+		// we're not being passed an old Nick or Channel.
+		st.l.Error("StateTracker.Dissociate(): channel %s not found in "+
+			"(or differs from) internal state.", ch.Name)
+	} else if _nk, ok := st.nicks[nk.Nick]; !ok || nk != _nk {
+		st.l.Error("StateTracker.Dissociate(): nick %s not found in "+
+			"(or differs from) internal state.", nk.Nick)
 	} else if _, ok := nk.IsOn(ch); !ok {
 		st.l.Warn("StateTracker.Dissociate(): %s not on %s.",
 			nk.Nick, ch.Name)

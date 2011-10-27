@@ -366,9 +366,9 @@ func TestSTAssociate(t *testing.T) {
 	nick1 := st.NewNick("test1")
 	chan1 := st.NewChannel("#test1")
 
-	st.Associate(chan1, nick1)
+	cp := st.Associate(chan1, nick1)
 	m.CheckNothingWritten(t)
-	if _, ok := st.IsOn("#test1", "test1"); !ok {
+	if priv, ok := st.IsOn("#test1", "test1"); !ok || cp != priv {
 		t.Errorf("test1 was not associated with #test1.")
 	}
 
@@ -384,4 +384,107 @@ func TestSTAssociate(t *testing.T) {
 	st.Associate(chan1, nick1)
 	m.CheckWrittenAtLevel(t, logging.Warn,
 		"StateTracker.Associate(): test1 already on #test1.")
+
+	nick2 := NewNick("test2", l)
+	st.Associate(chan1, nick2)
+	m.CheckWrittenAtLevel(t, logging.Error,
+		"StateTracker.Associate(): nick test2 not found in (or differs from) "+
+		"internal state.")
+
+	chan2 := NewChannel("#test2", l)
+	st.Associate(chan2, nick1)
+	m.CheckWrittenAtLevel(t, logging.Error,
+		"StateTracker.Associate(): channel #test2 not found in (or differs "+
+		"from) internal state.")
+}
+
+func TestSTDissociate(t *testing.T) {
+	l, m := logging.NewMock()
+	l.SetLogLevel(logging.Debug)
+	st := NewTracker("mynick", l)
+
+	nick1 := st.NewNick("test1")
+	chan1 := st.NewChannel("#test1")
+	chan2 := st.NewChannel("#test2")
+
+	// Associate both "my" nick and test1 with the channels
+	st.Associate(chan1, st.me)
+	st.Associate(chan1, nick1)
+	st.Associate(chan2, st.me)
+	st.Associate(chan2, nick1)
+
+	// Check the initial state looks mostly like we expect it to.
+	if len(chan1.nicks) != 2 || len(chan2.nicks) != 2 || len(st.nicks) != 2 ||
+		len(st.me.chans) != 2 || len(nick1.chans) != 2 || len(st.chans) != 2 {
+		t.Errorf("Initial state for dissociation tests looks odd.")
+	}
+
+	// First, test the case of me leaving #test2
+	st.Dissociate(chan2, st.me)
+	m.CheckNothingWritten(t)
+
+	// This should have resulted in the complete deletion of the channel.
+	if len(chan1.nicks) != 2 || len(chan2.nicks) != 0 || len(st.nicks) != 2 ||
+		len(st.me.chans) != 1 || len(nick1.chans) != 1 || len(st.chans) != 1 {
+		t.Errorf("Dissociating myself from channel didn't delete it correctly.")
+	}
+
+	// Reassociating myself and test1 to #test2 shouldn't cause any errors.
+	chan2 = st.NewChannel("#test2")
+	st.Associate(chan2, st.me)
+	st.Associate(chan2, nick1)
+	m.CheckNothingWritten(t)
+
+	// Check state once moar.
+	if len(chan1.nicks) != 2 || len(chan2.nicks) != 2 || len(st.nicks) != 2 ||
+		len(st.me.chans) != 2 || len(nick1.chans) != 2 || len(st.chans) != 2 {
+		t.Errorf("Reassociating to channel has produced unexpected state.")
+	}
+
+	// Now, lets dissociate test1 from #test1 then #test2.
+	// This first one should only result in a change in associations.
+	st.Dissociate(chan1, nick1)
+	m.CheckNothingWritten(t)
+
+	if len(chan1.nicks) != 1 || len(chan2.nicks) != 2 || len(st.nicks) != 2 ||
+		len(st.me.chans) != 2 || len(nick1.chans) != 1 || len(st.chans) != 2 {
+		t.Errorf("Dissociating a nick from one channel went wrong.")
+	}
+
+	// This second one should also delete test1
+	// as it's no longer on any common channels with us
+	st.Dissociate(chan2, nick1)
+	m.CheckNothingWritten(t)
+
+	if len(chan1.nicks) != 1 || len(chan2.nicks) != 1 || len(st.nicks) != 1 ||
+		len(st.me.chans) != 2 || len(nick1.chans) != 0 || len(st.chans) != 2 {
+		t.Errorf("Dissociating a nick from it's last channel went wrong.")
+	}
+
+	// Check error cases
+	// test1 was deleted above, so "re-track" it for this test.
+	nick1 = st.NewNick("test1")
+	st.Dissociate(chan1, nick1)
+	m.CheckWrittenAtLevel(t, logging.Warn,
+		"StateTracker.Dissociate(): test1 not on #test1.")
+
+	st.Dissociate(chan1, nil)
+	m.CheckWrittenAtLevel(t, logging.Error,
+		"StateTracker.Dissociate(): passed nil values :-(")
+
+	st.Dissociate(nil, nick1)
+	m.CheckWrittenAtLevel(t, logging.Error,
+		"StateTracker.Dissociate(): passed nil values :-(")
+
+	nick3 := NewNick("test3", l)
+	st.Dissociate(chan1, nick3)
+	m.CheckWrittenAtLevel(t, logging.Error,
+		"StateTracker.Dissociate(): nick test3 not found in (or differs from) "+
+		"internal state.")
+
+	chan3 := NewChannel("#test3", l)
+	st.Dissociate(chan3, nick1)
+	m.CheckWrittenAtLevel(t, logging.Error,
+		"StateTracker.Dissociate(): channel #test3 not found in (or differs "+
+		"from) internal state.")
 }
