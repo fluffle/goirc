@@ -7,7 +7,6 @@ import (
 
 func TestSTNewTracker(t *testing.T) {
 	l, m := logging.NewMock()
-	l.SetLogLevel(logging.Debug)
 
 	st := NewTracker("mynick", l)
 	m.CheckNothingWritten(t)
@@ -28,7 +27,6 @@ func TestSTNewTracker(t *testing.T) {
 
 func TestSTNewNick(t *testing.T) {
 	l, m := logging.NewMock()
-	l.SetLogLevel(logging.Debug)
 	st := NewTracker("mynick", l)
 
 	test1 := st.NewNick("test1")
@@ -50,7 +48,6 @@ func TestSTNewNick(t *testing.T) {
 
 func TestSTGetNick(t *testing.T) {
 	l, _ := logging.NewMock()
-	l.SetLogLevel(logging.Debug)
 	st := NewTracker("mynick", l)
 
 	test1 := NewNick("test1", l)
@@ -69,7 +66,6 @@ func TestSTGetNick(t *testing.T) {
 
 func TestSTReNick(t *testing.T) {
 	l, m := logging.NewMock()
-	l.SetLogLevel(logging.Debug)
 	st := NewTracker("mynick", l)
 
 	test1 := NewNick("test1", l)
@@ -127,7 +123,6 @@ func TestSTReNick(t *testing.T) {
 
 func TestSTDelNick(t *testing.T) {
 	l, m := logging.NewMock()
-	l.SetLogLevel(logging.Debug)
 	st := NewTracker("mynick", l)
 
 	nick1 := NewNick("test1", l)
@@ -204,7 +199,6 @@ func TestSTDelNick(t *testing.T) {
 
 func TestSTNewChannel(t *testing.T) {
 	l, m := logging.NewMock()
-	l.SetLogLevel(logging.Debug)
 	st := NewTracker("mynick", l)
 
 	if len(st.chans) != 0 {
@@ -230,7 +224,6 @@ func TestSTNewChannel(t *testing.T) {
 
 func TestSTGetChannel(t *testing.T) {
 	l, _ := logging.NewMock()
-	l.SetLogLevel(logging.Debug)
 	st := NewTracker("mynick", l)
 
 	test1 := NewChannel("#test1", l)
@@ -249,7 +242,6 @@ func TestSTGetChannel(t *testing.T) {
 
 func TestSTDelChannel(t *testing.T) {
 	l, m := logging.NewMock()
-	l.SetLogLevel(logging.Debug)
 	st := NewTracker("mynick", l)
 
 	chan1 := NewChannel("#test1", l)
@@ -338,7 +330,6 @@ func TestSTDelChannel(t *testing.T) {
 
 func TestSTIsOn(t *testing.T) {
 	l, m := logging.NewMock()
-	l.SetLogLevel(logging.Debug)
 	st := NewTracker("mynick", l)
 
 	nick1 := NewNick("test1", l)
@@ -360,7 +351,6 @@ func TestSTIsOn(t *testing.T) {
 
 func TestSTAssociate(t *testing.T) {
 	l, m := logging.NewMock()
-	l.SetLogLevel(logging.Debug)
 	st := NewTracker("mynick", l)
 
 	nick1 := st.NewNick("test1")
@@ -400,7 +390,6 @@ func TestSTAssociate(t *testing.T) {
 
 func TestSTDissociate(t *testing.T) {
 	l, m := logging.NewMock()
-	l.SetLogLevel(logging.Debug)
 	st := NewTracker("mynick", l)
 
 	nick1 := st.NewNick("test1")
