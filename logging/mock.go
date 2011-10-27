@@ -58,25 +58,25 @@ func (m writerMap) CheckWrittenAtLevel(t *testing.T, lv LogLevel, exp string) {
 	} else {
 		w = m[lv]
 	}
-	// 32 bytes covers the date, time and filename up to the colon in
+	// 20 bytes covers the date and time in
 	// 2011/10/22 10:22:57 log_test.go:<line no>: <level> <log message>
-	if len(w.written) <= 33 {
+	if len(w.written) <= 20 {
 		t.Errorf("Not enough bytes logged at level %s:", LogString(lv))
-		t.Errorf("exp: %s\ngot: %s", exp, string(w.written))
+		t.Errorf("exp: %s\ngot: %s", exp, w.written)
 		// Check nothing was written to a different log level here, too.
 		m.CheckNothingWritten(t)
 		return
 	}
-	s := string(w.written[32:])
-	// 2 covers the : itself and the extra space
-	idx := strings.Index(s, ":") + 2
+	s := string(w.written[20:])
+	// consume the log line file:line: and the level prefix
+	idx := strings.Index(s, ":") + 1
+	idx += strings.Index(s[idx:], ":") + len(LogString(lv)) + 3
 	// s will end in "\n", so -1 to chop that off too
 	s = s[idx:len(s)-1]
-	// expected won't contain the log level prefix, so prepend that
-	exp = LogString(lv) + " " + exp
 	if s != exp {
 		t.Errorf("Log message at level %s differed.", LogString(lv))
 		t.Errorf("exp: %s\ngot: %s", exp, s)
+		t.Errorf("orig: %s", w.written)
 	}
 	w.reset()
 	// Calling checkNothingWritten here both tests that w.reset() works
