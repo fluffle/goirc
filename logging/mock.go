@@ -61,7 +61,7 @@ func (m writerMap) CheckWrittenAtLevel(t *testing.T, lv LogLevel, exp string) {
 	// 2011/10/22 10:22:57 log_test.go:<line no>: <level> <log message>
 	if len(w.written) <= 33 {
 		t.Errorf("Not enough bytes logged at level %s:", LogString(lv))
-		t.Errorf("exp: %s\n\tgot: %s", exp, string(w.written))
+		t.Errorf("exp: %s\ngot: %s", exp, string(w.written))
 		// Check nothing was written to a different log level here, too.
 		m.CheckNothingWritten(t)
 		return
@@ -75,7 +75,7 @@ func (m writerMap) CheckWrittenAtLevel(t *testing.T, lv LogLevel, exp string) {
 	exp = LogString(lv) + " " + exp
 	if s != exp {
 		t.Errorf("Log message at level %s differed.", LogString(lv))
-		t.Errorf("exp: %s\n\tgot: %s", exp, s)
+		t.Errorf("exp: %s\ngot: %s", exp, s)
 	}
 	w.reset()
 	// Calling checkNothingWritten here both tests that w.reset() works
