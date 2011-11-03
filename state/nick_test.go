@@ -64,3 +64,31 @@ func TestDelChannel(t *testing.T) {
 		t.Errorf("Channel #test1 not properly removed from lookup map.")
 	}
 }
+
+func TestParseModes(t *testing.T) {
+	l, m := logging.NewMock()
+	nk := NewNick("test1", l)
+	md := nk.Modes
+
+	// Modes should all be false for a new nick
+	if md.Invisible || md.Oper || md.WallOps || md.HiddenHost || md.SSL {
+		t.Errorf("Modes for new nick set to true.")
+	}
+
+	// Set a couple of modes, for testing.
+	md.Invisible = true
+	md.HiddenHost = true
+
+	// Parse a mode line that flips one true to false and two false to true
+	nk.ParseModes("+z-x+w")
+	m.CheckNothingWritten(t)
+
+	if !md.Invisible || md.Oper || !md.WallOps || md.HiddenHost || !md.SSL {
+		t.Errorf("Modes not flipped correctly by ParseModes.")
+	}
+
+	// Check that passing an unknown mode char results in an info log
+	nk.ParseModes("+d")
+	m.CheckWrittenAtLevel(t, logging.Info,
+		"Nick.ParseModes(): unknown mode char d")
+}
