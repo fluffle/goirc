@@ -133,7 +133,7 @@ func (ch *Channel) delNick(nk *Nick) {
 }
 
 // Parses mode strings for a channel.
-func (ch *Channel) ParseModes(modes string, modeargs []string) {
+func (ch *Channel) ParseModes(modes string, modeargs ...string) {
 	var modeop bool // true => add mode, false => remove mode
 	var modestr string
 	for i := 0; i < len(modes); i++ {
@@ -167,7 +167,7 @@ func (ch *Channel) ParseModes(modes string, modeargs []string) {
 				ch.Modes.Key = ""
 			} else {
 				ch.l.Warn("Channel.ParseModes(): not enough arguments to "+
-					"process MODE %s %s%s", ch.Name, modestr, m)
+					"process MODE %s %s%c", ch.Name, modestr, m)
 			}
 		case 'l':
 			if modeop && len(modeargs) != 0 {
@@ -177,7 +177,7 @@ func (ch *Channel) ParseModes(modes string, modeargs []string) {
 				ch.Modes.Limit = 0
 			} else {
 				ch.l.Warn("Channel.ParseModes(): not enough arguments to "+
-					"process MODE %s %s%s", ch.Name, modestr, m)
+					"process MODE %s %s%c", ch.Name, modestr, m)
 			}
 		case 'q', 'a', 'o', 'h', 'v':
 			if len(modeargs) != 0 {
@@ -198,11 +198,11 @@ func (ch *Channel) ParseModes(modes string, modeargs []string) {
 					modeargs = modeargs[1:]
 				} else {
 					ch.l.Warn("Channel.ParseModes(): untracked nick %s "+
-						"recieved MODE on channel %s", modeargs[0], ch.Name)
+						"received MODE on channel %s", modeargs[0], ch.Name)
 				}
 			} else {
 				ch.l.Warn("Channel.ParseModes(): not enough arguments to "+
-					"process MODE %s %s%s", ch.Name, modestr, m)
+					"process MODE %s %s%c", ch.Name, modestr, m)
 			}
 		default:
 			ch.l.Info("Channel.ParseModes(): unknown mode char %c", m)

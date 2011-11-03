@@ -65,7 +65,7 @@ func TestDelChannel(t *testing.T) {
 	}
 }
 
-func TestParseModes(t *testing.T) {
+func TestNickParseModes(t *testing.T) {
 	l, m := logging.NewMock()
 	nk := NewNick("test1", l)
 	md := nk.Modes

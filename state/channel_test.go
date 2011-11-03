@@ -64,3 +64,129 @@ func TestDelNick(t *testing.T) {
 		t.Errorf("Nick test1 not properly removed from lookup map.")
 	}
 }
+
+func TestChannelParseModes(t *testing.T) {
+	l, m := logging.NewMock()
+	ch := NewChannel("#test1", l)
+	md := ch.Modes
+
+	// Channel modes can adjust channel privs too, so we need a Nick
+	nk := NewNick("test1", l)
+	cp := new(ChanPrivs)
+	ch.addNick(nk, cp)
+
+	// Test bools first.
+	if md.Private || md.Secret || md.ProtectedTopic || md.NoExternalMsg ||
+		md.Moderated || md.InviteOnly || md.OperOnly || md.SSLOnly {
+		t.Errorf("Modes for new channel set to true.")
+	}
+
+	// Flip some bits!
+	md.Private = true
+	md.NoExternalMsg = true
+	md.InviteOnly = true
+
+	// Flip some MOAR bits.
+	ch.ParseModes("+s-p+tm-i")
+	m.CheckNothingWritten(t)
+
+	if md.Private || !md.Secret || !md.ProtectedTopic || !md.NoExternalMsg ||
+		!md.Moderated || md.InviteOnly || md.OperOnly || md.SSLOnly {
+		t.Errorf("Modes not flipped correctly by ParseModes.")
+	}
+
+	// Test numeric parsing (currently only channel limits)
+	if md.Limit != 0 {
+		t.Errorf("Limit for new channel not zero.")
+	}
+
+	// enable limit correctly
+	ch.ParseModes("+l", "256")
+	m.CheckNothingWritten(t)
+	if md.Limit != 256 {
+		t.Errorf("Limit for channel not set correctly")
+	}
+
+	// enable limit incorrectly
+	ch.ParseModes("+l")
+	m.CheckWrittenAtLevel(t, logging.Warn,
+		"Channel.ParseModes(): not enough arguments to process MODE #test1 +l")
+	if md.Limit != 256 {
+		t.Errorf("Bad limit value caused limit to be unset.")
+	}
+
+	// disable limit correctly
+	ch.ParseModes("-l")
+	m.CheckNothingWritten(t)
+	if md.Limit != 0 {
+		t.Errorf("Limit for channel not unset correctly")
+	}
+
+	// Test string parsing (currently only channel key)
+	if md.Key != "" {
+		t.Errorf("Key set for new channel.")
+	}
+
+	// enable key correctly
+	ch.ParseModes("+k", "foobar")
+	m.CheckNothingWritten(t)
+	if md.Key != "foobar" {
+		t.Errorf("Key for channel not set correctly")
+	}
+
+	// enable key incorrectly
+	ch.ParseModes("+k")
+	m.CheckWrittenAtLevel(t, logging.Warn,
+		"Channel.ParseModes(): not enough arguments to process MODE #test1 +k")
+	if md.Key != "foobar" {
+		t.Errorf("Bad key value caused key to be unset.")
+	}
+
+	// disable key correctly
+	ch.ParseModes("-k")
+	m.CheckNothingWritten(t)
+	if md.Key != "" {
+		t.Errorf("Key for channel not unset correctly")
+	}
+
+	// Test chan privs parsing.
+	cp.Op = true
+	cp.HalfOp = true
+	ch.ParseModes("+aq-o", "test1", "test1", "test1")
+	m.CheckNothingWritten(t)
+
+	if !cp.Owner || !cp.Admin || cp.Op || !cp.HalfOp || cp.Voice {
+		t.Errorf("Channel privileges not flipped correctly by ParseModes.")
+	}
+
+	ch.ParseModes("+v", "test2")
+	m.CheckWrittenAtLevel(t, logging.Warn,
+		"Channel.ParseModes(): untracked nick test2 received MODE on channel #test1")
+
+	ch.ParseModes("-v")
+	m.CheckWrittenAtLevel(t, logging.Warn,
+		"Channel.ParseModes(): not enough arguments to process MODE #test1 -v")
+	
+	// Test a random mix of modes, just to be sure
+	md.Limit = 256
+	ch.ParseModes("+zpt-qsl+kv-h", "test1", "foobar", "test1")
+	m.CheckWrittenAtLevel(t, logging.Warn,
+		"Channel.ParseModes(): not enough arguments to process MODE #test1 -h")
+
+	if !md.Private || md.Secret || !md.ProtectedTopic || !md.NoExternalMsg ||
+		!md.Moderated || md.InviteOnly || md.OperOnly || !md.SSLOnly {
+		t.Errorf("Modes not flipped correctly by ParseModes (2).")
+	}
+	if md.Limit != 0 || md.Key != "foobar" {
+		t.Errorf("Key and limit not changed correctly by ParseModes (2).")
+	}
+	if cp.Owner || !cp.Admin || cp.Op || !cp.HalfOp || !cp.Voice {
+		// NOTE: HalfOp not actually unset above thanks to deliberate error.
+		t.Errorf("Channel privileges not flipped correctly by ParseModes (2).")
+	}
+	
+	// Finally, check we get an info log for an unrecognised mode character
+	ch.ParseModes("+d")
+	m.CheckWrittenAtLevel(t, logging.Info,
+		"Channel.ParseModes(): unknown mode char d")
+}
