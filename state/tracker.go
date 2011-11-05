@@ -246,3 +246,19 @@ func (st *stateTracker) Dissociate(ch *Channel, nk *Nick) {
 		}
 	}
 }
+
+func (st *stateTracker) String() string {
+	str := "GoIRC Channels\n"
+	str += "--------------\n\n"
+	for _, ch := range st.chans {
+		str += ch.String() + "\n"
+	}
+	str += "GoIRC NickNames\n"
+	str += "---------------\n\n"
+	for _, n := range st.nicks {
+		if n != st.me {
+			str += n.String() + "\n"
+		}
+	}
+	return str
+}
