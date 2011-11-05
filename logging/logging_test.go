@@ -7,16 +7,16 @@ import (
 // Note: the below is deliberately PLACED AT THE TOP OF THIS FILE because
 // it is fragile. It ensures the right file:line is logged. Sorry!
 func TestLogCorrectLineNumbers(t *testing.T) {
-	l, m := NewMock(t)
+	l, m := newMock(t)
 	l.Log(Error, "Error!")
 	// This breaks the mock encapsulation a little, but meh.
-	if s := string(m.m[Error].written); s[20:] != "log_test.go:11: ERROR Error!\n" {
+	if s := string(m.m[Error].written); s[20:] != "logging_test.go:11: ERROR Error!\n" {
 		t.Errorf("Error incorrectly logged (check line numbers!)")
 	}
 }
 
 func TestStandardLogging(t *testing.T) {
-	l, m := NewMock(t)
+	l, m := newMock(t)
 	l.SetLogLevel(Error)
 
 	l.Log(4, "Nothing should be logged yet")
@@ -36,7 +36,7 @@ func TestStandardLogging(t *testing.T) {
 }
 
 func TestAllLoggingLevels(t *testing.T) {
-	l, m := NewMock(t)
+	l, m := newMock(t)
 
 	l.Log(4, "Log to level 4.")
 	m.ExpectAt(4, "Log to level 4.")

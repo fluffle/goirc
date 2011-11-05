@@ -6,8 +6,6 @@ import (
 	"testing"
 )
 
-// These are provided to ease testing code that uses the logging pkg
-
 // TODO(fluffle): Assumes at most one logging line will be written
 // between calls to Expect*. Change to be Expect(exp []string)?
 
@@ -40,14 +38,16 @@ func (w *mockWriter) reset() {
 	w.written = w.written[:0]
 }
 
-type WriterMap struct {
+type writerMap struct {
 	t *testing.T
 	m map[LogLevel]*mockWriter
 }
 
 // This doesn't create a mock Logger but a Logger that writes to mock outputs
-func NewMock(t *testing.T) (*logger, *WriterMap) {
-	wMap := &WriterMap{
+// for testing purposes. Use the gomock-generated mock_logging package for
+// external testing code that needs to mock out a logger.
+func newMock(t *testing.T) (*logger, *writerMap) {
+	wMap := &writerMap{
 		t: t,
 		m: map[LogLevel]*mockWriter{
 			Debug: &mockWriter{make([]byte, 0)},
@@ -66,7 +66,7 @@ func NewMock(t *testing.T) (*logger, *WriterMap) {
 }
 
 // When you expect something to be logged but don't care so much what level at.
-func (wm *WriterMap) Expect(exp string) {
+func (wm *writerMap) Expect(exp string) {
 	found := false
 	for lv, w := range wm.m {
 		if s := w.getLine(); s != "" && !found {
@@ -91,7 +91,7 @@ func (wm *WriterMap) Expect(exp string) {
 
 
 // When you expect nothing to be logged
-func (wm *WriterMap) ExpectNothing() {
+func (wm *writerMap) ExpectNothing() {
 	for lv, w := range wm.m {
 		if s := w.getLine(); s != "" {
 			wm.t.Errorf("Unexpected log message at level %s:",
@@ -103,7 +103,7 @@ func (wm *WriterMap) ExpectNothing() {
 }
 
 // When you expect something to be logged at a specific level.
-func (wm *WriterMap) ExpectAt(lv LogLevel, exp string) {
+func (wm *writerMap) ExpectAt(lv LogLevel, exp string) {
 	var w *mockWriter
 	if _, ok := wm.m[lv]; !ok {
 		w = wm.m[Debug]
