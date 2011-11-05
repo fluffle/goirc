@@ -22,6 +22,8 @@ type StateTracker interface {
 	Associate(channel *Channel, nick *Nick) *ChanPrivs
 	Dissociate(channel *Channel, nick *Nick)
 	Wipe()
+	// The state tracker can output a debugging string
+	String() string
 }
 
 // ... and a struct to implement it ...
