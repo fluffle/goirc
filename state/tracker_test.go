@@ -477,3 +477,58 @@ func TestSTDissociate(t *testing.T) {
 		"StateTracker.Dissociate(): channel #test3 not found in (or differs "+
 		"from) internal state.")
 }
+
+func TestSTWipe(t *testing.T) {
+	l, m := logging.NewMock()
+	st := NewTracker("mynick", l)
+
+	nick1 := st.NewNick("test1")
+	nick2 := st.NewNick("test2")
+	nick3 := st.NewNick("test3")
+
+	chan1 := st.NewChannel("#test1")
+	chan2 := st.NewChannel("#test2")
+	chan3 := st.NewChannel("#test3")
+
+	// Some associations
+	st.Associate(chan1, st.me)
+	st.Associate(chan2, st.me)
+	st.Associate(chan3, st.me)
+
+	st.Associate(chan1, nick1)
+	st.Associate(chan2, nick2)
+	st.Associate(chan3, nick3)
+
+	st.Associate(chan1, nick2)
+	st.Associate(chan2, nick3)
+
+	st.Associate(chan1, nick3)
+
+	m.CheckNothingWritten(t)
+
+	// Check the state we have at this point is what we would expect.
+	if len(st.nicks) != 4 || len(st.chans) != 3 || len(st.me.chans) != 3 {
+		t.Errorf("Tracker nick/channel lists wrong length before wipe.")
+	}
+	if len(chan1.nicks) != 4 || len(chan2.nicks) != 3 || len(chan3.nicks) != 2 {
+		t.Errorf("Channel nick lists wrong length before wipe.")
+	}
+	if len(nick1.chans) != 1 || len(nick2.chans) != 2 || len(nick3.chans) != 3 {
+		t.Errorf("Nick chan lists wrong length before wipe.")
+	}
+
+	// Nuke *all* the state!
+	st.Wipe()
+	m.CheckNothingWritten(t)
+
+	// Check the state we have at this point is what we would expect.
+	if len(st.nicks) != 1 || len(st.chans) != 0 || len(st.me.chans) != 0 {
+		t.Errorf("Tracker nick/channel lists wrong length after wipe.")
+	}
+	if len(chan1.nicks) != 0 || len(chan2.nicks) != 0 || len(chan3.nicks) != 0 {
+		t.Errorf("Channel nick lists wrong length after wipe.")
+	}
+	if len(nick1.chans) != 0 || len(nick2.chans) != 0 || len(nick3.chans) != 0 {
+		t.Errorf("Nick chan lists wrong length after wipe.")
+	}
+}

@@ -21,6 +21,7 @@ type StateTracker interface {
 	IsOn(channel, nick string) (*ChanPrivs, bool)
 	Associate(channel *Channel, nick *Nick) *ChanPrivs
 	Dissociate(channel *Channel, nick *Nick)
+	Wipe()
 }
 
 // ... and a struct to implement it ...
@@ -37,7 +38,7 @@ type stateTracker struct {
 	l logging.Logger
 }
 
-// ... and finally a constructor to make it.
+// ... and a constructor to make it ...
 func NewTracker(mynick string, l logging.Logger) *stateTracker {
 	st := &stateTracker{
 		chans: make(map[string]*Channel),
@@ -46,6 +47,14 @@ func NewTracker(mynick string, l logging.Logger) *stateTracker {
 	}
 	st.me = st.NewNick(mynick)
 	return st
+}
+
+// ... and a method to wipe the state clean.
+func (st *stateTracker) Wipe() {
+	// Deleting all the channels implicitly deletes every nick but me.
+	for _, ch := range st.chans {
+		st.delChannel(ch)
+	}
 }
 
 /******************************************************************************\
