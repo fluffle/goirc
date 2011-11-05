@@ -6,10 +6,10 @@ import (
 )
 
 func TestSTNewTracker(t *testing.T) {
-	l, m := logging.NewMock()
+	l, m := logging.NewMock(t)
 
 	st := NewTracker("mynick", l)
-	m.CheckNothingWritten(t)
+	m.ExpectNothing()
 
 	if st.l != l {
 		t.Errorf("State tracker's logger not set correctly.")
@@ -26,11 +26,11 @@ func TestSTNewTracker(t *testing.T) {
 }
 
 func TestSTNewNick(t *testing.T) {
-	l, m := logging.NewMock()
+	l, m := logging.NewMock(t)
 	st := NewTracker("mynick", l)
 
 	test1 := st.NewNick("test1")
-	m.CheckNothingWritten(t)
+	m.ExpectNothing()
 
 	if test1 == nil || test1.Nick != "test1" || test1.l != l {
 		t.Errorf("Nick object created incorrectly by NewNick.")
@@ -42,12 +42,11 @@ func TestSTNewNick(t *testing.T) {
 	if fail := st.NewNick("test1"); fail != nil {
 		t.Errorf("Creating duplicate nick did not produce nil return.")
 	}
-	m.CheckWrittenAtLevel(t, logging.Warn,
-		"StateTracker.NewNick(): test1 already tracked.")
+	m.ExpectAt(logging.Warn, "StateTracker.NewNick(): test1 already tracked.")
 }
 
 func TestSTGetNick(t *testing.T) {
-	l, _ := logging.NewMock()
+	l, _ := logging.NewMock(t)
 	st := NewTracker("mynick", l)
 
 	test1 := NewNick("test1", l)
@@ -65,7 +64,7 @@ func TestSTGetNick(t *testing.T) {
 }
 
 func TestSTReNick(t *testing.T) {
-	l, m := logging.NewMock()
+	l, m := logging.NewMock(t)
 	st := NewTracker("mynick", l)
 
 	test1 := NewNick("test1", l)
@@ -78,7 +77,7 @@ func TestSTReNick(t *testing.T) {
 	chan1.addNick(test1, cp)
 
 	st.ReNick("test1", "test2")
-	m.CheckNothingWritten(t)
+	m.ExpectNothing()
 
 	if _, ok := st.nicks["test1"]; ok {
 		t.Errorf("Nick test1 still exists after ReNick.")
@@ -103,8 +102,7 @@ func TestSTReNick(t *testing.T) {
 	st.nicks["test1"] = test2
 
 	st.ReNick("test1", "test2")
-	m.CheckWrittenAtLevel(t, logging.Warn,
-		"StateTracker.ReNick(): test2 already exists.")
+	m.ExpectAt(logging.Warn, "StateTracker.ReNick(): test2 already exists.")
 
 	if n, ok := st.nicks["test2"]; !ok || n != test1 {
 		t.Errorf("Nick test2 overwritten/deleted by ReNick.")
@@ -117,19 +115,18 @@ func TestSTReNick(t *testing.T) {
 	}
 
 	st.ReNick("test3", "test2")
-	m.CheckWrittenAtLevel(t, logging.Warn,
-		"StateTracker.ReNick(): test3 not tracked.")
+	m.ExpectAt(logging.Warn, "StateTracker.ReNick(): test3 not tracked.")
 }
 
 func TestSTDelNick(t *testing.T) {
-	l, m := logging.NewMock()
+	l, m := logging.NewMock(t)
 	st := NewTracker("mynick", l)
 
 	nick1 := NewNick("test1", l)
 	st.nicks["test1"] = nick1
 
 	st.DelNick("test1")
-	m.CheckNothingWritten(t)
+	m.ExpectNothing()
 
 	if _, ok := st.nicks["test1"]; ok {
 		t.Errorf("Nick test1 still exists after DelNick.")
@@ -141,8 +138,7 @@ func TestSTDelNick(t *testing.T) {
 	st.nicks["test1"] = nick1
 
 	st.DelNick("test2")
-	m.CheckWrittenAtLevel(t, logging.Warn,
-		"StateTracker.DelNick(): test2 not tracked.")
+	m.ExpectAt(logging.Warn, "StateTracker.DelNick(): test2 not tracked.")
 
 	if len(st.nicks) != 2 {
 		t.Errorf("Deleting unknown nick had unexpected side-effects.")
@@ -150,8 +146,7 @@ func TestSTDelNick(t *testing.T) {
 
 	// Deleting my nick shouldn't work
 	st.DelNick("mynick")
-	m.CheckWrittenAtLevel(t, logging.Warn,
-		"StateTracker.DelNick(): won't delete myself.")
+	m.ExpectAt(logging.Warn, "StateTracker.DelNick(): won't delete myself.")
 
 	if len(st.nicks) != 2 {
 		t.Errorf("Deleting myself had unexpected side-effects.")
@@ -181,7 +176,7 @@ func TestSTDelNick(t *testing.T) {
 	}
 
 	st.DelNick("test1")
-	m.CheckNothingWritten(t)
+	m.ExpectNothing()
 
 	// Actual deletion tested above...
 	if len(chan1.nicks) != 1 || len(st.chans) != 1 ||
@@ -198,7 +193,7 @@ func TestSTDelNick(t *testing.T) {
 }
 
 func TestSTNewChannel(t *testing.T) {
-	l, m := logging.NewMock()
+	l, m := logging.NewMock(t)
 	st := NewTracker("mynick", l)
 
 	if len(st.chans) != 0 {
@@ -206,7 +201,7 @@ func TestSTNewChannel(t *testing.T) {
 	}
 
 	test1 := st.NewChannel("#test1")
-	m.CheckNothingWritten(t)
+	m.ExpectNothing()
 
 	if test1 == nil || test1.Name != "#test1" || test1.l != l {
 		t.Errorf("Channel object created incorrectly by NewChannel.")
@@ -218,12 +213,11 @@ func TestSTNewChannel(t *testing.T) {
 	if fail := st.NewChannel("#test1"); fail != nil {
 		t.Errorf("Creating duplicate chan did not produce nil return.")
 	}
-	m.CheckWrittenAtLevel(t, logging.Warn,
-		"StateTracker.NewChannel(): #test1 already tracked.")
+	m.ExpectAt(logging.Warn, "StateTracker.NewChannel(): #test1 already tracked.")
 }
 
 func TestSTGetChannel(t *testing.T) {
-	l, _ := logging.NewMock()
+	l, _ := logging.NewMock(t)
 	st := NewTracker("mynick", l)
 
 	test1 := NewChannel("#test1", l)
@@ -241,14 +235,14 @@ func TestSTGetChannel(t *testing.T) {
 }
 
 func TestSTDelChannel(t *testing.T) {
-	l, m := logging.NewMock()
+	l, m := logging.NewMock(t)
 	st := NewTracker("mynick", l)
 
 	chan1 := NewChannel("#test1", l)
 	st.chans["#test1"] = chan1
 
 	st.DelChannel("#test1")
-	m.CheckNothingWritten(t)
+	m.ExpectNothing()
 
 	if _, ok := st.chans["#test1"]; ok {
 		t.Errorf("Channel test1 still exists after DelChannel.")
@@ -260,8 +254,7 @@ func TestSTDelChannel(t *testing.T) {
 	st.chans["#test1"] = chan1
 
 	st.DelChannel("#test2")
-	m.CheckWrittenAtLevel(t, logging.Warn,
-		"StateTracker.DelChannel(): #test2 not tracked.")
+	m.ExpectAt(logging.Warn, "StateTracker.DelChannel(): #test2 not tracked.")
 
 	if len(st.chans) != 1 {
 		t.Errorf("DelChannel had unexpected side-effects.")
@@ -294,7 +287,7 @@ func TestSTDelChannel(t *testing.T) {
 	}
 
 	st.DelChannel("#test1")
-	m.CheckNothingWritten(t)
+	m.ExpectNothing()
 
 	// Test intermediate state. We're still on #test2 with test1, so test1
 	// shouldn't be deleted from state tracking itself just yet.
@@ -311,7 +304,7 @@ func TestSTDelChannel(t *testing.T) {
 	}
 
 	st.DelChannel("#test2")
-	m.CheckNothingWritten(t)
+	m.ExpectNothing()
 
 	// Test final state. Deleting #test2 means that we're no longer on any
 	// common channels with test1, and thus it should be removed from tracking.
@@ -329,7 +322,7 @@ func TestSTDelChannel(t *testing.T) {
 }
 
 func TestSTIsOn(t *testing.T) {
-	l, m := logging.NewMock()
+	l, m := logging.NewMock(t)
 	st := NewTracker("mynick", l)
 
 	nick1 := NewNick("test1", l)
@@ -346,50 +339,45 @@ func TestSTIsOn(t *testing.T) {
 	if priv, ok := st.IsOn("#test1", "test1"); !ok || priv != cp {
 		t.Errorf("test1 is on #test1 (now)")
 	}
-	m.CheckNothingWritten(t)
+	m.ExpectNothing()
 }
 
 func TestSTAssociate(t *testing.T) {
-	l, m := logging.NewMock()
+	l, m := logging.NewMock(t)
 	st := NewTracker("mynick", l)
 
 	nick1 := st.NewNick("test1")
 	chan1 := st.NewChannel("#test1")
 
 	cp := st.Associate(chan1, nick1)
-	m.CheckNothingWritten(t)
+	m.ExpectNothing()
 	if priv, ok := st.IsOn("#test1", "test1"); !ok || cp != priv {
 		t.Errorf("test1 was not associated with #test1.")
 	}
 
 	// Test error cases
 	st.Associate(nil, nick1)
-	m.CheckWrittenAtLevel(t, logging.Error,
-		"StateTracker.Associate(): passed nil values :-(")
+	m.ExpectAt(logging.Error, "StateTracker.Associate(): passed nil values :-(")
 
 	st.Associate(chan1, nil)
-	m.CheckWrittenAtLevel(t, logging.Error,
-		"StateTracker.Associate(): passed nil values :-(")
+	m.ExpectAt(logging.Error, "StateTracker.Associate(): passed nil values :-(")
 
 	st.Associate(chan1, nick1)
-	m.CheckWrittenAtLevel(t, logging.Warn,
-		"StateTracker.Associate(): test1 already on #test1.")
+	m.ExpectAt(logging.Warn, "StateTracker.Associate(): test1 already on #test1.")
 
 	nick2 := NewNick("test2", l)
 	st.Associate(chan1, nick2)
-	m.CheckWrittenAtLevel(t, logging.Error,
-		"StateTracker.Associate(): nick test2 not found in (or differs from) "+
-		"internal state.")
+	m.ExpectAt(logging.Error, "StateTracker.Associate(): nick test2 not found "+
+		"in (or differs from) internal state.")
 
 	chan2 := NewChannel("#test2", l)
 	st.Associate(chan2, nick1)
-	m.CheckWrittenAtLevel(t, logging.Error,
-		"StateTracker.Associate(): channel #test2 not found in (or differs "+
-		"from) internal state.")
+	m.ExpectAt(logging.Error, "StateTracker.Associate(): channel #test2 not "+
+		"found in (or differs from) internal state.")
 }
 
 func TestSTDissociate(t *testing.T) {
-	l, m := logging.NewMock()
+	l, m := logging.NewMock(t)
 	st := NewTracker("mynick", l)
 
 	nick1 := st.NewNick("test1")
@@ -410,7 +398,7 @@ func TestSTDissociate(t *testing.T) {
 
 	// First, test the case of me leaving #test2
 	st.Dissociate(chan2, st.me)
-	m.CheckNothingWritten(t)
+	m.ExpectNothing()
 
 	// This should have resulted in the complete deletion of the channel.
 	if len(chan1.nicks) != 2 || len(chan2.nicks) != 0 || len(st.nicks) != 2 ||
@@ -422,7 +410,7 @@ func TestSTDissociate(t *testing.T) {
 	chan2 = st.NewChannel("#test2")
 	st.Associate(chan2, st.me)
 	st.Associate(chan2, nick1)
-	m.CheckNothingWritten(t)
+	m.ExpectNothing()
 
 	// Check state once moar.
 	if len(chan1.nicks) != 2 || len(chan2.nicks) != 2 || len(st.nicks) != 2 ||
@@ -433,7 +421,7 @@ func TestSTDissociate(t *testing.T) {
 	// Now, lets dissociate test1 from #test1 then #test2.
 	// This first one should only result in a change in associations.
 	st.Dissociate(chan1, nick1)
-	m.CheckNothingWritten(t)
+	m.ExpectNothing()
 
 	if len(chan1.nicks) != 1 || len(chan2.nicks) != 2 || len(st.nicks) != 2 ||
 		len(st.me.chans) != 2 || len(nick1.chans) != 1 || len(st.chans) != 2 {
@@ -443,7 +431,7 @@ func TestSTDissociate(t *testing.T) {
 	// This second one should also delete test1
 	// as it's no longer on any common channels with us
 	st.Dissociate(chan2, nick1)
-	m.CheckNothingWritten(t)
+	m.ExpectNothing()
 
 	if len(chan1.nicks) != 1 || len(chan2.nicks) != 1 || len(st.nicks) != 1 ||
 		len(st.me.chans) != 2 || len(nick1.chans) != 0 || len(st.chans) != 2 {
@@ -454,32 +442,27 @@ func TestSTDissociate(t *testing.T) {
 	// test1 was deleted above, so "re-track" it for this test.
 	nick1 = st.NewNick("test1")
 	st.Dissociate(chan1, nick1)
-	m.CheckWrittenAtLevel(t, logging.Warn,
-		"StateTracker.Dissociate(): test1 not on #test1.")
+	m.ExpectAt(logging.Warn, "StateTracker.Dissociate(): test1 not on #test1.")
 
 	st.Dissociate(chan1, nil)
-	m.CheckWrittenAtLevel(t, logging.Error,
-		"StateTracker.Dissociate(): passed nil values :-(")
+	m.ExpectAt(logging.Error, "StateTracker.Dissociate(): passed nil values :-(")
 
 	st.Dissociate(nil, nick1)
-	m.CheckWrittenAtLevel(t, logging.Error,
-		"StateTracker.Dissociate(): passed nil values :-(")
+	m.ExpectAt(logging.Error, "StateTracker.Dissociate(): passed nil values :-(")
 
 	nick3 := NewNick("test3", l)
 	st.Dissociate(chan1, nick3)
-	m.CheckWrittenAtLevel(t, logging.Error,
-		"StateTracker.Dissociate(): nick test3 not found in (or differs from) "+
-		"internal state.")
+	m.ExpectAt(logging.Error, "StateTracker.Dissociate(): nick test3 not "+
+		"found in (or differs from) internal state.")
 
 	chan3 := NewChannel("#test3", l)
 	st.Dissociate(chan3, nick1)
-	m.CheckWrittenAtLevel(t, logging.Error,
-		"StateTracker.Dissociate(): channel #test3 not found in (or differs "+
-		"from) internal state.")
+	m.ExpectAt(logging.Error, "StateTracker.Dissociate(): channel #test3 not "+
+		"found in (or differs from) internal state.")
 }
 
 func TestSTWipe(t *testing.T) {
-	l, m := logging.NewMock()
+	l, m := logging.NewMock(t)
 	st := NewTracker("mynick", l)
 
 	nick1 := st.NewNick("test1")
@@ -504,7 +487,7 @@ func TestSTWipe(t *testing.T) {
 
 	st.Associate(chan1, nick3)
 
-	m.CheckNothingWritten(t)
+	m.ExpectNothing()
 
 	// Check the state we have at this point is what we would expect.
 	if len(st.nicks) != 4 || len(st.chans) != 3 || len(st.me.chans) != 3 {
@@ -519,7 +502,7 @@ func TestSTWipe(t *testing.T) {
 
 	// Nuke *all* the state!
 	st.Wipe()
-	m.CheckNothingWritten(t)
+	m.ExpectNothing()
 
 	// Check the state we have at this point is what we would expect.
 	if len(st.nicks) != 1 || len(st.chans) != 0 || len(st.me.chans) != 0 {

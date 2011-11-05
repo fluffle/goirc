@@ -6,7 +6,7 @@ import (
 )
 
 func TestNewNick(t *testing.T) {
-	l, _ := logging.NewMock()
+	l, _ := logging.NewMock(t)
 	nk := NewNick("test1", l)
 
 	if nk.Nick != "test1" || nk.l != l {
@@ -18,13 +18,13 @@ func TestNewNick(t *testing.T) {
 }
 
 func TestAddChannel(t *testing.T) {
-	l, m := logging.NewMock()
+	l, m := logging.NewMock(t)
 	nk := NewNick("test1", l)
 	ch := NewChannel("#test1", l)
 	cp := new(ChanPrivs)
 
 	nk.addChannel(ch, cp)
-	m.CheckNothingWritten(t)
+	m.ExpectNothing()
 
 	if len(nk.chans) != 1 || len(nk.lookup) != 1 {
 		t.Errorf("Channel lists not updated correctly for add.")
@@ -37,20 +37,18 @@ func TestAddChannel(t *testing.T) {
 	}
 
 	nk.addChannel(ch, cp)
-	m.CheckWrittenAtLevel(t, logging.Warn,
-		"Nick.addChannel(): test1 already on #test1.")
+	m.ExpectAt(logging.Warn, "Nick.addChannel(): test1 already on #test1.")
 }
 
 func TestDelChannel(t *testing.T) {
-	l, m := logging.NewMock()
+	l, m := logging.NewMock(t)
 	nk := NewNick("test1", l)
 	ch := NewChannel("#test1", l)
 	cp := new(ChanPrivs)
 
 	// Testing the error state first is easier
 	nk.delChannel(ch)
-	m.CheckWrittenAtLevel(t, logging.Warn,
-		"Nick.delChannel(): test1 not on #test1.")
+	m.ExpectAt(logging.Warn, "Nick.delChannel(): test1 not on #test1.")
 
 	nk.addChannel(ch, cp)
 	nk.delChannel(ch)
@@ -66,7 +64,7 @@ func TestDelChannel(t *testing.T) {
 }
 
 func TestNickParseModes(t *testing.T) {
-	l, m := logging.NewMock()
+	l, m := logging.NewMock(t)
 	nk := NewNick("test1", l)
 	md := nk.Modes
 
@@ -81,7 +79,7 @@ func TestNickParseModes(t *testing.T) {
 
 	// Parse a mode line that flips one true to false and two false to true
 	nk.ParseModes("+z-x+w")
-	m.CheckNothingWritten(t)
+	m.ExpectNothing()
 
 	if !md.Invisible || md.Oper || !md.WallOps || md.HiddenHost || !md.SSL {
 		t.Errorf("Modes not flipped correctly by ParseModes.")
@@ -89,6 +87,5 @@ func TestNickParseModes(t *testing.T) {
 
 	// Check that passing an unknown mode char results in an info log
 	nk.ParseModes("+d")
-	m.CheckWrittenAtLevel(t, logging.Info,
-		"Nick.ParseModes(): unknown mode char d")
+	m.ExpectAt(logging.Info, "Nick.ParseModes(): unknown mode char d")
 }

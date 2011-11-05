@@ -6,7 +6,7 @@ import (
 )
 
 func TestNewChannel(t *testing.T) {
-	l, _ := logging.NewMock()
+	l, _ := logging.NewMock(t)
 	ch := NewChannel("#test1", l)
 
 	if ch.Name != "#test1" || ch.l != l {
@@ -18,13 +18,13 @@ func TestNewChannel(t *testing.T) {
 }
 
 func TestAddNick(t *testing.T) {
-	l, m := logging.NewMock()
+	l, m := logging.NewMock(t)
 	ch := NewChannel("#test1", l)
 	nk := NewNick("test1", l)
 	cp := new(ChanPrivs)
 
 	ch.addNick(nk, cp)
-	m.CheckNothingWritten(t)
+	m.ExpectNothing()
 
 	if len(ch.nicks) != 1 || len(ch.lookup) != 1 {
 		t.Errorf("Nick lists not updated correctly for add.")
@@ -37,20 +37,18 @@ func TestAddNick(t *testing.T) {
 	}
 
 	ch.addNick(nk, cp)
-	m.CheckWrittenAtLevel(t, logging.Warn,
-		"Channel.addNick(): test1 already on #test1.")
+	m.ExpectAt(logging.Warn, "Channel.addNick(): test1 already on #test1.")
 }
 
 func TestDelNick(t *testing.T) {
-	l, m := logging.NewMock()
+	l, m := logging.NewMock(t)
 	ch := NewChannel("#test1", l)
 	nk := NewNick("test1", l)
 	cp := new(ChanPrivs)
 
 	// Testing the error state first is easier
 	ch.delNick(nk)
-	m.CheckWrittenAtLevel(t, logging.Warn,
-		"Channel.delNick(): test1 not on #test1.")
+	m.ExpectAt(logging.Warn, "Channel.delNick(): test1 not on #test1.")
 
 	ch.addNick(nk, cp)
 	ch.delNick(nk)
@@ -66,7 +64,7 @@ func TestDelNick(t *testing.T) {
 }
 
 func TestChannelParseModes(t *testing.T) {
-	l, m := logging.NewMock()
+	l, m := logging.NewMock(t)
 	ch := NewChannel("#test1", l)
 	md := ch.Modes
 
@@ -88,7 +86,7 @@ func TestChannelParseModes(t *testing.T) {
 
 	// Flip some MOAR bits.
 	ch.ParseModes("+s-p+tm-i")
-	m.CheckNothingWritten(t)
+	m.ExpectNothing()
 
 	if md.Private || !md.Secret || !md.ProtectedTopic || !md.NoExternalMsg ||
 		!md.Moderated || md.InviteOnly || md.OperOnly || md.SSLOnly {
@@ -102,14 +100,14 @@ func TestChannelParseModes(t *testing.T) {
 
 	// enable limit correctly
 	ch.ParseModes("+l", "256")
-	m.CheckNothingWritten(t)
+	m.ExpectNothing()
 	if md.Limit != 256 {
 		t.Errorf("Limit for channel not set correctly")
 	}
 
 	// enable limit incorrectly
 	ch.ParseModes("+l")
-	m.CheckWrittenAtLevel(t, logging.Warn,
+	m.ExpectAt(logging.Warn,
 		"Channel.ParseModes(): not enough arguments to process MODE #test1 +l")
 	if md.Limit != 256 {
 		t.Errorf("Bad limit value caused limit to be unset.")
@@ -117,7 +115,7 @@ func TestChannelParseModes(t *testing.T) {
 
 	// disable limit correctly
 	ch.ParseModes("-l")
-	m.CheckNothingWritten(t)
+	m.ExpectNothing()
 	if md.Limit != 0 {
 		t.Errorf("Limit for channel not unset correctly")
 	}
@@ -129,14 +127,14 @@ func TestChannelParseModes(t *testing.T) {
 
 	// enable key correctly
 	ch.ParseModes("+k", "foobar")
-	m.CheckNothingWritten(t)
+	m.ExpectNothing()
 	if md.Key != "foobar" {
 		t.Errorf("Key for channel not set correctly")
 	}
 
 	// enable key incorrectly
 	ch.ParseModes("+k")
-	m.CheckWrittenAtLevel(t, logging.Warn,
+	m.ExpectAt(logging.Warn,
 		"Channel.ParseModes(): not enough arguments to process MODE #test1 +k")
 	if md.Key != "foobar" {
 		t.Errorf("Bad key value caused key to be unset.")
@@ -144,7 +142,7 @@ func TestChannelParseModes(t *testing.T) {
 
 	// disable key correctly
 	ch.ParseModes("-k")
-	m.CheckNothingWritten(t)
+	m.ExpectNothing()
 	if md.Key != "" {
 		t.Errorf("Key for channel not unset correctly")
 	}
@@ -153,24 +151,24 @@ func TestChannelParseModes(t *testing.T) {
 	cp.Op = true
 	cp.HalfOp = true
 	ch.ParseModes("+aq-o", "test1", "test1", "test1")
-	m.CheckNothingWritten(t)
+	m.ExpectNothing()
 
 	if !cp.Owner || !cp.Admin || cp.Op || !cp.HalfOp || cp.Voice {
 		t.Errorf("Channel privileges not flipped correctly by ParseModes.")
 	}
 
 	ch.ParseModes("+v", "test2")
-	m.CheckWrittenAtLevel(t, logging.Warn,
+	m.ExpectAt(logging.Warn,
 		"Channel.ParseModes(): untracked nick test2 received MODE on channel #test1")
 
 	ch.ParseModes("-v")
-	m.CheckWrittenAtLevel(t, logging.Warn,
+	m.ExpectAt(logging.Warn,
 		"Channel.ParseModes(): not enough arguments to process MODE #test1 -v")
 	
 	// Test a random mix of modes, just to be sure
 	md.Limit = 256
 	ch.ParseModes("+zpt-qsl+kv-h", "test1", "foobar", "test1")
-	m.CheckWrittenAtLevel(t, logging.Warn,
+	m.ExpectAt(logging.Warn,
 		"Channel.ParseModes(): not enough arguments to process MODE #test1 -h")
 
 	if !md.Private || md.Secret || !md.ProtectedTopic || !md.NoExternalMsg ||
@@ -187,6 +185,5 @@ func TestChannelParseModes(t *testing.T) {
 	
 	// Finally, check we get an info log for an unrecognised mode character
 	ch.ParseModes("+d")
-	m.CheckWrittenAtLevel(t, logging.Info,
-		"Channel.ParseModes(): unknown mode char d")
+	m.ExpectAt(logging.Info, "Channel.ParseModes(): unknown mode char d")
 }
