@@ -1,15 +1,16 @@
 package state
 
 import (
-	"github.com/fluffle/goirc/logging"
 	"testing"
 )
 
 func TestNewNick(t *testing.T) {
-	l, _ := logging.NewMock(t)
-	nk := NewNick("test1", l)
+	_, s := setUp(t)
+	defer s.tearDown()
 
-	if nk.Nick != "test1" || nk.l != l {
+	nk := NewNick("test1", s.log)
+
+	if nk.Nick != "test1" || nk.l != s.log {
 		t.Errorf("Nick not created correctly by NewNick()")
 	}
 	if len(nk.chans) != 0 || len(nk.lookup) != 0 {
@@ -18,13 +19,14 @@ func TestNewNick(t *testing.T) {
 }
 
 func TestAddChannel(t *testing.T) {
-	l, m := logging.NewMock(t)
-	nk := NewNick("test1", l)
-	ch := NewChannel("#test1", l)
+	_, s := setUp(t)
+	defer s.tearDown()
+
+	nk := NewNick("test1", s.log)
+	ch := NewChannel("#test1", s.log)
 	cp := new(ChanPrivs)
 
 	nk.addChannel(ch, cp)
-	m.ExpectNothing()
 
 	if len(nk.chans) != 1 || len(nk.lookup) != 1 {
 		t.Errorf("Channel lists not updated correctly for add.")
@@ -36,19 +38,22 @@ func TestAddChannel(t *testing.T) {
 		t.Errorf("Channel #test1 not properly stored in lookup map.")
 	}
 
+	s.log.EXPECT().Warn("Nick.addChannel(): %s already on %s.",
+		"test1", "#test1")
 	nk.addChannel(ch, cp)
-	m.ExpectAt(logging.Warn, "Nick.addChannel(): test1 already on #test1.")
 }
 
 func TestDelChannel(t *testing.T) {
-	l, m := logging.NewMock(t)
-	nk := NewNick("test1", l)
-	ch := NewChannel("#test1", l)
+	_, s := setUp(t)
+	defer s.tearDown()
+
+	nk := NewNick("test1", s.log)
+	ch := NewChannel("#test1", s.log)
 	cp := new(ChanPrivs)
 
 	// Testing the error state first is easier
+	s.log.EXPECT().Warn("Nick.delChannel(): %s not on %s.", "test1", "#test1")
 	nk.delChannel(ch)
-	m.ExpectAt(logging.Warn, "Nick.delChannel(): test1 not on #test1.")
 
 	nk.addChannel(ch, cp)
 	nk.delChannel(ch)
@@ -64,8 +69,10 @@ func TestDelChannel(t *testing.T) {
 }
 
 func TestNickParseModes(t *testing.T) {
-	l, m := logging.NewMock(t)
-	nk := NewNick("test1", l)
+	_, s := setUp(t)
+	defer s.tearDown()
+
+	nk := NewNick("test1", s.log)
 	md := nk.Modes
 
 	// Modes should all be false for a new nick
@@ -79,13 +86,21 @@ func TestNickParseModes(t *testing.T) {
 
 	// Parse a mode line that flips one true to false and two false to true
 	nk.ParseModes("+z-x+w")
-	m.ExpectNothing()
 
 	if !md.Invisible || md.Oper || !md.WallOps || md.HiddenHost || !md.SSL {
 		t.Errorf("Modes not flipped correctly by ParseModes.")
 	}
 
 	// Check that passing an unknown mode char results in an info log
+	// The cast to byte here is needed to pass; gomock uses reflect.DeepEqual
+	// to examine argument equality, but 'd' (when not implicitly coerced to a
+	// uint8 by the type system) is an int, whereas string("+d")[1] is not.
+	// This type difference (despite the values being nominally the same)
+	// causes the test to fail with the following confusing error.
+	//
+	// no matching expected call: *logging.MockLogger.Info([Nick.ParseModes(): unknown mode char %c [100]])
+	// missing call(s) to *logging.MockLogger.Info(is equal to Nick.ParseModes(): unknown mode char %c, is equal to [100])
+
+	s.log.EXPECT().Info("Nick.ParseModes(): unknown mode char %c", byte('d'))
 	nk.ParseModes("+d")
-	m.ExpectAt(logging.Info, "Nick.ParseModes(): unknown mode char d")
 }

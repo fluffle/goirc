@@ -1,15 +1,16 @@
 package state
 
 import (
-	"github.com/fluffle/goirc/logging"
 	"testing"
 )
 
 func TestNewChannel(t *testing.T) {
-	l, _ := logging.NewMock(t)
-	ch := NewChannel("#test1", l)
+	_, s := setUp(t)
+	defer s.tearDown()
 
-	if ch.Name != "#test1" || ch.l != l {
+	ch := NewChannel("#test1", s.log)
+
+	if ch.Name != "#test1" || ch.l != s.log {
 		t.Errorf("Channel not created correctly by NewChannel()")
 	}
 	if len(ch.nicks) != 0 || len(ch.lookup) != 0 {
@@ -18,13 +19,14 @@ func TestNewChannel(t *testing.T) {
 }
 
 func TestAddNick(t *testing.T) {
-	l, m := logging.NewMock(t)
-	ch := NewChannel("#test1", l)
-	nk := NewNick("test1", l)
+	_, s := setUp(t)
+	defer s.tearDown()
+
+	ch := NewChannel("#test1", s.log)
+	nk := NewNick("test1", s.log)
 	cp := new(ChanPrivs)
 
 	ch.addNick(nk, cp)
-	m.ExpectNothing()
 
 	if len(ch.nicks) != 1 || len(ch.lookup) != 1 {
 		t.Errorf("Nick lists not updated correctly for add.")
@@ -36,19 +38,23 @@ func TestAddNick(t *testing.T) {
 		t.Errorf("Nick test1 not properly stored in lookup map.")
 	}
 
+	s.log.EXPECT().Warn("Channel.addNick(): %s already on %s.",
+		"test1", "#test1")
 	ch.addNick(nk, cp)
-	m.ExpectAt(logging.Warn, "Channel.addNick(): test1 already on #test1.")
 }
 
 func TestDelNick(t *testing.T) {
-	l, m := logging.NewMock(t)
-	ch := NewChannel("#test1", l)
-	nk := NewNick("test1", l)
+	_, s := setUp(t)
+	defer s.tearDown()
+
+	ch := NewChannel("#test1", s.log)
+	nk := NewNick("test1", s.log)
 	cp := new(ChanPrivs)
 
 	// Testing the error state first is easier
+	s.log.EXPECT().Warn("Channel.delNick(): %s not on %s.",
+		"test1", "#test1")
 	ch.delNick(nk)
-	m.ExpectAt(logging.Warn, "Channel.delNick(): test1 not on #test1.")
 
 	ch.addNick(nk, cp)
 	ch.delNick(nk)
@@ -64,12 +70,14 @@ func TestDelNick(t *testing.T) {
 }
 
 func TestChannelParseModes(t *testing.T) {
-	l, m := logging.NewMock(t)
-	ch := NewChannel("#test1", l)
+	_, s := setUp(t)
+	defer s.tearDown()
+
+	ch := NewChannel("#test1", s.log)
 	md := ch.Modes
 
 	// Channel modes can adjust channel privs too, so we need a Nick
-	nk := NewNick("test1", l)
+	nk := NewNick("test1", s.log)
 	cp := new(ChanPrivs)
 	ch.addNick(nk, cp)
 
@@ -86,7 +94,6 @@ func TestChannelParseModes(t *testing.T) {
 
 	// Flip some MOAR bits.
 	ch.ParseModes("+s-p+tm-i")
-	m.ExpectNothing()
 
 	if md.Private || !md.Secret || !md.ProtectedTopic || !md.NoExternalMsg ||
 		!md.Moderated || md.InviteOnly || md.OperOnly || md.SSLOnly {
@@ -100,22 +107,20 @@ func TestChannelParseModes(t *testing.T) {
 
 	// enable limit correctly
 	ch.ParseModes("+l", "256")
-	m.ExpectNothing()
 	if md.Limit != 256 {
 		t.Errorf("Limit for channel not set correctly")
 	}
 
-	// enable limit incorrectly
+	// enable limit incorrectly. see nick_test.go for why the byte() cast.
+	s.log.EXPECT().Warn("Channel.ParseModes(): not enough arguments to "+
+		"process MODE %s %s%c", "#test1", "+", byte('l'))
 	ch.ParseModes("+l")
-	m.ExpectAt(logging.Warn,
-		"Channel.ParseModes(): not enough arguments to process MODE #test1 +l")
 	if md.Limit != 256 {
 		t.Errorf("Bad limit value caused limit to be unset.")
 	}
 
 	// disable limit correctly
 	ch.ParseModes("-l")
-	m.ExpectNothing()
 	if md.Limit != 0 {
 		t.Errorf("Limit for channel not unset correctly")
 	}
@@ -127,22 +132,20 @@ func TestChannelParseModes(t *testing.T) {
 
 	// enable key correctly
 	ch.ParseModes("+k", "foobar")
-	m.ExpectNothing()
 	if md.Key != "foobar" {
 		t.Errorf("Key for channel not set correctly")
 	}
 
 	// enable key incorrectly
+	s.log.EXPECT().Warn("Channel.ParseModes(): not enough arguments to "+
+		"process MODE %s %s%c", "#test1", "+", byte('k'))
 	ch.ParseModes("+k")
-	m.ExpectAt(logging.Warn,
-		"Channel.ParseModes(): not enough arguments to process MODE #test1 +k")
 	if md.Key != "foobar" {
 		t.Errorf("Bad key value caused key to be unset.")
 	}
 
 	// disable key correctly
 	ch.ParseModes("-k")
-	m.ExpectNothing()
 	if md.Key != "" {
 		t.Errorf("Key for channel not unset correctly")
 	}
@@ -151,25 +154,24 @@ func TestChannelParseModes(t *testing.T) {
 	cp.Op = true
 	cp.HalfOp = true
 	ch.ParseModes("+aq-o", "test1", "test1", "test1")
-	m.ExpectNothing()
 
 	if !cp.Owner || !cp.Admin || cp.Op || !cp.HalfOp || cp.Voice {
 		t.Errorf("Channel privileges not flipped correctly by ParseModes.")
 	}
 
+	s.log.EXPECT().Warn("Channel.ParseModes(): untracked nick %s "+
+		"received MODE on channel %s", "test2", "#test1")
 	ch.ParseModes("+v", "test2")
-	m.ExpectAt(logging.Warn,
-		"Channel.ParseModes(): untracked nick test2 received MODE on channel #test1")
 
+	s.log.EXPECT().Warn("Channel.ParseModes(): not enough arguments to "+
+		"process MODE %s %s%c", "#test1", "-", byte('v'))
 	ch.ParseModes("-v")
-	m.ExpectAt(logging.Warn,
-		"Channel.ParseModes(): not enough arguments to process MODE #test1 -v")
-	
+
 	// Test a random mix of modes, just to be sure
 	md.Limit = 256
+	s.log.EXPECT().Warn("Channel.ParseModes(): not enough arguments to "+
+		"process MODE %s %s%c", "#test1", "-", byte('h'))
 	ch.ParseModes("+zpt-qsl+kv-h", "test1", "foobar", "test1")
-	m.ExpectAt(logging.Warn,
-		"Channel.ParseModes(): not enough arguments to process MODE #test1 -h")
 
 	if !md.Private || md.Secret || !md.ProtectedTopic || !md.NoExternalMsg ||
 		!md.Moderated || md.InviteOnly || md.OperOnly || !md.SSLOnly {
@@ -182,8 +184,8 @@ func TestChannelParseModes(t *testing.T) {
 		// NOTE: HalfOp not actually unset above thanks to deliberate error.
 		t.Errorf("Channel privileges not flipped correctly by ParseModes (2).")
 	}
-	
+
 	// Finally, check we get an info log for an unrecognised mode character
+	s.log.EXPECT().Info("Channel.ParseModes(): unknown mode char %c", byte('d'))
 	ch.ParseModes("+d")
-	m.ExpectAt(logging.Info, "Channel.ParseModes(): unknown mode char d")
 }
