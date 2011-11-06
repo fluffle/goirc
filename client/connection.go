@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"github.com/fluffle/goirc/event"
 	"github.com/fluffle/goirc/logging"
+	"github.com/fluffle/goirc/state"
 	"fmt"
 	"net"
 	"os"
@@ -20,15 +21,19 @@ const (
 type Conn struct {
 	// Connection Hostname and Nickname
 	Host    string
-	Me      *Nick
+	Me      *state.Nick
 	Network string
 
 	// Event handler registry and dispatcher
-	Registry   event.EventRegistry
-	Dispatcher event.EventDispatcher
+	ER event.EventRegistry
+	ED event.EventDispatcher
 
 	// State tracker for nicks and channels
-	Tracker StateTracker
+	ST state.StateTracker
+	st bool
+
+	// Logger for debugging/warning/etc output
+	l logging.Logger
 
 	// Use the State field to store external state that handlers might need.
 	// Remember ... you might need locking for this ;-)
@@ -61,11 +66,20 @@ type Conn struct {
 
 // Creates a new IRC connection object, but doesn't connect to anything so
 // that you can add event handlers to it. See AddHandler() for details.
-func New(nick, user, name string) *Conn {
-	reg := event.NewRegistry()
+// Dependency injection is a bitch :-/
+func New(nick, user, name string, st bool,
+	r event.EventRegistry, l logging.Logger) *Conn {
+	if r == nil {
+		r = event.NewRegistry()
+	}
+	if l == nil {
+		l = logging.NewFromFlags()
+	}
 	conn := &Conn{
-		Registry:   reg,
-		Dispatcher: reg,
+		ER:         r,
+		ED:         r,
+		l:          l,
+		st:         st,
 		in:         make(chan *Line, 32),
 		out:        make(chan string, 32),
 		cSend:      make(chan bool),
@@ -77,23 +91,27 @@ func New(nick, user, name string) *Conn {
 		badness:    0,
 		lastsent:   0,
 	}
+	conn.addIntHandlers()
+	if st {
+		conn.ST = state.NewTracker(nick, l)
+		conn.Me = conn.ST.Me()
+		conn.addSTHandlers()
+	} else {
+		conn.Me = state.NewNick(nick, l)
+	}
+	conn.Me.Ident = user
+	conn.Me.Name = name
+
 	conn.initialise()
-	conn.SetupHandlers()
-	conn.Me = conn.NewNick(nick, user, name, "")
 	return conn
 }
 
 // Per-connection state initialisation.
 func (conn *Conn) initialise() {
-	conn.nicks = make(map[string]*Nick)
-	conn.chans = make(map[string]*Channel)
 	conn.io = nil
 	conn.sock = nil
-
-	// If this is being called because we are reconnecting, conn.Me
-	// will still have all the old channels referenced -- nuke them!
-	if conn.Me != nil {
-		conn.Me = conn.NewNick(conn.Me.Nick, conn.Me.Ident, conn.Me.Name, "")
+	if conn.st {
+		conn.ST.Wipe()
 	}
 }
 
@@ -113,7 +131,7 @@ func (conn *Conn) Connect(host string, pass ...string) os.Error {
 		if !hasPort(host) {
 			host += ":6697"
 		}
-		logging.Info("irc.Connect(): Connecting to %s with SSL.", host)
+		conn.l.Info("irc.Connect(): Connecting to %s with SSL.", host)
 		if s, err := tls.Dial("tcp", host, conn.SSLConfig); err == nil {
 			conn.sock = s
 		} else {
@@ -123,7 +141,7 @@ func (conn *Conn) Connect(host string, pass ...string) os.Error {
 		if !hasPort(host) {
 			host += ":6667"
 		}
-		logging.Info("irc.Connect(): Connecting to %s without SSL.", host)
+		conn.l.Info("irc.Connect(): Connecting to %s without SSL.", host)
 		if s, err := net.Dial("tcp", host); err == nil {
 			conn.sock = s
 		} else {
@@ -176,16 +194,18 @@ func (conn *Conn) recv() {
 	for {
 		s, err := conn.io.ReadString('\n')
 		if err != nil {
-			logging.Error("irc.recv(): %s", err.String())
+			conn.l.Error("irc.recv(): %s", err.String())
 			conn.shutdown()
 			return
 		}
 		s = strings.Trim(s, "\r\n")
-		logging.Debug("<- %s", s)
+		conn.l.Debug("<- %s", s)
 
 		if line := parseLine(s); line != nil {
 			line.Time = time.LocalTime()
 			conn.in <- line
+		} else {
+			conn.l.Warn("irc.recv(): problems parsing line:\n  %s", s)
 		}
 	}
 }
@@ -195,7 +215,7 @@ func (conn *Conn) runLoop() {
 	for {
 		select {
 		case line := <-conn.in:
-			conn.Dispatcher.Dispatch(line.Cmd, conn, line)
+			conn.ED.Dispatch(line.Cmd, conn, line)
 		case <-conn.cLoop:
 			// strobe on control channel, bail out
 			return
@@ -211,12 +231,12 @@ func (conn *Conn) write(line string) {
 	}
 
 	if _, err := conn.io.WriteString(line + "\r\n"); err != nil {
-		logging.Error("irc.send(): %s", err.String())
+		conn.l.Error("irc.send(): %s", err.String())
 		conn.shutdown()
 		return
 	}
 	conn.io.Flush()
-	logging.Debug("-> %s", line)
+	conn.l.Debug("-> %s", line)
 }
 
 // Implement Hybrid's flood control algorithm to rate-limit outgoing lines.
@@ -234,9 +254,9 @@ func (conn *Conn) rateLimit(chars int64) {
 	// calculation above, then we're at risk of "Excess Flood".
 	if conn.badness > 10*second && !conn.Flood {
 		// so sleep for the current line's time value before sending it
-		logging.Debug("irc.rateLimit(): Flood! Sleeping for %.2f secs.",
+		conn.l.Debug("irc.rateLimit(): Flood! Sleeping for %.2f secs.",
 			float64(linetime)/float64(second))
-		time.Sleep(linetime)
+		<-time.After(linetime)
 	}
 }
 
@@ -244,8 +264,8 @@ func (conn *Conn) shutdown() {
 	// Guard against double-call of shutdown() if we get an error in send()
 	// as calling sock.Close() will cause recv() to recieve EOF in readstring()
 	if conn.Connected {
-		logging.Info("irc.shutdown(): Disconnected from server.")
-		conn.Dispatcher.Dispatch("disconnected", conn, &Line{})
+		conn.l.Info("irc.shutdown(): Disconnected from server.")
+		conn.ED.Dispatch("disconnected", conn, &Line{})
 		conn.Connected = false
 		conn.sock.Close()
 		conn.cSend <- true
@@ -257,7 +277,7 @@ func (conn *Conn) shutdown() {
 }
 
 // Dumps a load of information about the current state of the connection to a
-// string for debugging state tracking and other such things. 
+// string for debugging state tracking and other such things.
 func (conn *Conn) String() string {
 	str := "GoIRC Connection\n"
 	str += "----------------\n\n"
@@ -267,17 +287,8 @@ func (conn *Conn) String() string {
 		str += "Not currently connected!\n\n"
 	}
 	str += conn.Me.String() + "\n"
-	str += "GoIRC Channels\n"
-	str += "--------------\n\n"
-	for _, ch := range conn.chans {
-		str += ch.String() + "\n"
-	}
-	str += "GoIRC NickNames\n"
-	str += "---------------\n\n"
-	for _, n := range conn.nicks {
-		if n != conn.Me {
-			str += n.String() + "\n"
-		}
+	if conn.st {
+		str += conn.ST.String() + "\n"
 	}
 	return str
 }

@@ -2,20 +2,38 @@ package client
 
 import (
 	"github.com/fluffle/goirc/logging"
+	"github.com/fluffle/goirc/state"
+	"gomock.googlecode.com/hg/gomock"
 	"strings"
 	"testing"
 	"time"
 )
 
-func init() {
-	// We have Error level logging that is printed on socket shutdown
-	// which we don't care too much about when testing with a mock conn...
-	logging.SetLogLevel(logging.LogFatal)
+type testState struct {
+	ctrl *gomock.Controller
+	log  *logging.MockLogger
+	st   *state.MockStateTracker
+	nc   *mockNetConn
+	c    *Conn
 }
 
-func setUp(t *testing.T) (*mockNetConn, *Conn) {
-	c := New("test", "test", "Testing IRC")
-	c.State = t
+func setUp(t *testing.T) (*Conn, *testState) {
+	ctrl := gomock.NewController(t)
+	st := state.NewMockStateTracker(ctrl)
+	l := logging.NewMockLogger(ctrl)
+	nc := MockNetConn(t)
+	c := New("test", "test", "Testing IRC", false, nil, l)
+
+	// We don't want to have to specify s.log.EXPECT().Debug() for all the
+	// random crap that gets logged. This mocks it all out nicely.
+	ctrl.RecordCall(l, "Debug", gomock.Any(), gomock.Any()).AnyTimes()
+
+	c.ST = st
+	c.st = true
+	c.sock = nc
+	c.Flood = true // Tests can take a while otherwise
+	c.Connected = true
+	c.postConnect()
 
 	// Assert some basic things about the initial state of the Conn struct
 	if c.Me.Nick != "test" ||
@@ -24,40 +42,31 @@ func setUp(t *testing.T) (*mockNetConn, *Conn) {
 		c.Me.Host != "" {
 		t.Errorf("Conn.Me not correctly initialised.")
 	}
-	if len(c.chans) != 0 {
-		t.Errorf("Some channels are already known:")
-		for _, ch := range c.chans {
-			t.Logf(ch.String())
-		}
-	}
-	if len(c.nicks) != 1 {
-		t.Errorf("Other Nicks than ourselves exist:")
-		for _, n := range c.nicks {
-			t.Logf(n.String())
-		}
-	}
 
-	m := MockNetConn(t)
-	c.sock = m
-	c.postConnect()
-	c.Flood = true // Tests can take a while otherwise
-	c.Connected = true
-	return m, c
+	return c, &testState{ctrl, l, st, nc, c}
 }
 
-func tearDown(m *mockNetConn, c *Conn) {
-	c.shutdown()
+func (s *testState) tearDown() {
+	// This can get set to false in some tests
+	s.c.st = true
+	s.st.EXPECT().Wipe()
+	s.log.EXPECT().Error("irc.recv(): %s", "EOF")
+	s.log.EXPECT().Info("irc.shutdown(): Disconnected from server.")
+	s.nc.ExpectNothing()
+	s.c.shutdown()
+	<-time.After(1e6)
+	s.ctrl.Finish()
 }
+
 
 func TestShutdown(t *testing.T) {
-	_, c := setUp(t)
+	c, s := setUp(t)
 
 	// Setup a mock event dispatcher to test correct triggering of "disconnected"
-	flag := false
-	c.Dispatcher = WasEventDispatched("disconnected", &flag)
+	flag := c.ExpectEvent("disconnected")
 
-	// Call shutdown manually
-	c.shutdown()
+	// Call shutdown via tearDown
+	s.tearDown()
 
 	// Verify that the connection no longer thinks it's connected
 	if c.Connected {
@@ -65,7 +74,7 @@ func TestShutdown(t *testing.T) {
 	}
 
 	// Verify that the "disconnected" event fired correctly
-	if !flag {
+	if !*flag {
 		t.Errorf("Calling Close() didn't result in dispatch of disconnected event.")
 	}
 
@@ -76,18 +85,22 @@ func TestShutdown(t *testing.T) {
 // Practically the same as the above test, but shutdown is called implicitly
 // by recv() getting an EOF from the mock connection.
 func TestEOF(t *testing.T) {
-	m, c := setUp(t)
+	c, s := setUp(t)
+	// Since we're not using tearDown() here, manually call Finish()
+	defer s.ctrl.Finish()
 
 	// Setup a mock event dispatcher to test correct triggering of "disconnected"
-	flag := false
-	c.Dispatcher = WasEventDispatched("disconnected", &flag)
+	flag := c.ExpectEvent("disconnected")
 
 	// Simulate EOF from server
-	m.Close()
+	s.st.EXPECT().Wipe()
+	s.log.EXPECT().Info("irc.shutdown(): Disconnected from server.")
+	s.log.EXPECT().Error("irc.recv(): %s", "EOF")
+	s.nc.Close()
 
 	// Since things happen in different internal goroutines, we need to wait
 	// 1 ms should be enough :-)
-	time.Sleep(1e6)
+	<-time.After(1e6)
 
 	// Verify that the connection no longer thinks it's connected
 	if c.Connected {
@@ -95,7 +108,7 @@ func TestEOF(t *testing.T) {
 	}
 
 	// Verify that the "disconnected" event fired correctly
-	if !flag {
+	if !*flag {
 		t.Errorf("Calling Close() didn't result in dispatch of disconnected event.")
 	}
 }
@@ -107,10 +120,12 @@ func (d mockDispatcher) Dispatch(name string, ev ...interface{}) {
 	d(name, ev...)
 }
 
-func WasEventDispatched(name string, flag *bool) mockDispatcher {
-	return mockDispatcher(func(n string, ev ...interface{}) {
+func (conn *Conn) ExpectEvent(name string) *bool {
+	flag := false
+	conn.ED = mockDispatcher(func(n string, ev ...interface{}) {
 		if n == strings.ToLower(name) {
-			*flag = true
+			flag = true
 		}
 	})
+	return &flag
 }

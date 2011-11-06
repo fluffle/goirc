@@ -5,7 +5,6 @@ package client
 
 import (
 	"github.com/fluffle/goirc/event"
-	"github.com/fluffle/goirc/logging"
 	"strings"
 )
 
@@ -18,10 +17,10 @@ type IRCHandler func(*Conn, *Line)
 // "name" being equivalent to Line.Cmd. Read the RFCs for details on what
 // replies could come from the server. They'll generally be things like
 // "PRIVMSG", "JOIN", etc. but all the numeric replies are left as ascii
-// strings of digits like "332" (mainly because I really didn't feel like 
+// strings of digits like "332" (mainly because I really didn't feel like
 // putting massive constant tables in).
 func (conn *Conn) AddHandler(name string, f IRCHandler) {
-	conn.Registry.AddHandler(name, NewHandler(f))
+	conn.ER.AddHandler(name, NewHandler(f))
 }
 
 // Wrap f in an anonymous unboxing function
@@ -29,6 +28,15 @@ func NewHandler(f IRCHandler) event.Handler {
 	return event.NewHandler(func(ev ...interface{}) {
 		f(ev[0].(*Conn), ev[1].(*Line))
 	})
+}
+
+// sets up the internal event handlers to do essential IRC protocol things
+func (conn *Conn) addIntHandlers() {
+	conn.AddHandler("001", (*Conn).h_001)
+	conn.AddHandler("433", (*Conn).h_433)
+	conn.AddHandler("CTCP", (*Conn).h_CTCP)
+	conn.AddHandler("NICK", (*Conn).h_NICK)
+	conn.AddHandler("PING", (*Conn).h_PING)
 }
 
 // Basic ping/pong handler
@@ -39,7 +47,7 @@ func (conn *Conn) h_PING(line *Line) {
 // Handler to trigger a "CONNECTED" event on receipt of numeric 001
 func (conn *Conn) h_001(line *Line) {
 	// we're connected!
-	conn.Dispatcher.Dispatch("connected", conn, line)
+	conn.ED.Dispatch("connected", conn, line)
 	// and we're being given our hostname (from the server's perspective)
 	t := line.Args[len(line.Args)-1]
 	if idx := strings.LastIndex(t, " "); idx != -1 {
@@ -61,22 +69,17 @@ func (conn *Conn) h_001(line *Line) {
 // Handler to deal with "433 :Nickname already in use"
 func (conn *Conn) h_433(line *Line) {
 	// Args[1] is the new nick we were attempting to acquire
-	conn.Nick(line.Args[1] + "_")
+	neu := line.Args[1] + "_"
+	conn.Nick(neu)
 	// if this is happening before we're properly connected (i.e. the nick
 	// we sent in the initial NICK command is in use) we will not receive
 	// a NICK message to confirm our change of nick, so ReNick here...
 	if line.Args[1] == conn.Me.Nick {
-		conn.Me.ReNick(line.Args[1] + "_")
-	}
-}
-
-// Handler NICK messages to inform us about nick changes
-func (conn *Conn) h_NICK(line *Line) {
-	// all nicks should be handled the same way, our own included
-	if n := conn.GetNick(line.Nick); n != nil {
-		n.ReNick(line.Args[0])
-	} else {
-		logging.Warn("irc.NICK(): unknown nick %s.", line.Nick)
+		if conn.st {
+			conn.ST.ReNick(conn.Me.Nick, neu)
+		} else {
+			conn.Me.Nick = neu
+		}
 	}
 }
 
@@ -89,19 +92,53 @@ func (conn *Conn) h_CTCP(line *Line) {
 	}
 }
 
+// Handle updating our own NICK if we're not using the state tracker
+func (conn *Conn) h_NICK(line *Line) {
+	if !conn.st && line.Nick == conn.Me.Nick {
+		conn.Me.Nick = line.Args[0]
+	}
+}
+
+/******************************************************************************\
+ * State tracking handlers below here
+\******************************************************************************/
+
+func (conn *Conn) addSTHandlers() {
+	conn.AddHandler("JOIN", (*Conn).h_JOIN)
+	conn.AddHandler("KICK", (*Conn).h_KICK)
+	conn.AddHandler("MODE", (*Conn).h_MODE)
+	conn.AddHandler("NICK", (*Conn).h_STNICK)
+	conn.AddHandler("PART", (*Conn).h_PART)
+	conn.AddHandler("QUIT", (*Conn).h_QUIT)
+	conn.AddHandler("TOPIC", (*Conn).h_TOPIC)
+
+	conn.AddHandler("311", (*Conn).h_311)
+	conn.AddHandler("324", (*Conn).h_324)
+	conn.AddHandler("332", (*Conn).h_332)
+	conn.AddHandler("352", (*Conn).h_352)
+	conn.AddHandler("353", (*Conn).h_353)
+	conn.AddHandler("671", (*Conn).h_671)
+}
+
+// Handle NICK messages that need to update the state tracker
+func (conn *Conn) h_STNICK(line *Line) {
+	// all nicks should be handled the same way, our own included
+	conn.ST.ReNick(line.Nick, line.Args[0])
+}
+
 // Handle JOINs to channels to maintain state
 func (conn *Conn) h_JOIN(line *Line) {
-	ch := conn.GetChannel(line.Args[0])
-	n := conn.GetNick(line.Nick)
+	ch := conn.ST.GetChannel(line.Args[0])
+	nk := conn.ST.GetNick(line.Nick)
 	if ch == nil {
 		// first we've seen of this channel, so should be us joining it
-		// NOTE this will also take care of n == nil && ch == nil
-		if n != conn.Me {
-			logging.Warn("irc.JOIN(): JOIN to unknown channel %s recieved "+
+		// NOTE this will also take care of nk == nil && ch == nil
+		if nk != conn.Me {
+			conn.l.Warn("irc.JOIN(): JOIN to unknown channel %s received "+
 				"from (non-me) nick %s", line.Args[0], line.Nick)
 			return
 		}
-		ch = conn.NewChannel(line.Args[0])
+		ch = conn.ST.NewChannel(line.Args[0])
 		// since we don't know much about this channel, ask server for info
 		// we get the channel users automatically in 353 and the channel
 		// topic in 332 on join, so we just need to get the modes
@@ -110,147 +147,123 @@ func (conn *Conn) h_JOIN(line *Line) {
 		// triggering a WHOIS on every nick from the 353 handler
 		conn.Who(ch.Name)
 	}
-	if n == nil {
+	if nk == nil {
 		// this is the first we've seen of this nick
-		n = conn.NewNick(line.Nick, line.Ident, "", line.Host)
+		nk = conn.ST.NewNick(line.Nick)
+		nk.Ident = line.Ident
+		nk.Host = line.Host
 		// since we don't know much about this nick, ask server for info
-		conn.Who(n.Nick)
+		conn.Who(nk.Nick)
 	}
 	// this takes care of both nick and channel linking \o/
-	ch.AddNick(n)
+	conn.ST.Associate(ch, nk)
 }
 
 // Handle PARTs from channels to maintain state
 func (conn *Conn) h_PART(line *Line) {
-	ch := conn.GetChannel(line.Args[0])
-	n := conn.GetNick(line.Nick)
-	if ch != nil && n != nil {
-		if _, ok := ch.Nicks[n]; ok {
-			ch.DelNick(n)
-		} else {
-			logging.Warn("irc.PART(): nick %s is not on channel %s",
-				line.Nick, line.Args[0])
-		}
-	} else {
-		logging.Warn("irc.PART(): PART of channel %s by nick %s",
-			line.Args[0], line.Nick)
-	}
+	conn.ST.Dissociate(conn.ST.GetChannel(line.Args[0]),
+		conn.ST.GetNick(line.Nick))
 }
 
 // Handle KICKs from channels to maintain state
 func (conn *Conn) h_KICK(line *Line) {
 	// XXX: this won't handle autorejoining channels on KICK
 	// it's trivial to do this in a seperate handler...
-	ch := conn.GetChannel(line.Args[0])
-	n := conn.GetNick(line.Args[1])
-	if ch != nil && n != nil {
-		if _, ok := ch.Nicks[n]; ok {
-			ch.DelNick(n)
-		} else {
-			logging.Warn("irc.KICK(): nick %s is not on channel %s",
-				line.Nick, line.Args[0])
-		}
-	} else {
-		logging.Warn("irc.KICK(): KICK from channel %s of nick %s",
-			line.Args[0], line.Args[1])
-	}
+	conn.ST.Dissociate(conn.ST.GetChannel(line.Args[0]),
+		conn.ST.GetNick(line.Args[1]))
 }
 
 // Handle other people's QUITs
 func (conn *Conn) h_QUIT(line *Line) {
-	if n := conn.GetNick(line.Nick); n != nil {
-		n.Delete()
-	} else {
-		logging.Warn("irc.QUIT(): QUIT from unknown nick %s", line.Nick)
-	}
+	conn.ST.DelNick(line.Nick)
 }
 
 // Handle MODE changes for channels we know about (and our nick personally)
 func (conn *Conn) h_MODE(line *Line) {
-	// channel modes first
-	if ch := conn.GetChannel(line.Args[0]); ch != nil {
-		conn.ParseChannelModes(ch, line.Args[1], line.Args[2:])
-	} else if n := conn.GetNick(line.Args[0]); n != nil {
+	if ch := conn.ST.GetChannel(line.Args[0]); ch != nil {
+		// channel modes first
+		ch.ParseModes(line.Args[1], line.Args[2:]...)
+	} else if nk := conn.ST.GetNick(line.Args[0]); nk != nil {
 		// nick mode change, should be us
-		if n != conn.Me {
-			logging.Warn("irc.MODE(): recieved MODE %s for (non-me) nick %s",
-				line.Args[0], n.Nick)
+		if nk != conn.Me {
+			conn.l.Warn("irc.MODE(): recieved MODE %s for (non-me) nick %s",
+				line.Args[1], line.Args[0])
 			return
 		}
-		conn.ParseNickModes(n, line.Args[1])
+		nk.ParseModes(line.Args[1])
 	} else {
-		logging.Warn("irc.MODE(): not sure what to do with MODE %s",
+		conn.l.Warn("irc.MODE(): not sure what to do with MODE %s",
 			strings.Join(line.Args, " "))
 	}
 }
 
 // Handle TOPIC changes for channels
 func (conn *Conn) h_TOPIC(line *Line) {
-	if ch := conn.GetChannel(line.Args[0]); ch != nil {
+	if ch := conn.ST.GetChannel(line.Args[0]); ch != nil {
 		ch.Topic = line.Args[1]
 	} else {
-		logging.Warn("irc.TOPIC(): topic change on unknown channel %s",
+		conn.l.Warn("irc.TOPIC(): topic change on unknown channel %s",
 			line.Args[0])
 	}
 }
 
 // Handle 311 whois reply
 func (conn *Conn) h_311(line *Line) {
-	if n := conn.GetNick(line.Args[1]); n != nil {
-		n.Ident = line.Args[2]
-		n.Host = line.Args[3]
-		n.Name = line.Args[5]
+	if nk := conn.ST.GetNick(line.Args[1]); nk != nil {
+		nk.Ident = line.Args[2]
+		nk.Host = line.Args[3]
+		nk.Name = line.Args[5]
 	} else {
-		logging.Warn("irc.311(): received WHOIS info for unknown nick %s",
+		conn.l.Warn("irc.311(): received WHOIS info for unknown nick %s",
 			line.Args[1])
 	}
 }
 
 // Handle 324 mode reply
 func (conn *Conn) h_324(line *Line) {
-	if ch := conn.GetChannel(line.Args[1]); ch != nil {
-		conn.ParseChannelModes(ch, line.Args[2], line.Args[3:])
+	if ch := conn.ST.GetChannel(line.Args[1]); ch != nil {
+		ch.ParseModes(line.Args[2], line.Args[3:]...)
 	} else {
-		logging.Warn("irc.324(): received MODE settings for unknown channel %s",
+		conn.l.Warn("irc.324(): received MODE settings for unknown channel %s",
 			line.Args[1])
 	}
 }
 
 // Handle 332 topic reply on join to channel
 func (conn *Conn) h_332(line *Line) {
-	if ch := conn.GetChannel(line.Args[1]); ch != nil {
+	if ch := conn.ST.GetChannel(line.Args[1]); ch != nil {
 		ch.Topic = line.Args[2]
 	} else {
-		logging.Warn("irc.332(): received TOPIC value for unknown channel %s",
+		conn.l.Warn("irc.332(): received TOPIC value for unknown channel %s",
 			line.Args[1])
 	}
 }
 
 // Handle 352 who reply
 func (conn *Conn) h_352(line *Line) {
-	if n := conn.GetNick(line.Args[5]); n != nil {
-		n.Ident = line.Args[2]
-		n.Host = line.Args[3]
+	if nk := conn.ST.GetNick(line.Args[5]); nk != nil {
+		nk.Ident = line.Args[2]
+		nk.Host = line.Args[3]
 		// XXX: do we care about the actual server the nick is on?
 		//      or the hop count to this server?
 		// last arg contains "<hop count> <real name>"
 		a := strings.SplitN(line.Args[len(line.Args)-1], " ", 2)
-		n.Name = a[1]
+		nk.Name = a[1]
 		if idx := strings.Index(line.Args[6], "*"); idx != -1 {
-			n.Modes.Oper = true
+			nk.Modes.Oper = true
 		}
 		if idx := strings.Index(line.Args[6], "H"); idx != -1 {
-			n.Modes.Invisible = true
+			nk.Modes.Invisible = true
 		}
 	} else {
-		logging.Warn("irc.352(): received WHO reply for unknown nick %s",
+		conn.l.Warn("irc.352(): received WHO reply for unknown nick %s",
 			line.Args[5])
 	}
 }
 
 // Handle 353 names reply
 func (conn *Conn) h_353(line *Line) {
-	if ch := conn.GetChannel(line.Args[2]); ch != nil {
+	if ch := conn.ST.GetChannel(line.Args[2]); ch != nil {
 		nicks := strings.Split(line.Args[len(line.Args)-1], " ")
 		for _, nick := range nicks {
 			// UnrealIRCd's coders are lazy and leave a trailing space
@@ -262,64 +275,42 @@ func (conn *Conn) h_353(line *Line) {
 				nick = nick[1:]
 				fallthrough
 			default:
-				n := conn.GetNick(nick)
-				if n == nil {
+				nk := conn.ST.GetNick(nick)
+				if nk == nil {
 					// we don't know this nick yet!
-					n = conn.NewNick(nick, "", "", "")
+					nk = conn.ST.NewNick(nick)
 				}
-				if _, ok := ch.Nicks[n]; !ok {
+				cp, ok := conn.ST.IsOn(ch.Name, nick)
+				if !ok {
 					// This nick isn't associated with this channel yet!
-					ch.AddNick(n)
+					cp = conn.ST.Associate(ch, nk)
 				}
-				p := ch.Nicks[n]
 				switch c {
 				case '~':
-					p.Owner = true
+					cp.Owner = true
 				case '&':
-					p.Admin = true
+					cp.Admin = true
 				case '@':
-					p.Op = true
+					cp.Op = true
 				case '%':
-					p.HalfOp = true
+					cp.HalfOp = true
 				case '+':
-					p.Voice = true
+					cp.Voice = true
 				}
 			}
 		}
 	} else {
-		logging.Warn("irc.353(): received NAMES list for unknown channel %s",
+		conn.l.Warn("irc.353(): received NAMES list for unknown channel %s",
 			line.Args[2])
 	}
 }
 
 // Handle 671 whois reply (nick connected via SSL)
 func (conn *Conn) h_671(line *Line) {
-	if n := conn.GetNick(line.Args[1]); n != nil {
-		n.Modes.SSL = true
+	if nk := conn.ST.GetNick(line.Args[1]); nk != nil {
+		nk.Modes.SSL = true
 	} else {
-		logging.Warn("irc.671(): received WHOIS SSL info for unknown nick %s",
+		conn.l.Warn("irc.671(): received WHOIS SSL info for unknown nick %s",
 			line.Args[1])
 	}
-}
-
-// sets up the internal event handlers to do useful things with lines
-func (conn *Conn) SetupHandlers() {
-	conn.AddHandler("CTCP", (*Conn).h_CTCP)
-	conn.AddHandler("JOIN", (*Conn).h_JOIN)
-	conn.AddHandler("KICK", (*Conn).h_KICK)
-	conn.AddHandler("MODE", (*Conn).h_MODE)
-	conn.AddHandler("NICK", (*Conn).h_NICK)
-	conn.AddHandler("PART", (*Conn).h_PART)
-	conn.AddHandler("PING", (*Conn).h_PING)
-	conn.AddHandler("QUIT", (*Conn).h_QUIT)
-	conn.AddHandler("TOPIC", (*Conn).h_TOPIC)
-
-	conn.AddHandler("001", (*Conn).h_001)
-	conn.AddHandler("311", (*Conn).h_311)
-	conn.AddHandler("324", (*Conn).h_324)
-	conn.AddHandler("332", (*Conn).h_332)
-	conn.AddHandler("352", (*Conn).h_352)
-	conn.AddHandler("353", (*Conn).h_353)
-	conn.AddHandler("433", (*Conn).h_433)
-	conn.AddHandler("671", (*Conn).h_671)
 }

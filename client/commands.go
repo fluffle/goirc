@@ -9,7 +9,7 @@ import "strings"
 // the symbol table and add methods/functions on the fly
 // [ CMD, FMT, FMTARGS ] etc.
 
-// Raw() sends a raw line to the server, should really only be used for 
+// Raw() sends a raw line to the server, should really only be used for
 // debugging purposes but may well come in handy.
 func (conn *Conn) Raw(rawline string) { conn.out <- rawline }
 
