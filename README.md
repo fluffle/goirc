@@ -18,11 +18,12 @@ This will connect to freenode and join `#go-nuts` by default, so be careful ;-)
 
 Synopsis:
 
+    import "flag"
 	import irc "github.com/fluffle/goirc/client"
+
 	func main() {
-		c := irc.New("nick", "ident", "real name")
-		// Optionally, turn on debugging
-		c.Debug = true
+        flag.Parse() // parses the logging flags.
+		c := irc.New("nick", "ident", "real name", false, nil, nil)
 		// Optionally, enable SSL
 		c.SSL = true
 
@@ -53,8 +54,10 @@ the messages from the IRC server, so you have to handle e.g. "332" for
 `RPL_TOPIC` to get the topic for a channel.
 
 The vast majority of handlers implemented within the framework deal with state
-tracking of all nicks in any channels that the client is also present in. It's
-likely that this state tracking will become optional in the near future.
+tracking of all nicks in any channels that the client is also present in. These
+handers are in `client/state_handlers.go`. State tracking is optional, and can
+be enabled by passing `true` as the fourth argument to `client.New()`. This API
+sucks and may change in the future.
 
 ### Misc.
 

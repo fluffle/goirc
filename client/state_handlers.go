@@ -218,4 +218,3 @@ func (conn *Conn) h_671(line *Line) {
 			line.Args[1])
 	}
 }
-
