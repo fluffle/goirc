@@ -2,17 +2,23 @@ package main
 
 import (
 	irc "github.com/fluffle/goirc/client"
+	"flag"
 	"fmt"
 	"os"
 	"bufio"
 	"strings"
 )
 
+var host *string = flag.String("host", "irc.freenode.net", "IRC server")
+var channel *string = flag.String("channel", "#go-nuts", "IRC channel")
+
 func main() {
+	flag.Parse()
+
 	// create new IRC connection
-	c := irc.New("GoTest", "gotest", "GoBot")
+	c := irc.New("GoTest", "gotest", "GoBot", true, nil, nil)
 	c.AddHandler("connected",
-		func(conn *irc.Conn, line *irc.Line) { conn.Join("#go-nuts") })
+		func(conn *irc.Conn, line *irc.Line) { conn.Join(*channel) })
 
 	// Set up a handler to notify of disconnect events.
 	quit := make(chan bool)
@@ -74,7 +80,7 @@ func main() {
 
 	for !reallyquit {
 		// connect to server
-		if err := c.Connect("irc.freenode.net"); err != nil {
+		if err := c.Connect(*host); err != nil {
 			fmt.Printf("Connection error: %s\n", err)
 			return
 		}
