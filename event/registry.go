@@ -42,8 +42,8 @@ type EventDispatcher interface {
 }
 
 type EventRegistry interface {
-	AddHandler(name string, h Handler)
-	DelHandler(h Handler)
+	AddHandler(h Handler, names ...string)
+	DelHandler(h Handler, names ...string)
 	Dispatch(name string, ev ...interface{})
 	ClearEvents(name string)
 }
@@ -61,30 +61,46 @@ func NewRegistry() EventRegistry {
 	return r
 }
 
-func (r *registry) AddHandler(name string, h Handler) {
-	name = strings.ToLower(name)
+func (r *registry) AddHandler(h Handler, names ...string) {
+	if len(names) == 0 {
+		return
+	}
 	r.Lock()
 	defer r.Unlock()
-	if _, ok := r.events[name]; !ok {
-		r.events[name] = list.New()
-	}
-	for e := r.events[name].Front(); e != nil; e = e.Next() {
-		// Check we're not adding a duplicate handler to this event
-		if e.Value.(Handler).Id() == h.Id() {
-			return
+	for _, name := range names {
+		name = strings.ToLower(name)
+		if _, ok := r.events[name]; !ok {
+			r.events[name] = list.New()
 		}
+		for e := r.events[name].Front(); e != nil; e = e.Next() {
+			// Check we're not adding a duplicate handler to this event
+			if e.Value.(Handler).Id() == h.Id() {
+				return
+			}
+		}
+		r.events[name].PushBack(h)
 	}
-	r.events[name].PushBack(h)
 }
 
-func (r *registry) DelHandler(h Handler) {
-	// This is a bit brute-force. Don't add too many handlers!
+func _del(l *list.List, id HandlerID) {
+	for e := l.Front(); e != nil; e = e.Next() {
+		if e.Value.(Handler).Id() == id {
+			l.Remove(e)
+		}
+	}
+}
+
+func (r *registry) DelHandler(h Handler, names ...string) {
 	r.Lock()
 	defer r.Unlock()
-	for _, l := range r.events {
-		for e := l.Front(); e != nil; e = e.Next() {
-			if e.Value.(Handler).Id() == h.Id() {
-				l.Remove(e)
+	if len(names) == 0 {
+		for _, l := range r.events {
+			_del(l, h.Id())
+		}
+	} else {
+		for _, name := range names {
+			if l, ok := r.events[name]; ok {
+				_del(l, h.Id())
 			}
 		}
 	}

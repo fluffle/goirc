@@ -14,7 +14,7 @@ func TestSimpleDispatch(t *testing.T) {
 	h := NewHandler(func(ev ...interface{}) {
 		out <- ev[0].(bool)
 	})
-	r.AddHandler("send", h)
+	r.AddHandler(h, "send")
 
 	r.Dispatch("send", true)
 	if val := <-out; !val {
@@ -42,7 +42,7 @@ func TestParallelDispatch(t *testing.T) {
 
 	// create some handlers and send an event to them
 	for _, t := range []int{5, 11, 2, 15, 8} {
-		r.AddHandler("send", factory(t))
+		r.AddHandler(factory(t), "send")
 	}
 	r.Dispatch("send")
 
@@ -80,7 +80,7 @@ func TestSerialDispatch(t *testing.T) {
 
 	// create some handlers and send an event to them
 	for _, t := range []int{5, 11, 2, 15, 8} {
-		r.AddHandler("send", factory(t))
+		r.AddHandler(factory(t), "send")
 	}
 	r.Dispatch("send")
 
