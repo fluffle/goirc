@@ -11,10 +11,14 @@ import (
 // in this file will call their respective handlers synchronously, otherwise
 // testing becomes more difficult.
 func TestPING(t *testing.T) {
-	_, s := setUp(t)
+	c, s := setUp(t)
 	defer s.tearDown()
+	// As this is a real end-to-end test, we need a real end-to-end dispatcher.
+	c.ED = c.ER
 	s.nc.Send("PING :1234567890")
 	s.nc.Expect("PONG :1234567890")
+	// Return mock dispatcher to it's rightful place afterwards for tearDown.
+	c.ED = s.ed
 }
 
 // Test the handler for 001 / RPL_WELCOME
@@ -22,16 +26,10 @@ func Test001(t *testing.T) {
 	c, s := setUp(t)
 	defer s.tearDown()
 
-	// Setup a mock event dispatcher to test correct triggering of "connected"
-	flag := c.ExpectEvent("connected")
-
+	l := parseLine(":irc.server.org 001 test :Welcome to IRC test!ident@somehost.com")
+	s.ed.EXPECT().Dispatch("connected", c, l)
 	// Call handler with a valid 001 line
-	c.h_001(parseLine(":irc.server.org 001 test :Welcome to IRC test!ident@somehost.com"))
-
-	// Check that the event was dispatched correctly
-	if !*flag {
-		t.Errorf("Sending 001 didn't result in dispatch of connected event.")
-	}
+	c.h_001(l)
 
 	// Check host parsed correctly
 	if c.Me.Host != "somehost.com" {

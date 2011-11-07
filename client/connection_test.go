@@ -5,7 +5,6 @@ import (
 	"github.com/fluffle/goirc/logging"
 	"github.com/fluffle/goirc/state"
 	"gomock.googlecode.com/hg/gomock"
-	"strings"
 	"testing"
 	"time"
 )
@@ -14,6 +13,7 @@ type testState struct {
 	ctrl *gomock.Controller
 	log  *logging.MockLogger
 	st   *state.MockStateTracker
+	ed   *event.MockEventDispatcher
 	nc   *mockNetConn
 	c    *Conn
 }
@@ -22,6 +22,7 @@ func setUp(t *testing.T) (*Conn, *testState) {
 	ctrl := gomock.NewController(t)
 	st := state.NewMockStateTracker(ctrl)
 	r := event.NewRegistry()
+	ed := event.NewMockEventDispatcher(ctrl)
 	l := logging.NewMockLogger(ctrl)
 	nc := MockNetConn(t)
 	c := Client("test", "test", "Testing IRC", r, l)
@@ -30,6 +31,7 @@ func setUp(t *testing.T) (*Conn, *testState) {
 	// random crap that gets logged. This mocks it all out nicely.
 	ctrl.RecordCall(l, "Debug", gomock.Any(), gomock.Any()).AnyTimes()
 
+	c.ED = ed
 	c.ST = st
 	c.st = true
 	c.sock = nc
@@ -45,12 +47,13 @@ func setUp(t *testing.T) (*Conn, *testState) {
 		t.Errorf("Conn.Me not correctly initialised.")
 	}
 
-	return c, &testState{ctrl, l, st, nc, c}
+	return c, &testState{ctrl, l, st, ed, nc, c}
 }
 
 func (s *testState) tearDown() {
 	// This can get set to false in some tests
 	s.c.st = true
+	s.ed.EXPECT().Dispatch("disconnected", s.c, &Line{})
 	s.st.EXPECT().Wipe()
 	s.log.EXPECT().Error("irc.recv(): %s", "EOF")
 	s.log.EXPECT().Info("irc.shutdown(): Disconnected from server.")
@@ -60,30 +63,6 @@ func (s *testState) tearDown() {
 	s.ctrl.Finish()
 }
 
-
-func TestShutdown(t *testing.T) {
-	c, s := setUp(t)
-
-	// Setup a mock event dispatcher to test correct triggering of "disconnected"
-	flag := c.ExpectEvent("disconnected")
-
-	// Call shutdown via tearDown
-	s.tearDown()
-
-	// Verify that the connection no longer thinks it's connected
-	if c.Connected {
-		t.Errorf("Conn still thinks it's connected to the server.")
-	}
-
-	// Verify that the "disconnected" event fired correctly
-	if !*flag {
-		t.Errorf("Calling Close() didn't result in dispatch of disconnected event.")
-	}
-
-	// TODO(fluffle): Try to work out a way of testing that the background
-	// goroutines were *actually* stopped? Test m a bit more?
-}
-
 // Practically the same as the above test, but shutdown is called implicitly
 // by recv() getting an EOF from the mock connection.
 func TestEOF(t *testing.T) {
@@ -91,10 +70,8 @@ func TestEOF(t *testing.T) {
 	// Since we're not using tearDown() here, manually call Finish()
 	defer s.ctrl.Finish()
 
-	// Setup a mock event dispatcher to test correct triggering of "disconnected"
-	flag := c.ExpectEvent("disconnected")
-
 	// Simulate EOF from server
+	s.ed.EXPECT().Dispatch("disconnected", c, &Line{})
 	s.st.EXPECT().Wipe()
 	s.log.EXPECT().Info("irc.shutdown(): Disconnected from server.")
 	s.log.EXPECT().Error("irc.recv(): %s", "EOF")
@@ -108,26 +85,8 @@ func TestEOF(t *testing.T) {
 	if c.Connected {
 		t.Errorf("Conn still thinks it's connected to the server.")
 	}
-
-	// Verify that the "disconnected" event fired correctly
-	if !*flag {
-		t.Errorf("Calling Close() didn't result in dispatch of disconnected event.")
-	}
 }
 
-// Mock dispatcher to verify that events are triggered successfully
-type mockDispatcher func(string, ...interface{})
+func TestEnableStateTracking(t *testing.T) {
 
-func (d mockDispatcher) Dispatch(name string, ev ...interface{}) {
-	d(name, ev...)
-}
-
-func (conn *Conn) ExpectEvent(name string) *bool {
-	flag := false
-	conn.ED = mockDispatcher(func(n string, ev ...interface{}) {
-		if n == strings.ToLower(name) {
-			flag = true
-		}
-	})
-	return &flag
 }
