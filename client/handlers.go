@@ -19,8 +19,10 @@ type IRCHandler func(*Conn, *Line)
 // "PRIVMSG", "JOIN", etc. but all the numeric replies are left as ascii
 // strings of digits like "332" (mainly because I really didn't feel like
 // putting massive constant tables in).
-func (conn *Conn) AddHandler(name string, f IRCHandler) {
-	conn.ER.AddHandler(name, NewHandler(f))
+func (conn *Conn) AddHandler(name string, f IRCHandler) event.Handler {
+	h := NewHandler(f)
+	conn.ER.AddHandler(h, name)
+	return h
 }
 
 // Wrap f in an anonymous unboxing function

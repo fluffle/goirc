@@ -1,6 +1,7 @@
 package client
 
 import (
+	"github.com/fluffle/goirc/event"
 	"github.com/fluffle/goirc/logging"
 	"github.com/fluffle/goirc/state"
 	"gomock.googlecode.com/hg/gomock"
@@ -20,9 +21,10 @@ type testState struct {
 func setUp(t *testing.T) (*Conn, *testState) {
 	ctrl := gomock.NewController(t)
 	st := state.NewMockStateTracker(ctrl)
+	r := event.NewRegistry()
 	l := logging.NewMockLogger(ctrl)
 	nc := MockNetConn(t)
-	c := New("test", "test", "Testing IRC", false, nil, l)
+	c := Client("test", "test", "Testing IRC", r, l)
 
 	// We don't want to have to specify s.log.EXPECT().Debug() for all the
 	// random crap that gets logged. This mocks it all out nicely.

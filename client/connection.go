@@ -66,20 +66,31 @@ type Conn struct {
 
 // Creates a new IRC connection object, but doesn't connect to anything so
 // that you can add event handlers to it. See AddHandler() for details.
-// Dependency injection is a bitch :-/
-func New(nick, user, name string, st bool,
-	r event.EventRegistry, l logging.Logger) *Conn {
-	if r == nil {
-		r = event.NewRegistry()
+func SimpleClient(nick string, args ...string) *Conn {
+	r := event.NewRegistry()
+	l := logging.NewFromFlags()
+	ident := "goirc"
+	name := "Powered by GoIRC"
+
+	if len(args) > 0 && args[0] != "" {
+		ident = args[0]
 	}
-	if l == nil {
-		l = logging.NewFromFlags()
+	if len(args) > 1 && args[1] != "" {
+		name = args[1]
+	}
+	return Client(nick, ident, name, r, l)
+}
+
+func Client(nick, ident, name string,
+	r event.EventRegistry, l logging.Logger) *Conn {
+	if r == nil || l == nil {
+		return nil
 	}
 	conn := &Conn{
 		ER:         r,
 		ED:         r,
 		l:          l,
-		st:         st,
+		st:         false,
 		in:         make(chan *Line, 32),
 		out:        make(chan string, 32),
 		cSend:      make(chan bool),
@@ -92,18 +103,33 @@ func New(nick, user, name string, st bool,
 		lastsent:   0,
 	}
 	conn.addIntHandlers()
-	if st {
-		conn.ST = state.NewTracker(nick, l)
-		conn.Me = conn.ST.Me()
-		conn.addSTHandlers()
-	} else {
-		conn.Me = state.NewNick(nick, l)
-	}
-	conn.Me.Ident = user
+	conn.Me = state.NewNick(nick, l)
+	conn.Me.Ident = ident
 	conn.Me.Name = name
 
 	conn.initialise()
 	return conn
+}
+
+func (conn *Conn) EnableStateTracking() {
+	if !conn.st {
+		n := conn.Me
+		conn.ST = state.NewTracker(n.Nick, conn.l)
+		conn.Me = conn.ST.Me()
+		conn.Me.Ident = n.Ident
+		conn.Me.Name = n.Name
+		conn.addSTHandlers()
+		conn.st = true
+	}
+}
+
+func (conn *Conn) DisableStateTracking() {
+	if conn.st {
+		conn.st = false
+		conn.delSTHandlers()
+		conn.ST.Wipe()
+		conn.ST = nil
+	}
 }
 
 // Per-connection state initialisation.
