@@ -33,12 +33,20 @@ func NewHandler(f IRCHandler) event.Handler {
 }
 
 // sets up the internal event handlers to do essential IRC protocol things
+var intHandlers map[string]event.Handler
+func init() {
+	intHandlers = make(map[string]event.Handler)
+	intHandlers["001"] = NewHandler((*Conn).h_001)
+	intHandlers["433"] = NewHandler((*Conn).h_433)
+	intHandlers["CTCP"] = NewHandler((*Conn).h_CTCP)
+	intHandlers["NICK"] = NewHandler((*Conn).h_NICK)
+	intHandlers["PING"] = NewHandler((*Conn).h_PING)
+}
+
 func (conn *Conn) addIntHandlers() {
-	conn.AddHandler("001", (*Conn).h_001)
-	conn.AddHandler("433", (*Conn).h_433)
-	conn.AddHandler("CTCP", (*Conn).h_CTCP)
-	conn.AddHandler("NICK", (*Conn).h_NICK)
-	conn.AddHandler("PING", (*Conn).h_PING)
+	for n, h := range intHandlers {
+		conn.ER.AddHandler(h, n)
+	}
 }
 
 // Basic ping/pong handler
