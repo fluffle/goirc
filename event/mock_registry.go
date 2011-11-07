@@ -32,7 +32,7 @@ func (m *MockHandler) Run(_param0 ...interface{}) {
 	m.ctrl.Call(m, "Run", _param0)
 }
 
-func (mr *_MockHandlerRecorder) Run(, arg0 ...interface{}) *gomock.Call {
+func (mr *_MockHandlerRecorder) Run(arg0 ...interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCall(mr.mock, "Run", arg0)
 }
 
