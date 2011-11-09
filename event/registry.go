@@ -82,26 +82,31 @@ N:	for _, name := range names {
 	}
 }
 
-func _del(l *list.List, id HandlerID) {
+func _del(l *list.List, id HandlerID) bool {
 	for e := l.Front(); e != nil; e = e.Next() {
 		if e.Value.(Handler).Id() == id {
 			l.Remove(e)
 		}
 	}
+	return l.Len() == 0
 }
 
 func (r *registry) DelHandler(h Handler, names ...string) {
 	r.Lock()
 	defer r.Unlock()
 	if len(names) == 0 {
-		for _, l := range r.events {
-			_del(l, h.Id())
+		for name, l := range r.events {
+			if _del(l, h.Id()) {
+				r.events[name] = nil, false
+			}
 		}
 	} else {
 		for _, name := range names {
 			name = strings.ToLower(name)
 			if l, ok := r.events[name]; ok {
-				_del(l, h.Id())
+				if _del(l, h.Id()) {
+					r.events[name] = nil, false
+				}
 			}
 		}
 	}
@@ -112,10 +117,12 @@ func (r *registry) Dispatch(name string, ev ...interface{}) {
 }
 
 func (r *registry) ClearEvents(name string) {
+	name = strings.ToLower(name)
 	r.Lock()
 	defer r.Unlock()
-	if l, ok := r.events[strings.ToLower(name)]; ok {
-		l.Init()
+	if l, ok := r.events[name]; ok {
+		l.Init() // I hope this is enough to GC all list elements.
+		r.events[name] = nil, false
 	}
 }
 
