@@ -16,7 +16,8 @@ func main() {
 	flag.Parse()
 
 	// create new IRC connection
-	c := irc.New("GoTest", "gotest", "GoBot", true, nil, nil)
+	c := irc.SimpleClient("GoTest", "gotest")
+	c.EnableStateTracking()
 	c.AddHandler("connected",
 		func(conn *irc.Conn, line *irc.Line) { conn.Join(*channel) })
 

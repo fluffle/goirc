@@ -23,7 +23,7 @@ Synopsis:
 
 	func main() {
         flag.Parse() // parses the logging flags.
-		c := irc.New("nick", "ident", "real name", false, nil, nil)
+		c := irc.SimpleClient("nick")
 		// Optionally, enable SSL
 		c.SSL = true
 
@@ -55,9 +55,11 @@ the messages from the IRC server, so you have to handle e.g. "332" for
 
 The vast majority of handlers implemented within the framework deal with state
 tracking of all nicks in any channels that the client is also present in. These
-handers are in `client/state_handlers.go`. State tracking is optional, and can
-be enabled by passing `true` as the fourth argument to `client.New()`. This API
-sucks and may change in the future.
+handers are in `client/state_handlers.go`. State tracking is optional, disabled
+by default, and can be enabled and disabled by calling `EnableStateTracking()`
+and `DisableStateTracking()` respectively. Doing this while connected to an IRC
+server will probably result in an inconsistent state and a lot of warnings to
+STDERR ;-)
 
 ### Misc.
 
