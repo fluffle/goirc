@@ -55,7 +55,7 @@ type registry struct {
 	dispatcher func(r *registry, name string, ev ...interface{})
 }
 
-func NewRegistry() EventRegistry {
+func NewRegistry() *registry {
 	r := &registry{events: make(map[string]*list.List)}
 	r.Parallel()
 	return r
@@ -67,7 +67,7 @@ func (r *registry) AddHandler(h Handler, names ...string) {
 	}
 	r.Lock()
 	defer r.Unlock()
-	for _, name := range names {
+N:	for _, name := range names {
 		name = strings.ToLower(name)
 		if _, ok := r.events[name]; !ok {
 			r.events[name] = list.New()
@@ -75,7 +75,7 @@ func (r *registry) AddHandler(h Handler, names ...string) {
 		for e := r.events[name].Front(); e != nil; e = e.Next() {
 			// Check we're not adding a duplicate handler to this event
 			if e.Value.(Handler).Id() == h.Id() {
-				return
+				continue N
 			}
 		}
 		r.events[name].PushBack(h)
@@ -99,6 +99,7 @@ func (r *registry) DelHandler(h Handler, names ...string) {
 		}
 	} else {
 		for _, name := range names {
+			name = strings.ToLower(name)
 			if l, ok := r.events[name]; ok {
 				_del(l, h.Id())
 			}
@@ -107,13 +108,13 @@ func (r *registry) DelHandler(h Handler, names ...string) {
 }
 
 func (r *registry) Dispatch(name string, ev ...interface{}) {
-	r.dispatcher(r, name, ev...)
+	r.dispatcher(r, strings.ToLower(name), ev...)
 }
 
 func (r *registry) ClearEvents(name string) {
 	r.Lock()
 	defer r.Unlock()
-	if l, ok := r.events[name]; ok {
+	if l, ok := r.events[strings.ToLower(name)]; ok {
 		l.Init()
 	}
 }
@@ -127,7 +128,6 @@ func (r *registry) Serial() {
 }
 
 func (r *registry) parallelDispatch(name string, ev ...interface{}) {
-	name = strings.ToLower(name)
 	r.RLock()
 	defer r.RUnlock()
 	if l, ok := r.events[name]; ok {
@@ -139,7 +139,6 @@ func (r *registry) parallelDispatch(name string, ev ...interface{}) {
 }
 
 func (r *registry) serialDispatch(name string, ev ...interface{}) {
-	name = strings.ToLower(name)
 	r.RLock()
 	defer r.RUnlock()
 	if l, ok := r.events[name]; ok {
