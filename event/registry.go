@@ -143,9 +143,9 @@ func (r *registry) serialDispatch(name string, ev ...interface{}) {
 	r.RLock()
 	defer r.RUnlock()
 	if l, ok := r.events[name]; ok {
-		hlist := make([]Handler, 0, l.Len())
-		for e := l.Front(); e != nil; e = e.Next() {
-			hlist = append(hlist, e.Value.(Handler))
+		hlist := make([]Handler, l.Len())
+		for e, i := l.Front(), 0; e != nil; e, i = e.Next(), i+1 {
+			hlist[i] = e.Value.(Handler)
 		}
 		go func() {
 			for _, h := range hlist {
