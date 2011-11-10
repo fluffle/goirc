@@ -39,14 +39,6 @@ func setUp(t *testing.T) (*Conn, *testState) {
 	c.Connected = true
 	c.postConnect()
 
-	// Assert some basic things about the initial state of the Conn struct
-	if c.Me.Nick != "test" ||
-		c.Me.Ident != "test" ||
-		c.Me.Name != "Testing IRC" ||
-		c.Me.Host != "" {
-		t.Errorf("Conn.Me not correctly initialised.")
-	}
-
 	return c, &testState{ctrl, l, st, ed, nc, c}
 }
 
@@ -87,6 +79,55 @@ func TestEOF(t *testing.T) {
 	}
 }
 
-func TestEnableStateTracking(t *testing.T) {
+func TestClientAndStateTracking(t *testing.T) {
+	// This doesn't use setUp() as we want to pass in a mock EventRegistry.
+	ctrl := gomock.NewController(t)
+	r := event.NewMockEventRegistry(ctrl)
+	l := logging.NewMockLogger(ctrl)
+	st := state.NewMockStateTracker(ctrl)
 
+	for n, h := range intHandlers {
+		r.EXPECT().AddHandler(h, n)
+	}
+	c := Client("test", "test", "Testing IRC", r, l)
+
+	// Assert some basic things about the initial state of the Conn struct
+	if c.ER != r || c.ED != r || c.l != l || c.st != false || c.ST != nil {
+		t.Errorf("Conn not correctly initialised with external deps.")
+	}
+	if c.in == nil || c.out == nil || c.cSend == nil || c.cLoop == nil {
+		t.Errorf("Conn control channels not correctly initialised.")
+	}
+	if c.Me.Nick != "test" || c.Me.Ident != "test" ||
+		c.Me.Name != "Testing IRC" || c.Me.Host != "" {
+		t.Errorf("Conn.Me not correctly initialised.")
+	}
+
+	// OK, while we're here with a mock event registry...
+	for n, h := range stHandlers {
+		r.EXPECT().AddHandler(h, n)
+	}
+	c.EnableStateTracking()
+
+	// We're expecting the untracked me to be replaced by a tracked one.
+	if c.Me.Nick != "test" || c.Me.Ident != "test" ||
+		c.Me.Name != "Testing IRC" || c.Me.Host != "" {
+		t.Errorf("Enabling state tracking did not replace Me correctly.")
+	}
+	if !c.st || c.ST == nil || c.Me != c.ST.Me() {
+		t.Errorf("State tracker not enabled correctly.")
+	}
+
+	// Now, shim in the mock state tracker and test disabling state tracking.
+	me := c.Me
+	c.ST = st
+	st.EXPECT().Wipe()
+	for n, h := range stHandlers {
+		r.EXPECT().DelHandler(h, n)
+	}
+	c.DisableStateTracking()
+	if c.st || c.ST != nil || c.Me != me {
+		t.Errorf("State tracker not disabled correctly.")
+	}
+	ctrl.Finish()
 }
