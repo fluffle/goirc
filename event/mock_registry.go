@@ -98,7 +98,7 @@ func (m *MockEventRegistry) AddHandler(h Handler, names ...string) {
 	m.ctrl.Call(m, "AddHandler", h, names)
 }
 
-func (mr *_MockEventRegistryRecorder) AddHandler(arg0 interface{}, arg1 ...interface{}) *gomock.Call {
+func (mr *_MockEventRegistryRecorder) AddHandler(arg0 interface{}, arg1 ...string) *gomock.Call {
 	return mr.mock.ctrl.RecordCall(mr.mock, "AddHandler", arg0, arg1)
 }
 
@@ -106,7 +106,7 @@ func (m *MockEventRegistry) DelHandler(h Handler, names ...string) {
 	m.ctrl.Call(m, "DelHandler", h, names)
 }
 
-func (mr *_MockEventRegistryRecorder) DelHandler(arg0 interface{}, arg1 ...interface{}) *gomock.Call {
+func (mr *_MockEventRegistryRecorder) DelHandler(arg0 interface{}, arg1 ...string) *gomock.Call {
 	return mr.mock.ctrl.RecordCall(mr.mock, "DelHandler", arg0, arg1)
 }
 
