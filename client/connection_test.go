@@ -278,3 +278,56 @@ func TestRecv(t *testing.T) {
 		t.Errorf("Line received on input channel after socket close.")
 	}
 }
+
+func TestRunLoop(t *testing.T) {
+	// Passing a second value to setUp inhibits postConnect()
+	c, s := setUp(t, false)
+	// We can't use tearDown here, as it will cause a deadlock in shutdown()
+	// trying to send kill messages down channels to nonexistent goroutines.
+	defer s.ctrl.Finish()
+
+	// ... so we have to do some of it's work here.
+	c.io = bufio.NewReadWriter(
+		bufio.NewReader(c.sock),
+		bufio.NewWriter(c.sock))
+
+	// NOTE: here we assert that no Dispatch event has been called yet by
+	// calling s.ctrl.Finish(). There doesn't appear to be any harm in this.
+	l1 := parseLine(":irc.server.org 001 test :First test line.")
+	c.in <- l1
+	s.ctrl.Finish()
+
+	// We want to test that the a goroutine calling runLoop will exit correctly.
+	// Now, we can expect the call to Dispatch to take place as runLoop starts.
+	s.ed.EXPECT().Dispatch("001", c, l1)
+	exited := false
+	go func() {
+		c.runLoop()
+		exited = true
+	}()
+	// Here, the opposite seemed to take place, with TestRunLoop failing when
+	// run as part of the suite but passing when run on it's own.
+	<-time.After(1e6)
+
+	// Send another line, just to be sure :-)
+	l2 := parseLine(":irc.server.org 002 test :Second test line.")
+	s.ed.EXPECT().Dispatch("002", c, l2)
+	c.in <- l2
+	// It appears some sleeping is needed after all of these to ensure channel
+	// sends occur before the close signal is sent below...
+	<-time.After(1e6)
+
+	// Now, use the control channel to exit send and kill the goroutine.
+	if exited {
+		t.Errorf("Exited before signal sent.")
+	}
+	c.cLoop <- true
+	// Allow propagation time...
+	<-time.After(1e6)
+	if !exited {
+		t.Errorf("Didn't exit after signal.")
+	}
+
+	// Sending more on c.in shouldn't dispatch any further events
+	c.in <- l1
+}
