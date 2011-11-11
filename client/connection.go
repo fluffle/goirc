@@ -261,7 +261,11 @@ func (conn *Conn) write(line string) {
 		conn.shutdown()
 		return
 	}
-	conn.io.Flush()
+	if err := conn.io.Flush(); err != nil {
+		conn.l.Error("irc.send(): %s", err.String())
+		conn.shutdown()
+		return
+	}
 	conn.l.Debug("-> %s", line)
 }
 

@@ -166,13 +166,6 @@ func TestSend(t *testing.T) {
 	// to the socket connection.
 	s.nc.Expect("SENT BEFORE START")
 
-	// Flood control is disabled -- setUp sets c.Flood = true -- so we should
-	// not have set c.badness or c.lastsent. We test the actual rateLimit code
-	// elsewhere, this is just for verification purposes...
-	if c.badness != 0 || c.lastsent != 0 {
-		t.Errorf("Flood control appears to be incorrectly enabled.")
-	}
-
 	// Send another line, just to be sure :-)
 	c.out <- "SENT AFTER START"
 	s.nc.Expect("SENT AFTER START")
@@ -330,4 +323,54 @@ func TestRunLoop(t *testing.T) {
 
 	// Sending more on c.in shouldn't dispatch any further events
 	c.in <- l1
+}
+
+func TestWrite(t *testing.T) {
+	// Passing a second value to setUp inhibits postConnect()
+	c, s := setUp(t, false)
+	// We can't use tearDown here, as it will cause a deadlock in shutdown()
+	// trying to send kill messages down channels to nonexistent goroutines.
+	defer s.ctrl.Finish()
+
+	// ... so we have to do some of it's work here.
+	c.io = bufio.NewReadWriter(
+		bufio.NewReader(c.sock),
+		bufio.NewWriter(c.sock))
+
+	// Write should just write a line to the socket.
+	c.write("yo momma")
+	s.nc.Expect("yo momma")
+
+	// Flood control is disabled -- setUp sets c.Flood = true -- so we should
+	// not have set c.badness or c.lastsent at this point.
+	if c.badness != 0 || c.lastsent != 0 {
+		t.Errorf("Flood control used when Flood = true.")
+	}
+
+	c.Flood = false
+	c.write("she so useless")
+	s.nc.Expect("she so useless")
+
+	// The lastsent time should have been updated now.
+	if c.lastsent == 0 {
+		t.Errorf("Flood control not used when Flood = false.")
+	}
+
+	// Finally, test the error state by closing the socket then writing.
+	// This little function makes sure that all the blocking channels that are
+	// written to during the course of s.nc.Close() and c.write() are read from
+	// again, to prevent deadlocks when these are both called synchronously.
+	// XXX: This may well be a horrible hack.
+	go func() {
+		s.nc.Read(make([]byte, 0))
+		<-c.cSend
+		<-c.cLoop
+	}()
+	s.nc.Close()
+
+	s.ed.EXPECT().Dispatch("disconnected", c, &Line{})
+	s.st.EXPECT().Wipe()
+	s.log.EXPECT().Info("irc.shutdown(): Disconnected from server.")
+	s.log.EXPECT().Error("irc.send(): %s", "invalid argument")
+	c.write("she can't pass unit tests")
 }
