@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bufio"
 	"github.com/fluffle/goirc/event"
 	"github.com/fluffle/goirc/logging"
 	"github.com/fluffle/goirc/state"
@@ -18,7 +19,7 @@ type testState struct {
 	c    *Conn
 }
 
-func setUp(t *testing.T) (*Conn, *testState) {
+func setUp(t *testing.T, start ...bool) (*Conn, *testState) {
 	ctrl := gomock.NewController(t)
 	st := state.NewMockStateTracker(ctrl)
 	r := event.NewRegistry()
@@ -37,7 +38,11 @@ func setUp(t *testing.T) (*Conn, *testState) {
 	c.sock = nc
 	c.Flood = true // Tests can take a while otherwise
 	c.Connected = true
-	c.postConnect()
+	if len(start) == 0 {
+		// Hack to allow tests of send, recv, write etc.
+		// NOTE: the value of the boolean doesn't matter.
+		c.postConnect()
+	}
 
 	return c, &testState{ctrl, l, st, ed, nc, c}
 }
@@ -130,4 +135,61 @@ func TestClientAndStateTracking(t *testing.T) {
 		t.Errorf("State tracker not disabled correctly.")
 	}
 	ctrl.Finish()
+}
+
+func TestSend(t *testing.T) {
+	// Passing a second value to setUp inhibits postConnect()
+	c, s := setUp(t, false)
+	// We can't use tearDown here, as it will cause a deadlock in shutdown()
+	// trying to send kill messages down channels to nonexistent goroutines.
+	defer s.ctrl.Finish()
+
+	// ... so we have to do some of it's work here.
+	c.io = bufio.NewReadWriter(
+		bufio.NewReader(c.sock),
+		bufio.NewWriter(c.sock))
+
+	// Assert that before send is running, nothing should be sent to the socket
+	// but writes to the buffered channel "out" should not block.
+	c.out <- "SENT BEFORE START"
+	s.nc.ExpectNothing()
+
+	// We want to test that the a goroutine calling send will exit correctly.
+	exited := false
+	go func() {
+		c.send()
+		exited = true
+	}()
+
+	// send is now running in the background as if started by postConnect.
+	// This should read the line previously buffered in c.out, and write it
+	// to the socket connection.
+	s.nc.Expect("SENT BEFORE START")
+
+	// Flood control is disabled -- setUp sets c.Flood = true -- so we should
+	// not have set c.badness or c.lastsent. We test the actual rateLimit code
+	// elsewhere, this is just for verification purposes...
+	if c.badness != 0 || c.lastsent != 0 {
+		t.Errorf("Flood control appears to be incorrectly enabled.")
+	}
+
+	// Send another line, just to be sure :-)
+	c.out <- "SENT AFTER START"
+	s.nc.Expect("SENT AFTER START")
+
+	// Now, use the control channel to exit send and kill the goroutine.
+	if exited {
+		t.Errorf("Exited before signal sent.")
+	}
+	c.cSend <- true
+	// Allow propagation time...
+	<-time.After(1e6)
+	if !exited {
+		t.Errorf("Didn't exit after signal.")
+	}
+	s.nc.ExpectNothing()
+
+	// Sending more on c.out shouldn't reach the network.
+	c.out <- "SENT AFTER END"
+	s.nc.ExpectNothing()
 }
