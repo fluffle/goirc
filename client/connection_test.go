@@ -193,3 +193,88 @@ func TestSend(t *testing.T) {
 	c.out <- "SENT AFTER END"
 	s.nc.ExpectNothing()
 }
+
+func TestRecv(t *testing.T) {
+	// Passing a second value to setUp inhibits postConnect()
+	c, s := setUp(t, false)
+	// We can't tearDown here as we need to explicitly test recv exiting.
+	// The same shutdown() caveat in TestSend above also applies.
+	defer s.ctrl.Finish()
+
+	// ... so we have to do some of it's work here.
+	c.io = bufio.NewReadWriter(
+		bufio.NewReader(c.sock),
+		bufio.NewWriter(c.sock))
+
+	// Send a line before recv is started up, to verify nothing appears on c.in
+	s.nc.Send(":irc.server.org 001 test :First test line.")
+
+	// reader is a helper to do a "non-blocking" read of c.in
+	reader := func() *Line {
+		select {
+		case <-time.After(1e6):
+		case l := <-c.in:
+			return l
+		}
+		return nil
+	}
+	if l := reader(); l != nil {
+		t.Errorf("Line parsed before recv started.")
+	}
+
+	// We want to test that the a goroutine calling recv will exit correctly.
+	exited := false
+	go func() {
+		c.recv()
+		exited = true
+	}()
+
+	// Strangely, recv() needs some time to start up, but *only* when this test
+	// is run standalone with: client/_test/_testmain --test.run TestRecv
+	<-time.After(1e6)
+
+	// Now, this should mean that we'll receive our parsed line on c.in
+	if l := reader(); l == nil || l.Cmd != "001" {
+		t.Errorf("Bad first line received on input channel")
+	}
+
+	// Send a second line, just to be sure.
+	s.nc.Send(":irc.server.org 002 test :Second test line.")
+	if l := reader(); l == nil || l.Cmd != "002" {
+		t.Errorf("Bad second line received on input channel.")
+	}
+
+	// Test that recv does something useful with a line it can't parse
+	// (not that there are many, parseLine is forgiving).
+	s.log.EXPECT().Warn("irc.recv(): problems parsing line:\n  %s",
+		":textwithnospaces")
+	s.nc.Send(":textwithnospaces")
+	if l := reader(); l != nil {
+		t.Errorf("Bad line still caused receive on input channel.")
+	}
+
+	// The only way recv() exits is when the socket closes.
+	if exited {
+		t.Errorf("Exited before socket close.")
+	}
+	s.ed.EXPECT().Dispatch("disconnected", c, &Line{})
+	s.st.EXPECT().Wipe()
+	s.log.EXPECT().Info("irc.shutdown(): Disconnected from server.")
+	s.log.EXPECT().Error("irc.recv(): %s", "EOF")
+	s.nc.Close()
+
+	// Since send and runloop aren't actually running, we need to empty their
+	// channels manually for recv() to be able to call shutdown correctly.
+	<-c.cSend
+	<-c.cLoop
+	// Give things time to shake themselves out...
+	<-time.After(1e6)
+	if !exited {
+		t.Errorf("Didn't exit on socket close.")
+	}
+
+	// Since s.nc is closed we can't attempt another send on it...
+	if l := reader(); l != nil {
+		t.Errorf("Line received on input channel after socket close.")
+	}
+}
