@@ -253,7 +253,12 @@ func (conn *Conn) runLoop() {
 // using Hybrid's algorithm to rate limit if conn.Flood is false.
 func (conn *Conn) write(line string) {
 	if !conn.Flood {
-		conn.rateLimit(int64(len(line)))
+		if t := conn.rateLimit(int64(len(line))); t != 0 {
+			// sleep for the current line's time value before sending it
+			conn.l.Debug("irc.rateLimit(): Flood! Sleeping for %.2f secs.",
+				float64(t)/float64(second))
+			<-time.After(t)
+		}
 	}
 
 	if _, err := conn.io.WriteString(line + "\r\n"); err != nil {
@@ -270,7 +275,7 @@ func (conn *Conn) write(line string) {
 }
 
 // Implement Hybrid's flood control algorithm to rate-limit outgoing lines.
-func (conn *Conn) rateLimit(chars int64) {
+func (conn *Conn) rateLimit(chars int64) int64 {
 	// Hybrid's algorithm allows for 2 seconds per line and an additional
 	// 1/120 of a second per character on that line.
 	linetime := 2*second + chars*second/120
@@ -282,12 +287,10 @@ func (conn *Conn) rateLimit(chars int64) {
 	conn.lastsent = time.Nanoseconds()
 	// If we've sent more than 10 second's worth of lines according to the
 	// calculation above, then we're at risk of "Excess Flood".
-	if conn.badness > 10*second && !conn.Flood {
-		// so sleep for the current line's time value before sending it
-		conn.l.Debug("irc.rateLimit(): Flood! Sleeping for %.2f secs.",
-			float64(linetime)/float64(second))
-		<-time.After(linetime)
+	if conn.badness > 10*second {
+		return linetime
 	}
+	return 0
 }
 
 func (conn *Conn) shutdown() {

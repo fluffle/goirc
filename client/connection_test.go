@@ -373,3 +373,29 @@ func TestWrite(t *testing.T) {
 	s.log.EXPECT().Error("irc.send(): %s", "invalid argument")
 	c.write("she can't pass unit tests")
 }
+
+func TestRateLimit(t *testing.T) {
+	c, s := setUp(t)
+	defer s.tearDown()
+
+	if c.badness != 0 || c.lastsent != 0 {
+		t.Errorf("Bad initial values for rate limit variables.")
+	}
+
+	// badness will still be 0 because lastsent was 0 before rateLimit.
+	if l := c.rateLimit(60); l != 0 || c.badness != 0 || c.lastsent == 0 {
+		t.Errorf("Rate limit variables not updated correctly after rateLimit.")
+	}
+	// So, time at the nanosecond resolution is a bit of a bitch. Choosing 60
+	// characters as the line length means we should be increasing badness by
+	// 2.5 seconds minus the delta between the two ratelimit calls. This should
+	// be minimal but it's guaranteed that it won't be zero. Use 1us as a fuzz.
+	// This seems to be the minimum timer resolution, on my laptop at least...
+	if l := c.rateLimit(60); l != 0 || c.badness - int64(25*1e8) > 1e3 {
+		t.Errorf("Rate limit calculating badness incorrectly.")
+	}
+	// At this point, we can tip over the badness scale, with a bit of help.	
+	if l := c.rateLimit(360); l == 80*1e8 || c.badness - int64(105*1e8) > 1e3 {
+		t.Errorf("Rate limit failed to return correct limiting values.")
+	}
+}
