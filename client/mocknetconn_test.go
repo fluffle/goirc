@@ -8,12 +8,18 @@ import (
 	"time"
 )
 
+const (
+	mockReadCloser = iota
+	mockInCloser
+	mockOutCloser
+)
+
 type mockNetConn struct {
 	*testing.T
 
 	In, Out chan string
 	in, out chan []byte
-	closers []chan bool
+	closers [3]chan bool
 	rc      chan bool
 
 	closed bool
@@ -23,22 +29,15 @@ type mockNetConn struct {
 func MockNetConn(t *testing.T) *mockNetConn {
 	// Our mock connection is a testing object
 	m := &mockNetConn{T: t}
-	m.closers = make([]chan bool, 0, 3)
-
-	// set known values for conn info
-	m.closed = false
-	m.rt = 0
-	m.wt = 0
 
 	// buffer input
 	m.In = make(chan string, 20)
 	m.in = make(chan []byte)
-	ic := make(chan bool)
-	m.closers = append(m.closers, ic)
+	m.closers[mockInCloser] = make(chan bool, 1)
 	go func() {
 		for {
 			select {
-			case <-ic:
+			case <-m.closers[mockInCloser]:
 				return
 			case s := <-m.In:
 				m.in <- []byte(s)
@@ -49,12 +48,11 @@ func MockNetConn(t *testing.T) *mockNetConn {
 	// buffer output
 	m.Out = make(chan string)
 	m.out = make(chan []byte, 20)
-	oc := make(chan bool)
-	m.closers = append(m.closers, oc)
+	m.closers[mockOutCloser] = make(chan bool, 1)
 	go func() {
 		for {
 			select {
-			case <-oc:
+			case <-m.closers[mockOutCloser]:
 				return
 			case b := <-m.out:
 				m.Out <- string(b)
@@ -63,8 +61,7 @@ func MockNetConn(t *testing.T) *mockNetConn {
 	}()
 
 	// Set up channel to force EOF to Read() on close.
-	m.rc = make(chan bool)
-	m.closers = append(m.closers, m.rc)
+	m.closers[mockReadCloser] = make(chan bool, 1)
 
 	return m
 }
@@ -108,7 +105,7 @@ func (m *mockNetConn) Read(b []byte) (int, os.Error) {
 	case s := <-m.in:
 		l = len(s)
 		copy(b, s)
-	case <-m.rc:
+	case <-m.closers[mockReadCloser]:
 		return 0, os.EOF
 	}
 	return l, nil
