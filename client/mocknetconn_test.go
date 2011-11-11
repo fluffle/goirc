@@ -75,13 +75,11 @@ func (m *mockNetConn) Send(s string) {
 }
 
 func (m *mockNetConn) Expect(e string) {
-	t := time.NewTimer(5e6)
 	select {
-	case <-t.C:
+	case <-time.After(1e6):
 		m.Errorf("Mock connection did not receive expected output.\n\t"+
 			"Expected: '%s', got nothing.", e)
 	case s := <-m.Out:
-		t.Stop()
 		s = strings.Trim(s, "\r\n")
 		if e != s {
 			m.Errorf("Mock connection received unexpected value.\n\t"+
@@ -91,11 +89,9 @@ func (m *mockNetConn) Expect(e string) {
 }
 
 func (m *mockNetConn) ExpectNothing() {
-	t := time.NewTimer(5e6)
 	select {
-	case <-t.C:
+	case <-time.After(1e6):
 	case s := <-m.Out:
-		t.Stop()
 		s = strings.Trim(s, "\r\n")
 		m.Errorf("Mock connection received unexpected output.\n\t"+
 			"Expected nothing, got: '%s'", s)
