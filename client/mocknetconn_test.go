@@ -103,13 +103,15 @@ func (m *mockNetConn) Read(b []byte) (int, os.Error) {
 	if m.closed {
 		return 0, os.EINVAL
 	}
+	l := 0
 	select {
 	case s := <-m.in:
+		l = len(s)
 		copy(b, s)
 	case <-m.rc:
 		return 0, os.EOF
 	}
-	return len(b), nil
+	return l, nil
 }
 
 func (m *mockNetConn) Write(s []byte) (int, os.Error) {
@@ -119,7 +121,7 @@ func (m *mockNetConn) Write(s []byte) (int, os.Error) {
 	b := make([]byte, len(s))
 	copy(b, s)
 	m.out <- b
-	return len(b), nil
+	return len(s), nil
 }
 
 func (m *mockNetConn) Close() os.Error {
