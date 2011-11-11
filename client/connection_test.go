@@ -42,14 +42,14 @@ func setUp(t *testing.T, start ...bool) (*Conn, *testState) {
 		// Hack to allow tests of send, recv, write etc.
 		// NOTE: the value of the boolean doesn't matter.
 		c.postConnect()
+		// Sleep 1ms to allow background routines to start.
+		<-time.After(1e6)
 	}
 
 	return c, &testState{ctrl, l, st, ed, nc, c}
 }
 
 func (s *testState) tearDown() {
-	// This can get set to false in some tests
-	s.c.st = true
 	s.ed.EXPECT().Dispatch("disconnected", s.c, &Line{})
 	s.st.EXPECT().Wipe()
 	s.log.EXPECT().Error("irc.recv(): %s", "EOF")
@@ -362,7 +362,6 @@ func TestWrite(t *testing.T) {
 	// again, to prevent deadlocks when these are both called synchronously.
 	// XXX: This may well be a horrible hack.
 	go func() {
-		s.nc.Read(make([]byte, 0))
 		<-c.cSend
 		<-c.cLoop
 	}()

@@ -74,6 +74,7 @@ func Test433(t *testing.T) {
 	if c.Me.Nick != "test_" {
 		t.Errorf("My nick not updated from '%s'.", c.Me.Nick)
 	}
+	c.st = true
 }
 
 // Test the handler for NICK messages when state tracking is disabled
