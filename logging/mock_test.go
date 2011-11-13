@@ -1,7 +1,6 @@
 package logging
 
 import (
-	"os"
 	"strings"
 	"testing"
 )
@@ -13,7 +12,7 @@ type mockWriter struct {
 	written []byte
 }
 
-func (w *mockWriter) Write(p []byte) (n int, err os.Error) {
+func (w *mockWriter) Write(p []byte) (n int, err error) {
 	w.written = append(w.written, p...)
 	return len(p), nil
 }
@@ -62,7 +61,7 @@ func newMock(t *testing.T) (*logger, *writerMap) {
 		logMap[lv] = makeLogger(w)
 	}
 	// Set the default log level high enough that everything will get logged
-	return New(logMap, (1 << 31) - 1, false), wMap
+	return New(logMap, (1<<31)-1, false), wMap
 }
 
 // When you expect something to be logged but don't care so much what level at.
@@ -88,7 +87,6 @@ func (wm *writerMap) Expect(exp string) {
 		wm.t.Errorf("exp: %s", exp)
 	}
 }
-
 
 // When you expect nothing to be logged
 func (wm *writerMap) ExpectNothing() {
