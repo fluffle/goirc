@@ -1,7 +1,7 @@
 package state
 
 import (
-	"github.com/fluffle/goirc/logging"
+	"github.com/fluffle/golog/logging"
 	"gomock.googlecode.com/hg/gomock"
 	"testing"
 )

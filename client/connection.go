@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"crypto/tls"
 	"github.com/fluffle/goirc/event"
-	"github.com/fluffle/goirc/logging"
+	"github.com/fluffle/golog/logging"
 	"github.com/fluffle/goirc/state"
 	"fmt"
 	"net"
