@@ -45,7 +45,7 @@ func NewTracker(mynick string, l logging.Logger) *stateTracker {
 	st := &stateTracker{
 		chans: make(map[string]*Channel),
 		nicks: make(map[string]*Nick),
-		l: l,
+		l:     l,
 	}
 	st.me = st.NewNick(mynick)
 	return st
@@ -88,12 +88,12 @@ func (st *stateTracker) ReNick(old, neu string) {
 	if nk, ok := st.nicks[old]; ok {
 		if _, ok := st.nicks[neu]; !ok {
 			nk.Nick = neu
-			st.nicks[old] = nil, false
+			delete(st.nicks, old)
 			st.nicks[neu] = nk
 			for ch, _ := range nk.chans {
 				// We also need to update the lookup maps of all the channels
 				// the nick is on, to keep things in sync.
-				ch.lookup[old] = nil, false
+				delete(ch.lookup, old)
 				ch.lookup[neu] = nk
 			}
 		} else {
@@ -123,7 +123,7 @@ func (st *stateTracker) delNick(nk *Nick) {
 		st.l.Error("StateTracker.DelNick(): TRYING TO DELETE ME :-(")
 		return
 	}
-	st.nicks[nk.Nick] = nil, false
+	delete(st.nicks, nk.Nick)
 	for ch, _ := range nk.chans {
 		nk.delChannel(ch)
 		ch.delNick(nk)
@@ -165,7 +165,7 @@ func (st *stateTracker) DelChannel(c string) {
 }
 
 func (st *stateTracker) delChannel(ch *Channel) {
-	st.chans[ch.Name] = nil, false
+	delete(st.chans, ch.Name)
 	for nk, _ := range ch.nicks {
 		ch.delNick(nk)
 		nk.delChannel(ch)

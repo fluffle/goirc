@@ -9,9 +9,9 @@ import (
 type Nick struct {
 	Nick, Ident, Host, Name string
 	Modes                   *NickMode
-	lookup					map[string]*Channel
+	lookup                  map[string]*Channel
 	chans                   map[*Channel]*ChanPrivs
-	l						logging.Logger
+	l                       logging.Logger
 }
 
 // A struct representing the modes of an IRC Nick (User Modes)
@@ -46,11 +46,11 @@ func init() {
 
 func NewNick(n string, l logging.Logger) *Nick {
 	return &Nick{
-		Nick: n,
-		Modes: new(NickMode),
-		chans: make(map[*Channel]*ChanPrivs),
+		Nick:   n,
+		Modes:  new(NickMode),
+		chans:  make(map[*Channel]*ChanPrivs),
 		lookup: make(map[string]*Channel),
-		l: l,
+		l:      l,
 	}
 }
 
@@ -78,8 +78,8 @@ func (nk *Nick) addChannel(ch *Channel, cp *ChanPrivs) {
 // Disassociates a Channel from a Nick.
 func (nk *Nick) delChannel(ch *Channel) {
 	if _, ok := nk.chans[ch]; ok {
-		nk.chans[ch] = nil, false
-		nk.lookup[ch.Name] = nil, false
+		delete(nk.chans, ch)
+		delete(nk.lookup, ch.Name)
 	} else {
 		nk.l.Warn("Nick.delChannel(): %s not on %s.", nk.Nick, ch.Name)
 	}
