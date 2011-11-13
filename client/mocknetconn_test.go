@@ -1,6 +1,7 @@
 package client
 
 import (
+	"io"
 	"net"
 	"os"
 	"strings"
@@ -96,7 +97,7 @@ func (m *mockNetConn) ExpectNothing() {
 }
 
 // Implement net.Conn interface
-func (m *mockNetConn) Read(b []byte) (int, os.Error) {
+func (m *mockNetConn) Read(b []byte) (int, error) {
 	if m.closed {
 		return 0, os.EINVAL
 	}
@@ -106,12 +107,12 @@ func (m *mockNetConn) Read(b []byte) (int, os.Error) {
 		l = len(s)
 		copy(b, s)
 	case <-m.closers[mockReadCloser]:
-		return 0, os.EOF
+		return 0, io.EOF
 	}
 	return l, nil
 }
 
-func (m *mockNetConn) Write(s []byte) (int, os.Error) {
+func (m *mockNetConn) Write(s []byte) (int, error) {
 	if m.closed {
 		return 0, os.EINVAL
 	}
@@ -121,7 +122,7 @@ func (m *mockNetConn) Write(s []byte) (int, os.Error) {
 	return len(s), nil
 }
 
-func (m *mockNetConn) Close() os.Error {
+func (m *mockNetConn) Close() error {
 	if m.closed {
 		return os.EINVAL
 	}
@@ -142,18 +143,18 @@ func (m *mockNetConn) RemoteAddr() net.Addr {
 	return &net.IPAddr{net.IPv4(127, 0, 0, 1)}
 }
 
-func (m *mockNetConn) SetTimeout(ns int64) os.Error {
+func (m *mockNetConn) SetTimeout(ns int64) error {
 	m.rt = ns
 	m.wt = ns
 	return nil
 }
 
-func (m *mockNetConn) SetReadTimeout(ns int64) os.Error {
+func (m *mockNetConn) SetReadTimeout(ns int64) error {
 	m.rt = ns
 	return nil
 }
 
-func (m *mockNetConn) SetWriteTimeout(ns int64) os.Error {
+func (m *mockNetConn) SetWriteTimeout(ns int64) error {
 	m.wt = ns
 	return nil
 }

@@ -3,12 +3,13 @@ package client
 import (
 	"bufio"
 	"crypto/tls"
+	"errors"
+	"fmt"
 	"github.com/fluffle/goirc/event"
 	"github.com/fluffle/goirc/logging"
 	"github.com/fluffle/goirc/state"
-	"fmt"
 	"net"
-	"os"
+
 	"strings"
 	"time"
 )
@@ -87,20 +88,20 @@ func Client(nick, ident, name string,
 		return nil
 	}
 	conn := &Conn{
-		ER:         r,
-		ED:         r,
-		l:          l,
-		st:         false,
-		in:         make(chan *Line, 32),
-		out:        make(chan string, 32),
-		cSend:      make(chan bool),
-		cLoop:      make(chan bool),
-		SSL:        false,
-		SSLConfig:  nil,
-		Timeout:    300,
-		Flood:      false,
-		badness:    0,
-		lastsent:   0,
+		ER:        r,
+		ED:        r,
+		l:         l,
+		st:        false,
+		in:        make(chan *Line, 32),
+		out:       make(chan string, 32),
+		cSend:     make(chan bool),
+		cLoop:     make(chan bool),
+		SSL:       false,
+		SSLConfig: nil,
+		Timeout:   300,
+		Flood:     false,
+		badness:   0,
+		lastsent:  0,
 	}
 	conn.addIntHandlers()
 	conn.Me = state.NewNick(nick, l)
@@ -146,9 +147,9 @@ func (conn *Conn) initialise() {
 // on the connection to the IRC server, set Conn.SSL to true before calling
 // Connect(). The port will default to 6697 if ssl is enabled, and 6667
 // otherwise. You can also provide an optional connect password.
-func (conn *Conn) Connect(host string, pass ...string) os.Error {
+func (conn *Conn) Connect(host string, pass ...string) error {
 	if conn.Connected {
-		return os.NewError(fmt.Sprintf(
+		return errors.New(fmt.Sprintf(
 			"irc.Connect(): already connected to %s, cannot connect to %s",
 			conn.Host, host))
 	}
@@ -220,7 +221,7 @@ func (conn *Conn) recv() {
 	for {
 		s, err := conn.io.ReadString('\n')
 		if err != nil {
-			conn.l.Error("irc.recv(): %s", err.String())
+			conn.l.Error("irc.recv(): %s", err.Error())
 			conn.shutdown()
 			return
 		}
@@ -262,12 +263,12 @@ func (conn *Conn) write(line string) {
 	}
 
 	if _, err := conn.io.WriteString(line + "\r\n"); err != nil {
-		conn.l.Error("irc.send(): %s", err.String())
+		conn.l.Error("irc.send(): %s", err.Error())
 		conn.shutdown()
 		return
 	}
 	if err := conn.io.Flush(); err != nil {
-		conn.l.Error("irc.send(): %s", err.String())
+		conn.l.Error("irc.send(): %s", err.Error())
 		conn.shutdown()
 		return
 	}
