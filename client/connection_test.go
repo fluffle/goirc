@@ -2,7 +2,7 @@ package client
 
 import (
 	"bufio"
-	"github.com/fluffle/goirc/event"
+	"github.com/fluffle/goevent/event"
 	"github.com/fluffle/golog/logging"
 	"github.com/fluffle/goirc/state"
 	"gomock.googlecode.com/hg/gomock"
