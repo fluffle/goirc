@@ -5,11 +5,10 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"github.com/fluffle/goirc/event"
-	"github.com/fluffle/goirc/logging"
+	"github.com/fluffle/goevent/event"
+	"github.com/fluffle/golog/logging"
 	"github.com/fluffle/goirc/state"
 	"net"
-
 	"strings"
 	"time"
 )

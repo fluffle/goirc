@@ -4,7 +4,7 @@ package client
 // to manage tracking an irc connection etc.
 
 import (
-	"github.com/fluffle/goirc/event"
+	"github.com/fluffle/goevent/event"
 	"strings"
 )
 
