@@ -3,8 +3,8 @@ package event
 import (
 	"container/list"
 	"strings"
-	"sync/atomic"
 	"sync"
+	"sync/atomic"
 )
 
 type HandlerID uint32
@@ -67,7 +67,8 @@ func (r *registry) AddHandler(h Handler, names ...string) {
 	}
 	r.Lock()
 	defer r.Unlock()
-N:	for _, name := range names {
+N:
+	for _, name := range names {
 		name = strings.ToLower(name)
 		if _, ok := r.events[name]; !ok {
 			r.events[name] = list.New()
@@ -97,7 +98,7 @@ func (r *registry) DelHandler(h Handler, names ...string) {
 	if len(names) == 0 {
 		for name, l := range r.events {
 			if _del(l, h.Id()) {
-				r.events[name] = nil, false
+				delete(r.events, name)
 			}
 		}
 	} else {
@@ -105,7 +106,7 @@ func (r *registry) DelHandler(h Handler, names ...string) {
 			name = strings.ToLower(name)
 			if l, ok := r.events[name]; ok {
 				if _del(l, h.Id()) {
-					r.events[name] = nil, false
+					delete(r.events, name)
 				}
 			}
 		}
@@ -122,7 +123,7 @@ func (r *registry) ClearEvents(name string) {
 	defer r.Unlock()
 	if l, ok := r.events[name]; ok {
 		l.Init() // I hope this is enough to GC all list elements.
-		r.events[name] = nil, false
+		delete(r.events, name)
 	}
 }
 
