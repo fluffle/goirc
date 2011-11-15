@@ -199,7 +199,9 @@ func (conn *Conn) postConnect() {
 	conn.sock.SetTimeout(conn.Timeout * second)
 	go conn.send()
 	go conn.recv()
-	go conn.ping()
+	if conn.PingFreq > 0 {
+		go conn.ping()
+	}
 	go conn.runLoop()
 }
 
