@@ -201,6 +201,9 @@ func (conn *Conn) postConnect() {
 	go conn.recv()
 	if conn.PingFreq > 0 {
 		go conn.ping()
+	} else {
+		// Otherwise the send in shutdown will hang :-/
+		go func() { <-conn.cPing }()
 	}
 	go conn.runLoop()
 }
