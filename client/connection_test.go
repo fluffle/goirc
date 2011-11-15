@@ -6,6 +6,7 @@ import (
 	"github.com/fluffle/golog/logging"
 	"github.com/fluffle/goirc/state"
 	"gomock.googlecode.com/hg/gomock"
+	"strings"
 	"testing"
 	"time"
 )
@@ -260,6 +261,7 @@ func TestRecv(t *testing.T) {
 	// channels manually for recv() to be able to call shutdown correctly.
 	<-c.cSend
 	<-c.cLoop
+	<-c.cPing
 	// Give things time to shake themselves out...
 	<-time.After(1e6)
 	if !exited {
@@ -269,6 +271,74 @@ func TestRecv(t *testing.T) {
 	// Since s.nc is closed we can't attempt another send on it...
 	if l := reader(); l != nil {
 		t.Errorf("Line received on input channel after socket close.")
+	}
+}
+
+func TestPing(t *testing.T) {
+	// Passing a second value to setUp inhibits postConnect()
+	c, s := setUp(t, false)
+	// We can't use tearDown here, as it will cause a deadlock in shutdown()
+	// trying to send kill messages down channels to nonexistent goroutines.
+	defer s.ctrl.Finish()
+
+	// Set a low ping frequency for testing.
+	// This still increases testing time by a good few seconds :-/
+	c.PingFreq = 1
+
+	// reader is a helper to do a "non-blocking" read of c.out
+	reader := func() string {
+		select {
+		case <-time.After(1e6):
+		case s := <-c.out:
+			return s
+		}
+		return ""
+	}
+	if s := reader(); s != "" {
+		t.Errorf("Line output before ping started.")
+	}
+
+	// Start ping loop.
+	exited := false
+	go func() {
+		c.ping()
+		exited = true
+	}()
+
+	// The first ping should be after a second,
+	// so we don't expect anything now on c.in
+	if s := reader(); s != "" {
+		t.Errorf("Line output directly after ping started.")
+	}
+
+	<-time.After(1e9)
+	if s := reader(); s == "" || !strings.HasPrefix(s, "PING :") {
+		t.Errorf("Line not output after 1 second.")
+	}
+
+	<-time.After(1e7)
+	if s := reader(); s != "" {
+		t.Errorf("Line output under a second after last ping.")
+	}
+
+	<-time.After(1e9)
+	if s := reader(); s == "" || !strings.HasPrefix(s, "PING :") {
+		t.Errorf("Line not output after another second.")
+	}
+
+	// Now kill the ping loop.
+	if exited {
+		t.Errorf("Exited before signal sent.")
+	}
+
+	c.cPing <- true
+	<-time.After(1e9)
+	if s := reader(); s != "" {
+		t.Errorf("Line output after ping stopped.")
+	}
+
+	if !exited {
+		t.Errorf("Didn't exit after signal.")
 	}
 }
 
@@ -364,6 +434,7 @@ func TestWrite(t *testing.T) {
 	go func() {
 		<-c.cSend
 		<-c.cLoop
+		<-c.cPing
 	}()
 	s.nc.Close()
 

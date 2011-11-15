@@ -47,15 +47,18 @@ type Conn struct {
 	Connected bool
 
 	// Control channels to goroutines
-	cSend, cLoop chan bool
+	cSend, cLoop, cPing chan bool
 
 	// Misc knobs to tweak client behaviour:
 	// Are we connecting via SSL? Do we care about certificate validity?
 	SSL       bool
 	SSLConfig *tls.Config
 
-	// Socket timeout, in seconds. Defaulted to 5m in New().
-	Timeout int64
+	// Client->server ping frequency, in seconds. Defaults to 3m.
+	PingFreq int64
+
+	// Socket timeout, in seconds. Default to 5m.
+	Timeout  int64
 
 	// Set this to true to disable flood protection and false to re-enable
 	Flood bool
@@ -95,8 +98,10 @@ func Client(nick, ident, name string,
 		out:        make(chan string, 32),
 		cSend:      make(chan bool),
 		cLoop:      make(chan bool),
+		cPing:      make(chan bool),
 		SSL:        false,
 		SSLConfig:  nil,
+		PingFreq:	180,
 		Timeout:    300,
 		Flood:      false,
 		badness:    0,
@@ -194,6 +199,7 @@ func (conn *Conn) postConnect() {
 	conn.sock.SetTimeout(conn.Timeout * second)
 	go conn.send()
 	go conn.recv()
+	go conn.ping()
 	go conn.runLoop()
 }
 
@@ -232,6 +238,20 @@ func (conn *Conn) recv() {
 			conn.in <- line
 		} else {
 			conn.l.Warn("irc.recv(): problems parsing line:\n  %s", s)
+		}
+	}
+}
+
+// Repeatedly pings the server every PingFreq seconds (no matter what)
+func (conn *Conn) ping() {
+	tick := time.NewTicker(conn.PingFreq * second)
+	for {
+		select {
+		case <-tick.C:
+			conn.Raw(fmt.Sprintf("PING :%d", time.Nanoseconds()))
+		case <-conn.cPing:
+			tick.Stop()
+			return
 		}
 	}
 }
@@ -303,6 +323,7 @@ func (conn *Conn) shutdown() {
 		conn.sock.Close()
 		conn.cSend <- true
 		conn.cLoop <- true
+		conn.cPing <- true
 		// reinit datastructures ready for next connection
 		// do this here rather than after runLoop()'s for due to race
 		conn.initialise()
