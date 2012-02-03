@@ -5,7 +5,7 @@ import (
 	"github.com/fluffle/goevent/event"
 	"github.com/fluffle/golog/logging"
 	"github.com/fluffle/goirc/state"
-	"gomock.googlecode.com/hg/gomock"
+	gomock "github.com/dsymonds/gomock/gomock"
 	"testing"
 	"time"
 )
