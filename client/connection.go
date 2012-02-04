@@ -13,10 +13,6 @@ import (
 	"time"
 )
 
-const (
-	second = int64(1e9)
-)
-
 // An IRC connection is represented by this struct.
 type Conn struct {
 	// Connection Hostname and Nickname
@@ -58,7 +54,8 @@ type Conn struct {
 	Flood bool
 
 	// Internal counters for flood protection
-	badness, lastsent int64
+	badness time.Duration
+	lastsent time.Time
 }
 
 // Creates a new IRC connection object, but doesn't connect to anything so
@@ -96,7 +93,7 @@ func Client(nick, ident, name string,
 		SSLConfig: nil,
 		Flood:     false,
 		badness:   0,
-		lastsent:  0,
+		lastsent:  time.Now(),
 	}
 	conn.addIntHandlers()
 	conn.Me = state.NewNick(nick, l)
@@ -248,10 +245,10 @@ func (conn *Conn) runLoop() {
 // using Hybrid's algorithm to rate limit if conn.Flood is false.
 func (conn *Conn) write(line string) {
 	if !conn.Flood {
-		if t := conn.rateLimit(int64(len(line))); t != 0 {
+		if t := conn.rateLimit(len(line)); t != 0 {
 			// sleep for the current line's time value before sending it
 			conn.l.Debug("irc.rateLimit(): Flood! Sleeping for %.2f secs.",
-				float64(t)/float64(second))
+				t.Seconds())
 			<-time.After(t)
 		}
 	}
@@ -270,19 +267,19 @@ func (conn *Conn) write(line string) {
 }
 
 // Implement Hybrid's flood control algorithm to rate-limit outgoing lines.
-func (conn *Conn) rateLimit(chars int64) int64 {
+func (conn *Conn) rateLimit(chars int) time.Duration {
 	// Hybrid's algorithm allows for 2 seconds per line and an additional
 	// 1/120 of a second per character on that line.
-	linetime := 2*second + chars*second/120
+	linetime := 2*time.Second + time.Duration(chars)*time.Second/120
 	elapsed := time.Now().Sub(conn.lastsent)
 	if conn.badness += linetime - elapsed; conn.badness < 0 {
 		// negative badness times are badness...
-		conn.badness = int64(0)
+		conn.badness = 0
 	}
 	conn.lastsent = time.Now()
 	// If we've sent more than 10 second's worth of lines according to the
 	// calculation above, then we're at risk of "Excess Flood".
-	if conn.badness > 10*second {
+	if conn.badness > 10*time.Second {
 		return linetime
 	}
 	return 0
