@@ -14,7 +14,7 @@ type Line struct {
 	Nick, Ident, Host, Src string
 	Cmd, Raw               string
 	Args                   []string
-	Time                   *time.Time
+	Time                   time.Time
 }
 
 // NOTE: this doesn't copy l.Time (this should be read-only anyway)

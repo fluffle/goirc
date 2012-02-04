@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/fluffle/goevent/event"
-	"github.com/fluffle/golog/logging"
 	"github.com/fluffle/goirc/state"
+	"github.com/fluffle/golog/logging"
 	"net"
 	"strings"
 	"time"
@@ -228,7 +228,7 @@ func (conn *Conn) recv() {
 		conn.l.Debug("<- %s", s)
 
 		if line := parseLine(s); line != nil {
-			line.Time = time.LocalTime()
+			line.Time = time.Now()
 			conn.in <- line
 		} else {
 			conn.l.Warn("irc.recv(): problems parsing line:\n  %s", s)
@@ -279,12 +279,12 @@ func (conn *Conn) rateLimit(chars int64) int64 {
 	// Hybrid's algorithm allows for 2 seconds per line and an additional
 	// 1/120 of a second per character on that line.
 	linetime := 2*second + chars*second/120
-	elapsed := time.Nanoseconds() - conn.lastsent
+	elapsed := time.Now().Sub(conn.lastsent)
 	if conn.badness += linetime - elapsed; conn.badness < 0 {
 		// negative badness times are badness...
 		conn.badness = int64(0)
 	}
-	conn.lastsent = time.Nanoseconds()
+	conn.lastsent = time.Now()
 	// If we've sent more than 10 second's worth of lines according to the
 	// calculation above, then we're at risk of "Excess Flood".
 	if conn.badness > 10*second {
