@@ -388,20 +388,36 @@ func TestRateLimit(t *testing.T) {
 		t.Errorf("Bad initial values for rate limit variables.")
 	}
 
-	if l := c.rateLimit(60); l != 0 || c.badness == 0 {
-		t.Errorf("Rate limit variables not updated correctly after rateLimit.")
+	// We'll be needing this later...
+	abs := func(i time.Duration) time.Duration {
+		if (i < 0) {
+			return -i
+		}
+		return i
 	}
+
+	// Since the changes to the time module, c.lastsent is now a time.Time.
+	// It's initialised on client creation to time.Now() which for the purposes
+	// of this test was probably around 1.2 ms ago. This is inconvenient.
+	// Making it >10s ago effectively clears out the inconsistency, as this
+	// makes elapsed > linetime and thus zeros c.badness and resets c.lastsent.
+	c.lastsent = time.Now().Add(-10 * time.Second)
+	if l := c.rateLimit(60); l != 0 || c.badness != 0 {
+		t.Errorf("Rate limit got non-zero badness from long-ago lastsent.")
+	}
+
 	// So, time at the nanosecond resolution is a bit of a bitch. Choosing 60
 	// characters as the line length means we should be increasing badness by
 	// 2.5 seconds minus the delta between the two ratelimit calls. This should
-	// be minimal but it's guaranteed that it won't be zero. Use 1us as a fuzz.
-	// This seems to be the minimum timer resolution, on my laptop at least...
-	if l := c.rateLimit(60); l != 0 || c.badness - 25*1e8 > time.Microsecond {
+	// be minimal but it's guaranteed that it won't be zero. Use 10us as a fuzz.
+	if l := c.rateLimit(60); l != 0 || abs(c.badness - 25*1e8) > 10 * time.Microsecond {
 		t.Errorf("Rate limit calculating badness incorrectly.")
 	}
-	// At this point, we can tip over the badness scale, with a bit of help.	
-	if l := c.rateLimit(360); l == 80*1e8 ||
-		c.badness - 105*1e8 > time.Microsecond {
+	// At this point, we can tip over the badness scale, with a bit of help.
+	// 720 chars => +8 seconds of badness => 10.5 seconds => ratelimit
+	if l := c.rateLimit(720); l != 8 * time.Second ||
+		abs(c.badness - 105*1e8) > 10 * time.Microsecond {
 		t.Errorf("Rate limit failed to return correct limiting values.")
+		t.Errorf("l=%d, badness=%d", l, c.badness)
 	}
 }
