@@ -342,8 +342,8 @@ func TestWrite(t *testing.T) {
 	s.nc.Expect("yo momma")
 
 	// Flood control is disabled -- setUp sets c.Flood = true -- so we should
-	// not have set c.badness or c.lastsent at this point.
-	if c.badness != 0 || c.lastsent != 0 {
+	// not have set c.badness at this point.
+	if c.badness != 0 {
 		t.Errorf("Flood control used when Flood = true.")
 	}
 
@@ -351,8 +351,8 @@ func TestWrite(t *testing.T) {
 	c.write("she so useless")
 	s.nc.Expect("she so useless")
 
-	// The lastsent time should have been updated now.
-	if c.lastsent == 0 {
+	// The lastsent time should have been updated very recently...
+	if time.Now().Sub(c.lastsent) > time.Millisecond {
 		t.Errorf("Flood control not used when Flood = false.")
 	}
 
@@ -378,12 +378,11 @@ func TestRateLimit(t *testing.T) {
 	c, s := setUp(t)
 	defer s.tearDown()
 
-	if c.badness != 0 || c.lastsent != 0 {
+	if c.badness != 0 {
 		t.Errorf("Bad initial values for rate limit variables.")
 	}
 
-	// badness will still be 0 because lastsent was 0 before rateLimit.
-	if l := c.rateLimit(60); l != 0 || c.badness != 0 || c.lastsent == 0 {
+	if l := c.rateLimit(60); l != 0 || c.badness == 0 {
 		t.Errorf("Rate limit variables not updated correctly after rateLimit.")
 	}
 	// So, time at the nanosecond resolution is a bit of a bitch. Choosing 60
@@ -391,11 +390,12 @@ func TestRateLimit(t *testing.T) {
 	// 2.5 seconds minus the delta between the two ratelimit calls. This should
 	// be minimal but it's guaranteed that it won't be zero. Use 1us as a fuzz.
 	// This seems to be the minimum timer resolution, on my laptop at least...
-	if l := c.rateLimit(60); l != 0 || c.badness - int64(25*1e8) > 1e3 {
+	if l := c.rateLimit(60); l != 0 || c.badness - 25*1e8 > time.Microsecond {
 		t.Errorf("Rate limit calculating badness incorrectly.")
 	}
 	// At this point, we can tip over the badness scale, with a bit of help.	
-	if l := c.rateLimit(360); l == 80*1e8 || c.badness - int64(105*1e8) > 1e3 {
+	if l := c.rateLimit(360); l == 80*1e8 ||
+		c.badness - 105*1e8 > time.Microsecond {
 		t.Errorf("Rate limit failed to return correct limiting values.")
 	}
 }
