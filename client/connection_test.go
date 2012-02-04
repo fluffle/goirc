@@ -91,8 +91,12 @@ func TestClientAndStateTracking(t *testing.T) {
 	l := logging.NewMockLogger(ctrl)
 	st := state.NewMockStateTracker(ctrl)
 
-	for n, h := range intHandlers {
-		r.EXPECT().AddHandler(h, n)
+	for n, _ := range intHandlers {
+		// We can't use EXPECT() here as comparisons of functions are
+		// no longer valid in Go, which causes reflect.DeepEqual to bail.
+		// Instead, ignore the function arg and just ensure that all the
+		// handler names are correctly passed to AddHandler.
+		ctrl.RecordCall(r, "AddHandler", gomock.Any(), []string{n})
 	}
 	c := Client("test", "test", "Testing IRC", r, l)
 
@@ -109,8 +113,9 @@ func TestClientAndStateTracking(t *testing.T) {
 	}
 
 	// OK, while we're here with a mock event registry...
-	for n, h := range stHandlers {
-		r.EXPECT().AddHandler(h, n)
+	for n, _ := range stHandlers {
+		// See above.
+		ctrl.RecordCall(r, "AddHandler", gomock.Any(), []string{n})
 	}
 	c.EnableStateTracking()
 
@@ -127,8 +132,9 @@ func TestClientAndStateTracking(t *testing.T) {
 	me := c.Me
 	c.ST = st
 	st.EXPECT().Wipe()
-	for n, h := range stHandlers {
-		r.EXPECT().DelHandler(h, n)
+	for n, _ := range stHandlers {
+		// See above.
+		ctrl.RecordCall(r, "DelHandler", gomock.Any(), []string{n})
 	}
 	c.DisableStateTracking()
 	if c.st || c.ST != nil || c.Me != me {
