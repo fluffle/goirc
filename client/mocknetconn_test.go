@@ -24,7 +24,7 @@ type mockNetConn struct {
 	rc      chan bool
 
 	closed bool
-	rt, wt int64
+	rt, wt time.Time
 }
 
 func MockNetConn(t *testing.T) *mockNetConn {
@@ -143,18 +143,18 @@ func (m *mockNetConn) RemoteAddr() net.Addr {
 	return &net.IPAddr{net.IPv4(127, 0, 0, 1)}
 }
 
-func (m *mockNetConn) SetTimeout(ns int64) error {
-	m.rt = ns
-	m.wt = ns
+func (m *mockNetConn) SetDeadline(t time.Time) error {
+	m.rt = t
+	m.wt = t
 	return nil
 }
 
-func (m *mockNetConn) SetReadTimeout(ns int64) error {
-	m.rt = ns
+func (m *mockNetConn) SetReadDeadline(t time.Time) error {
+	m.rt = t
 	return nil
 }
 
-func (m *mockNetConn) SetWriteTimeout(ns int64) error {
-	m.wt = ns
+func (m *mockNetConn) SetWriteDeadline(t time.Time) error {
+	m.wt = t
 	return nil
 }
