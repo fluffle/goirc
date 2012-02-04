@@ -54,9 +54,6 @@ type Conn struct {
 	SSL       bool
 	SSLConfig *tls.Config
 
-	// Socket timeout, in seconds. Defaulted to 5m in New().
-	Timeout int64
-
 	// Set this to true to disable flood protection and false to re-enable
 	Flood bool
 
@@ -97,7 +94,6 @@ func Client(nick, ident, name string,
 		cLoop:     make(chan bool),
 		SSL:       false,
 		SSLConfig: nil,
-		Timeout:   300,
 		Flood:     false,
 		badness:   0,
 		lastsent:  0,
@@ -191,7 +187,6 @@ func (conn *Conn) postConnect() {
 	conn.io = bufio.NewReadWriter(
 		bufio.NewReader(conn.sock),
 		bufio.NewWriter(conn.sock))
-	conn.sock.SetTimeout(conn.Timeout * second)
 	go conn.send()
 	go conn.recv()
 	go conn.runLoop()
