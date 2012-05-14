@@ -99,7 +99,7 @@ func (m *mockNetConn) ExpectNothing() {
 // Implement net.Conn interface
 func (m *mockNetConn) Read(b []byte) (int, error) {
 	if m.closed {
-		return 0, os.EINVAL
+		return 0, os.ErrInvalid
 	}
 	l := 0
 	select {
@@ -114,7 +114,7 @@ func (m *mockNetConn) Read(b []byte) (int, error) {
 
 func (m *mockNetConn) Write(s []byte) (int, error) {
 	if m.closed {
-		return 0, os.EINVAL
+		return 0, os.ErrInvalid
 	}
 	b := make([]byte, len(s))
 	copy(b, s)
@@ -124,7 +124,7 @@ func (m *mockNetConn) Write(s []byte) (int, error) {
 
 func (m *mockNetConn) Close() error {
 	if m.closed {
-		return os.EINVAL
+		return os.ErrInvalid
 	}
 	// Shut down *ALL* the goroutines!
 	// This will trigger an EOF event in Read() too
