@@ -51,7 +51,7 @@ type Conn struct {
 	SSLConfig *tls.Config
 
 	// Client->server ping frequency, in seconds. Defaults to 3m.
-	PingFreq int64
+	PingFreq time.Duration
 
 	// Set this to true to disable flood protection and false to re-enable
 	Flood bool
@@ -95,7 +95,7 @@ func Client(nick, ident, name string,
 		cPing:     make(chan bool),
 		SSL:       false,
 		SSLConfig: nil,
-		PingFreq:  180,
+		PingFreq:  3 * time.Minute,
 		Flood:     false,
 		badness:   0,
 		lastsent:  time.Now(),
@@ -241,11 +241,11 @@ func (conn *Conn) recv() {
 
 // Repeatedly pings the server every PingFreq seconds (no matter what)
 func (conn *Conn) ping() {
-	tick := time.NewTicker(conn.PingFreq * second)
+	tick := time.NewTicker(conn.PingFreq)
 	for {
 		select {
 		case <-tick.C:
-			conn.Raw(fmt.Sprintf("PING :%d", time.Nanoseconds()))
+			conn.Raw(fmt.Sprintf("PING :%d", time.Now().UnixNano()))
 		case <-conn.cPing:
 			tick.Stop()
 			return

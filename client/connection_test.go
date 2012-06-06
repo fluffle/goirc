@@ -97,7 +97,7 @@ func TestClientAndStateTracking(t *testing.T) {
 		// no longer valid in Go, which causes reflect.DeepEqual to bail.
 		// Instead, ignore the function arg and just ensure that all the
 		// handler names are correctly passed to AddHandler.
-		ctrl.RecordCall(r, "AddHandler", gomock.Any(), []string{n})
+		ctrl.RecordCall(r, "AddHandler", gomock.Any(), n)
 	}
 	c := Client("test", "test", "Testing IRC", r, l)
 
@@ -116,7 +116,7 @@ func TestClientAndStateTracking(t *testing.T) {
 	// OK, while we're here with a mock event registry...
 	for n, _ := range stHandlers {
 		// See above.
-		ctrl.RecordCall(r, "AddHandler", gomock.Any(), []string{n})
+		ctrl.RecordCall(r, "AddHandler", gomock.Any(), n)
 	}
 	c.EnableStateTracking()
 
@@ -135,7 +135,7 @@ func TestClientAndStateTracking(t *testing.T) {
 	st.EXPECT().Wipe()
 	for n, _ := range stHandlers {
 		// See above.
-		ctrl.RecordCall(r, "DelHandler", gomock.Any(), []string{n})
+		ctrl.RecordCall(r, "DelHandler", gomock.Any(), n)
 	}
 	c.DisableStateTracking()
 	if c.st || c.ST != nil || c.Me != me {
@@ -288,13 +288,12 @@ func TestPing(t *testing.T) {
 	defer s.ctrl.Finish()
 
 	// Set a low ping frequency for testing.
-	// This still increases testing time by a good few seconds :-/
-	c.PingFreq = 1
+	c.PingFreq = 50 * time.Millisecond
 
 	// reader is a helper to do a "non-blocking" read of c.out
 	reader := func() string {
 		select {
-		case <-time.After(1e6):
+		case <-time.After(time.Millisecond):
 		case s := <-c.out:
 			return s
 		}
@@ -317,19 +316,22 @@ func TestPing(t *testing.T) {
 		t.Errorf("Line output directly after ping started.")
 	}
 
-	<-time.After(1e9)
+	<-time.After(50 * time.Millisecond)
 	if s := reader(); s == "" || !strings.HasPrefix(s, "PING :") {
-		t.Errorf("Line not output after 1 second.")
+		t.Errorf("Line not output after 50ms.")
 	}
 
-	<-time.After(1e7)
+	// Reader waits for 1ms and we call it a few times above.
+	<-time.After(45 * time.Millisecond)
 	if s := reader(); s != "" {
-		t.Errorf("Line output under a second after last ping.")
+		t.Errorf("Line output under 50ms after last ping.")
 	}
 
-	<-time.After(1e9)
+	// This is a short window (49-51ms) in which the ping should happen
+	// This may result in flaky tests; sorry (and file a bug) if so.
+	<-time.After(2 * time.Millisecond)
 	if s := reader(); s == "" || !strings.HasPrefix(s, "PING :") {
-		t.Errorf("Line not output after another second.")
+		t.Errorf("Line not output after another 2ms.")
 	}
 
 	// Now kill the ping loop.
@@ -338,7 +340,8 @@ func TestPing(t *testing.T) {
 	}
 
 	c.cPing <- true
-	<-time.After(1e9)
+	// Make sure we're no longer pinging by waiting ~2x PingFreq
+	<-time.After(105 * time.Millisecond)
 	if s := reader(); s != "" {
 		t.Errorf("Line output after ping stopped.")
 	}

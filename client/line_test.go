@@ -2,6 +2,7 @@ package client
 
 import (
 	"testing"
+	"time"
 )
 
 func TestCopy(t *testing.T) {
@@ -13,7 +14,7 @@ func TestCopy(t *testing.T) {
 		Cmd: "cmd",
 		Raw: "raw",
 		Args: []string{"arg", "text"},
-		Time: nil,
+		Time: time.Now(),
 	}
 
 	l2 := l1.Copy()
