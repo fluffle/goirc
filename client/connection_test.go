@@ -5,7 +5,7 @@ import (
 	"github.com/fluffle/goevent/event"
 	"github.com/fluffle/golog/logging"
 	"github.com/fluffle/goirc/state"
-	"gomock.googlecode.com/hg/gomock"
+	gomock "github.com/dsymonds/gomock/gomock"
 	"strings"
 	"testing"
 	"time"
@@ -92,8 +92,12 @@ func TestClientAndStateTracking(t *testing.T) {
 	l := logging.NewMockLogger(ctrl)
 	st := state.NewMockStateTracker(ctrl)
 
-	for n, h := range intHandlers {
-		r.EXPECT().AddHandler(h, n)
+	for n, _ := range intHandlers {
+		// We can't use EXPECT() here as comparisons of functions are
+		// no longer valid in Go, which causes reflect.DeepEqual to bail.
+		// Instead, ignore the function arg and just ensure that all the
+		// handler names are correctly passed to AddHandler.
+		ctrl.RecordCall(r, "AddHandler", gomock.Any(), []string{n})
 	}
 	c := Client("test", "test", "Testing IRC", r, l)
 
@@ -110,8 +114,9 @@ func TestClientAndStateTracking(t *testing.T) {
 	}
 
 	// OK, while we're here with a mock event registry...
-	for n, h := range stHandlers {
-		r.EXPECT().AddHandler(h, n)
+	for n, _ := range stHandlers {
+		// See above.
+		ctrl.RecordCall(r, "AddHandler", gomock.Any(), []string{n})
 	}
 	c.EnableStateTracking()
 
@@ -128,8 +133,9 @@ func TestClientAndStateTracking(t *testing.T) {
 	me := c.Me
 	c.ST = st
 	st.EXPECT().Wipe()
-	for n, h := range stHandlers {
-		r.EXPECT().DelHandler(h, n)
+	for n, _ := range stHandlers {
+		// See above.
+		ctrl.RecordCall(r, "DelHandler", gomock.Any(), []string{n})
 	}
 	c.DisableStateTracking()
 	if c.st || c.ST != nil || c.Me != me {
@@ -412,8 +418,8 @@ func TestWrite(t *testing.T) {
 	s.nc.Expect("yo momma")
 
 	// Flood control is disabled -- setUp sets c.Flood = true -- so we should
-	// not have set c.badness or c.lastsent at this point.
-	if c.badness != 0 || c.lastsent != 0 {
+	// not have set c.badness at this point.
+	if c.badness != 0 {
 		t.Errorf("Flood control used when Flood = true.")
 	}
 
@@ -421,8 +427,8 @@ func TestWrite(t *testing.T) {
 	c.write("she so useless")
 	s.nc.Expect("she so useless")
 
-	// The lastsent time should have been updated now.
-	if c.lastsent == 0 {
+	// The lastsent time should have been updated very recently...
+	if time.Now().Sub(c.lastsent) > time.Millisecond {
 		t.Errorf("Flood control not used when Flood = false.")
 	}
 
@@ -449,24 +455,40 @@ func TestRateLimit(t *testing.T) {
 	c, s := setUp(t)
 	defer s.tearDown()
 
-	if c.badness != 0 || c.lastsent != 0 {
+	if c.badness != 0 {
 		t.Errorf("Bad initial values for rate limit variables.")
 	}
 
-	// badness will still be 0 because lastsent was 0 before rateLimit.
-	if l := c.rateLimit(60); l != 0 || c.badness != 0 || c.lastsent == 0 {
-		t.Errorf("Rate limit variables not updated correctly after rateLimit.")
+	// We'll be needing this later...
+	abs := func(i time.Duration) time.Duration {
+		if (i < 0) {
+			return -i
+		}
+		return i
 	}
+
+	// Since the changes to the time module, c.lastsent is now a time.Time.
+	// It's initialised on client creation to time.Now() which for the purposes
+	// of this test was probably around 1.2 ms ago. This is inconvenient.
+	// Making it >10s ago effectively clears out the inconsistency, as this
+	// makes elapsed > linetime and thus zeros c.badness and resets c.lastsent.
+	c.lastsent = time.Now().Add(-10 * time.Second)
+	if l := c.rateLimit(60); l != 0 || c.badness != 0 {
+		t.Errorf("Rate limit got non-zero badness from long-ago lastsent.")
+	}
+
 	// So, time at the nanosecond resolution is a bit of a bitch. Choosing 60
 	// characters as the line length means we should be increasing badness by
 	// 2.5 seconds minus the delta between the two ratelimit calls. This should
-	// be minimal but it's guaranteed that it won't be zero. Use 1us as a fuzz.
-	// This seems to be the minimum timer resolution, on my laptop at least...
-	if l := c.rateLimit(60); l != 0 || c.badness - int64(25*1e8) > 1e3 {
+	// be minimal but it's guaranteed that it won't be zero. Use 10us as a fuzz.
+	if l := c.rateLimit(60); l != 0 || abs(c.badness - 25*1e8) > 10 * time.Microsecond {
 		t.Errorf("Rate limit calculating badness incorrectly.")
 	}
-	// At this point, we can tip over the badness scale, with a bit of help.	
-	if l := c.rateLimit(360); l == 80*1e8 || c.badness - int64(105*1e8) > 1e3 {
+	// At this point, we can tip over the badness scale, with a bit of help.
+	// 720 chars => +8 seconds of badness => 10.5 seconds => ratelimit
+	if l := c.rateLimit(720); l != 8 * time.Second ||
+		abs(c.badness - 105*1e8) > 10 * time.Microsecond {
 		t.Errorf("Rate limit failed to return correct limiting values.")
+		t.Errorf("l=%d, badness=%d", l, c.badness)
 	}
 }

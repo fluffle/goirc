@@ -1,6 +1,7 @@
 package client
 
 import (
+	"io"
 	"net"
 	"os"
 	"strings"
@@ -23,7 +24,7 @@ type mockNetConn struct {
 	rc      chan bool
 
 	closed bool
-	rt, wt int64
+	rt, wt time.Time
 }
 
 func MockNetConn(t *testing.T) *mockNetConn {
@@ -96,9 +97,9 @@ func (m *mockNetConn) ExpectNothing() {
 }
 
 // Implement net.Conn interface
-func (m *mockNetConn) Read(b []byte) (int, os.Error) {
+func (m *mockNetConn) Read(b []byte) (int, error) {
 	if m.closed {
-		return 0, os.EINVAL
+		return 0, os.ErrInvalid
 	}
 	l := 0
 	select {
@@ -106,14 +107,14 @@ func (m *mockNetConn) Read(b []byte) (int, os.Error) {
 		l = len(s)
 		copy(b, s)
 	case <-m.closers[mockReadCloser]:
-		return 0, os.EOF
+		return 0, io.EOF
 	}
 	return l, nil
 }
 
-func (m *mockNetConn) Write(s []byte) (int, os.Error) {
+func (m *mockNetConn) Write(s []byte) (int, error) {
 	if m.closed {
-		return 0, os.EINVAL
+		return 0, os.ErrInvalid
 	}
 	b := make([]byte, len(s))
 	copy(b, s)
@@ -121,9 +122,9 @@ func (m *mockNetConn) Write(s []byte) (int, os.Error) {
 	return len(s), nil
 }
 
-func (m *mockNetConn) Close() os.Error {
+func (m *mockNetConn) Close() error {
 	if m.closed {
-		return os.EINVAL
+		return os.ErrInvalid
 	}
 	// Shut down *ALL* the goroutines!
 	// This will trigger an EOF event in Read() too
@@ -142,18 +143,18 @@ func (m *mockNetConn) RemoteAddr() net.Addr {
 	return &net.IPAddr{net.IPv4(127, 0, 0, 1)}
 }
 
-func (m *mockNetConn) SetTimeout(ns int64) os.Error {
-	m.rt = ns
-	m.wt = ns
+func (m *mockNetConn) SetDeadline(t time.Time) error {
+	m.rt = t
+	m.wt = t
 	return nil
 }
 
-func (m *mockNetConn) SetReadTimeout(ns int64) os.Error {
-	m.rt = ns
+func (m *mockNetConn) SetReadDeadline(t time.Time) error {
+	m.rt = t
 	return nil
 }
 
-func (m *mockNetConn) SetWriteTimeout(ns int64) os.Error {
-	m.wt = ns
+func (m *mockNetConn) SetWriteDeadline(t time.Time) error {
+	m.wt = t
 	return nil
 }

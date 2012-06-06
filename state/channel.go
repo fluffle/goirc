@@ -11,9 +11,9 @@ import (
 type Channel struct {
 	Name, Topic string
 	Modes       *ChanMode
-	lookup		map[string]*Nick
+	lookup      map[string]*Nick
 	nicks       map[*Nick]*ChanPrivs
-	l			logging.Logger
+	l           logging.Logger
 }
 
 // A struct representing the modes of an IRC Channel
@@ -93,11 +93,11 @@ func init() {
 
 func NewChannel(name string, l logging.Logger) *Channel {
 	return &Channel{
-		Name: name,
-		Modes: new(ChanMode),
-		nicks: make(map[*Nick]*ChanPrivs),
+		Name:   name,
+		Modes:  new(ChanMode),
+		nicks:  make(map[*Nick]*ChanPrivs),
 		lookup: make(map[string]*Nick),
-		l: l,
+		l:      l,
 	}
 }
 
@@ -125,8 +125,8 @@ func (ch *Channel) addNick(nk *Nick, cp *ChanPrivs) {
 // Disassociates a Nick from a Channel.
 func (ch *Channel) delNick(nk *Nick) {
 	if _, ok := ch.nicks[nk]; ok {
-		ch.nicks[nk] = nil, false
-		ch.lookup[nk.Nick] = nil, false
+		delete(ch.nicks, nk)
+		delete(ch.lookup, nk.Nick)
 	} else {
 		ch.l.Warn("Channel.delNick(): %s not on %s.", nk.Nick, ch.Name)
 	}
@@ -181,7 +181,7 @@ func (ch *Channel) ParseModes(modes string, modeargs ...string) {
 			}
 		case 'q', 'a', 'o', 'h', 'v':
 			if len(modeargs) != 0 {
-				if nk, ok  := ch.lookup[modeargs[0]]; ok {
+				if nk, ok := ch.lookup[modeargs[0]]; ok {
 					cp := ch.nicks[nk]
 					switch m {
 					case 'q':

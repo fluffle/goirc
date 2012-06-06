@@ -5,14 +5,9 @@ GoIRC Client Framework
 
 Pretty simple, really:
 
-	goinstall github.com/fluffle/goirc
+	go get github.com/fluffle/goirc/client
 
-You can build the test client also with:
-
-	make
-	./gobot
-
-This will connect to freenode and join `#go-nuts` by default, so be careful ;-)
+There is some example code that demonstrates usage of the library in `client.go`. This will connect to freenode and join `#go-nuts` by default, so be careful ;-)
 
 ### Using the framework
 

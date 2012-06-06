@@ -3,18 +3,14 @@ package client
 import (
 	"bufio"
 	"crypto/tls"
-	"github.com/fluffle/goevent/event"
-	"github.com/fluffle/golog/logging"
-	"github.com/fluffle/goirc/state"
+	"errors"
 	"fmt"
+	"github.com/fluffle/goevent/event"
+	"github.com/fluffle/goirc/state"
+	"github.com/fluffle/golog/logging"
 	"net"
-	"os"
 	"strings"
 	"time"
-)
-
-const (
-	second = int64(1e9)
 )
 
 // An IRC connection is represented by this struct.
@@ -57,14 +53,12 @@ type Conn struct {
 	// Client->server ping frequency, in seconds. Defaults to 3m.
 	PingFreq int64
 
-	// Socket timeout, in seconds. Default to 5m.
-	Timeout  int64
-
 	// Set this to true to disable flood protection and false to re-enable
 	Flood bool
 
 	// Internal counters for flood protection
-	badness, lastsent int64
+	badness time.Duration
+	lastsent time.Time
 }
 
 // Creates a new IRC connection object, but doesn't connect to anything so
@@ -90,22 +84,21 @@ func Client(nick, ident, name string,
 		return nil
 	}
 	conn := &Conn{
-		ER:         r,
-		ED:         r,
-		l:          l,
-		st:         false,
-		in:         make(chan *Line, 32),
-		out:        make(chan string, 32),
-		cSend:      make(chan bool),
-		cLoop:      make(chan bool),
-		cPing:      make(chan bool),
-		SSL:        false,
-		SSLConfig:  nil,
-		PingFreq:	180,
-		Timeout:    300,
-		Flood:      false,
-		badness:    0,
-		lastsent:   0,
+		ER:        r,
+		ED:        r,
+		l:         l,
+		st:        false,
+		in:        make(chan *Line, 32),
+		out:       make(chan string, 32),
+		cSend:     make(chan bool),
+		cLoop:     make(chan bool),
+		cPing:     make(chan bool),
+		SSL:       false,
+		SSLConfig: nil,
+		PingFreq:  180,
+		Flood:     false,
+		badness:   0,
+		lastsent:  time.Now(),
 	}
 	conn.addIntHandlers()
 	conn.Me = state.NewNick(nick, l)
@@ -151,9 +144,9 @@ func (conn *Conn) initialise() {
 // on the connection to the IRC server, set Conn.SSL to true before calling
 // Connect(). The port will default to 6697 if ssl is enabled, and 6667
 // otherwise. You can also provide an optional connect password.
-func (conn *Conn) Connect(host string, pass ...string) os.Error {
+func (conn *Conn) Connect(host string, pass ...string) error {
 	if conn.Connected {
-		return os.NewError(fmt.Sprintf(
+		return errors.New(fmt.Sprintf(
 			"irc.Connect(): already connected to %s, cannot connect to %s",
 			conn.Host, host))
 	}
@@ -196,7 +189,6 @@ func (conn *Conn) postConnect() {
 	conn.io = bufio.NewReadWriter(
 		bufio.NewReader(conn.sock),
 		bufio.NewWriter(conn.sock))
-	conn.sock.SetTimeout(conn.Timeout * second)
 	go conn.send()
 	go conn.recv()
 	if conn.PingFreq > 0 {
@@ -231,7 +223,7 @@ func (conn *Conn) recv() {
 	for {
 		s, err := conn.io.ReadString('\n')
 		if err != nil {
-			conn.l.Error("irc.recv(): %s", err.String())
+			conn.l.Error("irc.recv(): %s", err.Error())
 			conn.shutdown()
 			return
 		}
@@ -239,7 +231,7 @@ func (conn *Conn) recv() {
 		conn.l.Debug("<- %s", s)
 
 		if line := parseLine(s); line != nil {
-			line.Time = time.LocalTime()
+			line.Time = time.Now()
 			conn.in <- line
 		} else {
 			conn.l.Warn("irc.recv(): problems parsing line:\n  %s", s)
@@ -278,21 +270,21 @@ func (conn *Conn) runLoop() {
 // using Hybrid's algorithm to rate limit if conn.Flood is false.
 func (conn *Conn) write(line string) {
 	if !conn.Flood {
-		if t := conn.rateLimit(int64(len(line))); t != 0 {
+		if t := conn.rateLimit(len(line)); t != 0 {
 			// sleep for the current line's time value before sending it
 			conn.l.Debug("irc.rateLimit(): Flood! Sleeping for %.2f secs.",
-				float64(t)/float64(second))
+				t.Seconds())
 			<-time.After(t)
 		}
 	}
 
 	if _, err := conn.io.WriteString(line + "\r\n"); err != nil {
-		conn.l.Error("irc.send(): %s", err.String())
+		conn.l.Error("irc.send(): %s", err.Error())
 		conn.shutdown()
 		return
 	}
 	if err := conn.io.Flush(); err != nil {
-		conn.l.Error("irc.send(): %s", err.String())
+		conn.l.Error("irc.send(): %s", err.Error())
 		conn.shutdown()
 		return
 	}
@@ -300,19 +292,19 @@ func (conn *Conn) write(line string) {
 }
 
 // Implement Hybrid's flood control algorithm to rate-limit outgoing lines.
-func (conn *Conn) rateLimit(chars int64) int64 {
+func (conn *Conn) rateLimit(chars int) time.Duration {
 	// Hybrid's algorithm allows for 2 seconds per line and an additional
 	// 1/120 of a second per character on that line.
-	linetime := 2*second + chars*second/120
-	elapsed := time.Nanoseconds() - conn.lastsent
+	linetime := 2*time.Second + time.Duration(chars)*time.Second/120
+	elapsed := time.Now().Sub(conn.lastsent)
 	if conn.badness += linetime - elapsed; conn.badness < 0 {
 		// negative badness times are badness...
-		conn.badness = int64(0)
+		conn.badness = 0
 	}
-	conn.lastsent = time.Nanoseconds()
+	conn.lastsent = time.Now()
 	// If we've sent more than 10 second's worth of lines according to the
 	// calculation above, then we're at risk of "Excess Flood".
-	if conn.badness > 10*second {
+	if conn.badness > 10*time.Second {
 		return linetime
 	}
 	return 0

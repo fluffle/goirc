@@ -2,7 +2,7 @@ package client
 
 import (
 	"github.com/fluffle/goirc/state"
-	"gomock.googlecode.com/hg/gomock"
+	gomock "github.com/dsymonds/gomock/gomock"
 	"testing"
 )
 

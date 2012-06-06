@@ -2,7 +2,7 @@ package state
 
 import (
 	"github.com/fluffle/golog/logging"
-	"gomock.googlecode.com/hg/gomock"
+	gomock "github.com/dsymonds/gomock/gomock"
 	"testing"
 )
 
