@@ -1,8 +1,8 @@
 package state
 
 import (
+	"code.google.com/p/gomock/gomock"
 	"github.com/fluffle/golog/logging"
-	gomock "github.com/dsymonds/gomock/gomock"
 	"testing"
 )
 

@@ -2,10 +2,10 @@ package client
 
 import (
 	"bufio"
+	"code.google.com/p/gomock/gomock"
 	"github.com/fluffle/goevent/event"
 	"github.com/fluffle/golog/logging"
 	"github.com/fluffle/goirc/state"
-	gomock "github.com/dsymonds/gomock/gomock"
 	"strings"
 	"testing"
 	"time"

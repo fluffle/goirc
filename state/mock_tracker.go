@@ -4,7 +4,7 @@
 package state
 
 import (
-	gomock "github.com/dsymonds/gomock/gomock"
+	gomock "code.google.com/p/gomock/gomock"
 )
 
 // Mock of StateTracker interface
