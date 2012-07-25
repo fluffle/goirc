@@ -28,8 +28,8 @@ Synopsis:
 			func(conn *irc.Conn, line *irc.Line) { conn.Join("#channel") })
 		// And a signal on disconnect
 		quit := make(chan bool)
-		c.AddHandler("disconnected"),
-			func(conn *irc.Conn, line *irc.Line) { quit <- true }
+		c.AddHandler("disconnected",
+			func(conn *irc.Conn, line *irc.Line) { quit <- true })
 
 		// Tell client to connect
 		if err := c.Connect("irc.freenode.net"); err != nil {
