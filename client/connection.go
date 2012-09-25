@@ -65,7 +65,7 @@ type Conn struct {
 // that you can add event handlers to it. See AddHandler() for details.
 func SimpleClient(nick string, args ...string) *Conn {
 	r := event.NewRegistry()
-	l := logging.NewFromFlags()
+	l := logging.DefaultLogger
 	ident := "goirc"
 	name := "Powered by GoIRC"
 
