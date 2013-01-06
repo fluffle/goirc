@@ -79,7 +79,7 @@ func (conn *Conn) h_001(line *Line) {
 // Handler to deal with "433 :Nickname already in use"
 func (conn *Conn) h_433(line *Line) {
 	// Args[1] is the new nick we were attempting to acquire
-	neu := line.Args[1] + "_"
+	neu := conn.NewNick(line.Args[1])
 	conn.Nick(neu)
 	// if this is happening before we're properly connected (i.e. the nick
 	// we sent in the initial NICK command is in use) we will not receive

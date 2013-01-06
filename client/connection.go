@@ -20,6 +20,9 @@ type Conn struct {
 	Me      *state.Nick
 	Network string
 
+	// Replaceable function to customise the 433 handler's new nick
+	NewNick func(string) string
+
 	// Event handler registry and dispatcher
 	ER event.EventRegistry
 	ED event.EventDispatcher
@@ -97,6 +100,7 @@ func Client(nick, ident, name string,
 		SSLConfig: nil,
 		PingFreq:  3 * time.Minute,
 		Flood:     false,
+		NewNick:   func(s string) string { return s + "_" },
 		badness:   0,
 		lastsent:  time.Now(),
 	}
