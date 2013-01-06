@@ -110,6 +110,24 @@ func (nk *Nick) ParseModes(modes string) {
 	}
 }
 
+// Channels returns a list of *Channel the nick is on.
+func (nk *Nick) Channels() []*Channel {
+	channels := make([]*Channel, 0, len(nk.lookup))
+	for _, channel := range nk.lookup {
+		channels = append(channels, channel)
+	}
+	return channels
+}
+
+// ChannelsStr returns a list of channel strings the nick is on.
+func (nk *Nick) ChannelsStr() []string {
+	channels := make([]string, 0, len(nk.lookup))
+	for _, channel := range nk.lookup {
+		channels = append(channels, channel.Name)
+	}
+	return channels
+}
+
 // Returns a string representing the nick. Looks like:
 //	Nick: <nick name> e.g. CowMaster
 //	Hostmask: <ident@host> e.g. moo@cows.org
