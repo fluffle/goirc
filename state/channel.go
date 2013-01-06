@@ -210,6 +210,24 @@ func (ch *Channel) ParseModes(modes string, modeargs ...string) {
 	}
 }
 
+// Nicks returns a list of *Nick that are on the channel.
+func (ch *Channel) Nicks() []*Nick {
+	nicks := make([]*Nick, 0, len(ch.lookup))
+	for _, nick := range ch.lookup {
+		nicks = append(nicks, nick)
+	}
+	return nicks
+}
+
+// NicksStr returns a list of nick strings that are on the channel.
+func (ch *Channel) NicksStr() []string {
+	nicks := make([]string, 0, len(ch.lookup))
+	for _, nick := range ch.lookup {
+		nicks = append(nicks, nick.Nick)
+	}
+	return nicks
+}
+
 // Returns a string representing the channel. Looks like:
 //	Channel: <channel name> e.g. #moo
 //	Topic: <channel topic> e.g. Discussing the merits of cows!
