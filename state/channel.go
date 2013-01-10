@@ -18,12 +18,16 @@ type Channel struct {
 
 // A struct representing the modes of an IRC Channel
 // (the ones we care about, at least).
+// http://www.unrealircd.com/files/docs/unreal32docs.html#userchannelmodes
 type ChanMode struct {
 	// MODE +p, +s, +t, +n, +m
 	Private, Secret, ProtectedTopic, NoExternalMsg, Moderated bool
 
 	// MODE +i, +O, +z
 	InviteOnly, OperOnly, SSLOnly bool
+
+	// MODE +r, +Z
+	Registered, AllSSL bool
 
 	// MODE +k
 	Key string
@@ -49,6 +53,8 @@ var ChanModeToString = map[string]string{
 	"InviteOnly":     "i",
 	"OperOnly":       "O",
 	"SSLOnly":        "z",
+	"Registered":     "r",
+	"AllSSL":         "Z",
 	"Key":            "k",
 	"Limit":          "l",
 }
@@ -152,12 +158,16 @@ func (ch *Channel) ParseModes(modes string, modeargs ...string) {
 			ch.Modes.NoExternalMsg = modeop
 		case 'p':
 			ch.Modes.Private = modeop
+		case 'r':
+			ch.Modes.Registered = modeop
 		case 's':
 			ch.Modes.Secret = modeop
 		case 't':
 			ch.Modes.ProtectedTopic = modeop
 		case 'z':
 			ch.Modes.SSLOnly = modeop
+		case 'Z':
+			ch.Modes.AllSSL = modeop
 		case 'O':
 			ch.Modes.OperOnly = modeop
 		case 'k':
