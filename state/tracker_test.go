@@ -1,33 +1,19 @@
 package state
 
 import (
-	"code.google.com/p/gomock/gomock"
 	"github.com/fluffle/golog/logging"
 	"testing"
 )
 
-type testState struct {
-	ctrl *gomock.Controller
-	log  *logging.MockLogger
-}
-
-func setUp(t *testing.T) (*stateTracker, *testState) {
-	ctrl := gomock.NewController(t)
-	log := logging.NewMockLogger(ctrl)
-	return NewTracker("mynick", log), &testState{ctrl, log}
-}
-
-func (s *testState) tearDown() {
-	s.ctrl.Finish()
+func init() {
+	// This is probably a dirty hack...
+	logging.InitFromFlags()
+	logging.SetLogLevel(logging.LogFatal)
 }
 
 func TestSTNewTracker(t *testing.T) {
-	st, s := setUp(t)
-	defer s.tearDown()
+	st := NewTracker("mynick")
 
-	if st.l != s.log {
-		t.Errorf("State tracker's logger not set correctly.")
-	}
 	if len(st.nicks) != 1 {
 		t.Errorf("Nick list of new tracker is not 1 (me!).")
 	}
@@ -40,28 +26,23 @@ func TestSTNewTracker(t *testing.T) {
 }
 
 func TestSTNewNick(t *testing.T) {
-	st, s := setUp(t)
-	defer s.tearDown()
-
+	st := NewTracker("mynick")
 	test1 := st.NewNick("test1")
 
-	if test1 == nil || test1.Nick != "test1" || test1.l != s.log {
+	if test1 == nil || test1.Nick != "test1" {
 		t.Errorf("Nick object created incorrectly by NewNick.")
 	}
 	if n, ok := st.nicks["test1"]; !ok || n != test1 || len(st.nicks) != 2 {
 		t.Errorf("Nick object stored incorrectly by NewNick.")
 	}
 
-	s.log.EXPECT().Warn("StateTracker.NewNick(): %s already tracked.", "test1")
 	if fail := st.NewNick("test1"); fail != nil {
 		t.Errorf("Creating duplicate nick did not produce nil return.")
 	}
 }
 
 func TestSTGetNick(t *testing.T) {
-	st, s := setUp(t)
-	defer s.tearDown()
-
+	st := NewTracker("mynick")
 	test1 := st.NewNick("test1")
 
 	if n := st.GetNick("test1"); n != test1 {
@@ -76,9 +57,7 @@ func TestSTGetNick(t *testing.T) {
 }
 
 func TestSTReNick(t *testing.T) {
-	st, s := setUp(t)
-	defer s.tearDown()
-
+	st := NewTracker("mynick")
 	test1 := st.NewNick("test1")
 
 	// This channel is here to ensure that its lookup map gets updated
@@ -107,8 +86,6 @@ func TestSTReNick(t *testing.T) {
 	}
 
 	test2 := st.NewNick("test1")
-
-	s.log.EXPECT().Warn("StateTracker.ReNick(): %s already exists.", "test2")
 	st.ReNick("test1", "test2")
 
 	if n, ok := st.nicks["test2"]; !ok || n != test1 {
@@ -120,14 +97,10 @@ func TestSTReNick(t *testing.T) {
 	if len(st.nicks) != 3 {
 		t.Errorf("Nick list changed size during ReNick.")
 	}
-
-	s.log.EXPECT().Warn("StateTracker.ReNick(): %s not tracked.", "test3")
-	st.ReNick("test3", "test2")
 }
 
 func TestSTDelNick(t *testing.T) {
-	st, s := setUp(t)
-	defer s.tearDown()
+	st := NewTracker("mynick")
 
 	st.NewNick("test1")
 	st.DelNick("test1")
@@ -142,17 +115,13 @@ func TestSTDelNick(t *testing.T) {
 	// Deleting unknown nick shouldn't work, but let's make sure we have a
 	// known nick first to catch any possible accidental removals.
 	nick1 := st.NewNick("test1")
-
-	s.log.EXPECT().Warn("StateTracker.DelNick(): %s not tracked.", "test2")
 	st.DelNick("test2")
 	if len(st.nicks) != 2 {
 		t.Errorf("Deleting unknown nick had unexpected side-effects.")
 	}
 
 	// Deleting my nick shouldn't work
-	s.log.EXPECT().Warn("StateTracker.DelNick(): won't delete myself.")
 	st.DelNick("mynick")
-
 	if len(st.nicks) != 2 {
 		t.Errorf("Deleting myself had unexpected side-effects.")
 	}
@@ -192,8 +161,7 @@ func TestSTDelNick(t *testing.T) {
 }
 
 func TestSTNewChannel(t *testing.T) {
-	st, s := setUp(t)
-	defer s.tearDown()
+	st := NewTracker("mynick")
 
 	if len(st.chans) != 0 {
 		t.Errorf("Channel list of new tracker is non-zero length.")
@@ -201,22 +169,20 @@ func TestSTNewChannel(t *testing.T) {
 
 	test1 := st.NewChannel("#test1")
 
-	if test1 == nil || test1.Name != "#test1" || test1.l != s.log {
+	if test1 == nil || test1.Name != "#test1" {
 		t.Errorf("Channel object created incorrectly by NewChannel.")
 	}
 	if c, ok := st.chans["#test1"]; !ok || c != test1 || len(st.chans) != 1 {
 		t.Errorf("Channel object stored incorrectly by NewChannel.")
 	}
 
-	s.log.EXPECT().Warn("StateTracker.NewChannel(): %s already tracked.", "#test1")
 	if fail := st.NewChannel("#test1"); fail != nil {
 		t.Errorf("Creating duplicate chan did not produce nil return.")
 	}
 }
 
 func TestSTGetChannel(t *testing.T) {
-	st, s := setUp(t)
-	defer s.tearDown()
+	st := NewTracker("mynick")
 
 	test1 := st.NewChannel("#test1")
 
@@ -232,8 +198,7 @@ func TestSTGetChannel(t *testing.T) {
 }
 
 func TestSTDelChannel(t *testing.T) {
-	st, s := setUp(t)
-	defer s.tearDown()
+	st := NewTracker("mynick")
 
 	st.NewChannel("#test1")
 	st.DelChannel("#test1")
@@ -248,10 +213,7 @@ func TestSTDelChannel(t *testing.T) {
 	// Deleting unknown nick shouldn't work, but let's make sure we have a
 	// known nick first to catch any possible accidental removals.
 	chan1 := st.NewChannel("#test1")
-
-	s.log.EXPECT().Warn("StateTracker.DelChannel(): %s not tracked.", "#test2")
 	st.DelChannel("#test2")
-
 	if len(st.chans) != 1 {
 		t.Errorf("DelChannel had unexpected side-effects.")
 	}
@@ -306,8 +268,7 @@ func TestSTDelChannel(t *testing.T) {
 }
 
 func TestSTIsOn(t *testing.T) {
-	st, s := setUp(t)
-	defer s.tearDown()
+	st := NewTracker("mynick")
 
 	nick1 := st.NewNick("test1")
 	chan1 := st.NewChannel("#test1")
@@ -322,8 +283,7 @@ func TestSTIsOn(t *testing.T) {
 }
 
 func TestSTAssociate(t *testing.T) {
-	st, s := setUp(t)
-	defer s.tearDown()
+	st := NewTracker("mynick")
 
 	nick1 := st.NewNick("test1")
 	chan1 := st.NewChannel("#test1")
@@ -337,32 +297,25 @@ func TestSTAssociate(t *testing.T) {
 	}
 
 	// Test error cases
-	s.log.EXPECT().Error("StateTracker.Associate(): passed nil values :-(")
-	st.Associate(nil, nick1)
-
-	s.log.EXPECT().Error("StateTracker.Associate(): passed nil values :-(")
-	st.Associate(chan1, nil)
-
-	s.log.EXPECT().Warn("StateTracker.Associate(): %s already on %s.",
-		"test1", "#test1")
-	st.Associate(chan1, nick1)
-
-	// nick2 deliberately created directly here.
-	nick2 := NewNick("test2", s.log)
-	s.log.EXPECT().Error("StateTracker.Associate(): nick %s not found in "+
-		"(or differs from) internal state.", "test2")
-	st.Associate(chan1, nick2)
-
-	// chan2 deliberately created directly here.
-	chan2 := NewChannel("#test2", s.log)
-	s.log.EXPECT().Error("StateTracker.Associate(): channel %s not found in "+
-		"(or differs from) internal state.", "#test2")
-	st.Associate(chan2, nick1)
+	if st.Associate(nil, nick1) != nil {
+		t.Errorf("Associating nil *Channel did not return nil.")
+	}
+	if st.Associate(chan1, nil) != nil {
+		t.Errorf("Associating nil *Nick did not return nil.")
+	}
+	if st.Associate(chan1, nick1) != nil {
+		t.Errorf("Associating already-associated things did not return nil.")
+	}
+	if st.Associate(chan1, NewNick("test2")) != nil {
+		t.Errorf("Associating unknown *Nick did not return nil.")
+	}
+	if st.Associate(NewChannel("#test2"), nick1) != nil {
+		t.Errorf("Associating unknown *Channel did not return nil.")
+	}
 }
 
 func TestSTDissociate(t *testing.T) {
-	st, s := setUp(t)
-	defer s.tearDown()
+	st := NewTracker("mynick")
 
 	nick1 := st.NewNick("test1")
 	chan1 := st.NewChannel("#test1")
@@ -417,36 +370,10 @@ func TestSTDissociate(t *testing.T) {
 		len(st.me.chans) != 2 || len(nick1.chans) != 0 || len(st.chans) != 2 {
 		t.Errorf("Dissociating a nick from it's last channel went wrong.")
 	}
-
-	// Check error cases
-	// test1 was deleted above, so "re-track" it for this test.
-	nick1 = st.NewNick("test1")
-	s.log.EXPECT().Warn("StateTracker.Dissociate(): %s not on %s.",
-		"test1", "#test1")
-	st.Dissociate(chan1, nick1)
-
-	s.log.EXPECT().Error("StateTracker.Dissociate(): passed nil values :-(")
-	st.Dissociate(chan1, nil)
-
-	s.log.EXPECT().Error("StateTracker.Dissociate(): passed nil values :-(")
-	st.Dissociate(nil, nick1)
-
-	// nick3 deliberately created directly here.
-	nick3 := NewNick("test3", s.log)
-	s.log.EXPECT().Error("StateTracker.Dissociate(): nick %s not found in "+
-		"(or differs from) internal state.", "test3")
-	st.Dissociate(chan1, nick3)
-
-	// chan3 deliberately created directly here.
-	chan3 := NewChannel("#test3", s.log)
-	s.log.EXPECT().Error("StateTracker.Dissociate(): channel %s not found in "+
-		"(or differs from) internal state.", "#test3")
-	st.Dissociate(chan3, nick1)
 }
 
 func TestSTWipe(t *testing.T) {
-	st, s := setUp(t)
-	defer s.tearDown()
+	st := NewTracker("mynick")
 
 	nick1 := st.NewNick("test1")
 	nick2 := st.NewNick("test2")
