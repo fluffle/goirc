@@ -11,7 +11,6 @@ type Nick struct {
 	Modes                   *NickMode
 	lookup                  map[string]*Channel
 	chans                   map[*Channel]*ChanPrivs
-	l                       logging.Logger
 }
 
 // A struct representing the modes of an IRC Nick (User Modes)
@@ -45,13 +44,12 @@ func init() {
  * Nick methods for state management
 \******************************************************************************/
 
-func NewNick(n string, l logging.Logger) *Nick {
+func NewNick(n string) *Nick {
 	return &Nick{
 		Nick:   n,
 		Modes:  new(NickMode),
 		chans:  make(map[*Channel]*ChanPrivs),
 		lookup: make(map[string]*Channel),
-		l:      l,
 	}
 }
 
@@ -72,7 +70,7 @@ func (nk *Nick) addChannel(ch *Channel, cp *ChanPrivs) {
 		nk.chans[ch] = cp
 		nk.lookup[ch.Name] = ch
 	} else {
-		nk.l.Warn("Nick.addChannel(): %s already on %s.", nk.Nick, ch.Name)
+		logging.Warn("Nick.addChannel(): %s already on %s.", nk.Nick, ch.Name)
 	}
 }
 
@@ -82,7 +80,7 @@ func (nk *Nick) delChannel(ch *Channel) {
 		delete(nk.chans, ch)
 		delete(nk.lookup, ch.Name)
 	} else {
-		nk.l.Warn("Nick.delChannel(): %s not on %s.", nk.Nick, ch.Name)
+		logging.Warn("Nick.delChannel(): %s not on %s.", nk.Nick, ch.Name)
 	}
 }
 
@@ -108,7 +106,7 @@ func (nk *Nick) ParseModes(modes string) {
 		case 'z':
 			nk.Modes.SSL = modeop
 		default:
-			nk.l.Info("Nick.ParseModes(): unknown mode char %c", m)
+			logging.Info("Nick.ParseModes(): unknown mode char %c", m)
 		}
 	}
 }
