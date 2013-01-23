@@ -5,12 +5,9 @@ import (
 )
 
 func TestNewChannel(t *testing.T) {
-	_, s := setUp(t)
-	defer s.tearDown()
+	ch := NewChannel("#test1")
 
-	ch := NewChannel("#test1", s.log)
-
-	if ch.Name != "#test1" || ch.l != s.log {
+	if ch.Name != "#test1" {
 		t.Errorf("Channel not created correctly by NewChannel()")
 	}
 	if len(ch.nicks) != 0 || len(ch.lookup) != 0 {
@@ -19,11 +16,8 @@ func TestNewChannel(t *testing.T) {
 }
 
 func TestAddNick(t *testing.T) {
-	_, s := setUp(t)
-	defer s.tearDown()
-
-	ch := NewChannel("#test1", s.log)
-	nk := NewNick("test1", s.log)
+	ch := NewChannel("#test1")
+	nk := NewNick("test1")
 	cp := new(ChanPrivs)
 
 	ch.addNick(nk, cp)
@@ -37,24 +31,12 @@ func TestAddNick(t *testing.T) {
 	if n, ok := ch.lookup["test1"]; !ok || n != nk {
 		t.Errorf("Nick test1 not properly stored in lookup map.")
 	}
-
-	s.log.EXPECT().Warn("Channel.addNick(): %s already on %s.",
-		"test1", "#test1")
-	ch.addNick(nk, cp)
 }
 
 func TestDelNick(t *testing.T) {
-	_, s := setUp(t)
-	defer s.tearDown()
-
-	ch := NewChannel("#test1", s.log)
-	nk := NewNick("test1", s.log)
+	ch := NewChannel("#test1")
+	nk := NewNick("test1")
 	cp := new(ChanPrivs)
-
-	// Testing the error state first is easier
-	s.log.EXPECT().Warn("Channel.delNick(): %s not on %s.",
-		"test1", "#test1")
-	ch.delNick(nk)
 
 	ch.addNick(nk, cp)
 	ch.delNick(nk)
@@ -70,14 +52,11 @@ func TestDelNick(t *testing.T) {
 }
 
 func TestChannelParseModes(t *testing.T) {
-	_, s := setUp(t)
-	defer s.tearDown()
-
-	ch := NewChannel("#test1", s.log)
+	ch := NewChannel("#test1")
 	md := ch.Modes
 
 	// Channel modes can adjust channel privs too, so we need a Nick
-	nk := NewNick("test1", s.log)
+	nk := NewNick("test1")
 	cp := new(ChanPrivs)
 	ch.addNick(nk, cp)
 
@@ -111,9 +90,7 @@ func TestChannelParseModes(t *testing.T) {
 		t.Errorf("Limit for channel not set correctly")
 	}
 
-	// enable limit incorrectly. see nick_test.go for why the byte() cast.
-	s.log.EXPECT().Warn("Channel.ParseModes(): not enough arguments to "+
-		"process MODE %s %s%c", "#test1", "+", byte('l'))
+	// enable limit incorrectly
 	ch.ParseModes("+l")
 	if md.Limit != 256 {
 		t.Errorf("Bad limit value caused limit to be unset.")
@@ -137,8 +114,6 @@ func TestChannelParseModes(t *testing.T) {
 	}
 
 	// enable key incorrectly
-	s.log.EXPECT().Warn("Channel.ParseModes(): not enough arguments to "+
-		"process MODE %s %s%c", "#test1", "+", byte('k'))
 	ch.ParseModes("+k")
 	if md.Key != "foobar" {
 		t.Errorf("Bad key value caused key to be unset.")
@@ -159,18 +134,8 @@ func TestChannelParseModes(t *testing.T) {
 		t.Errorf("Channel privileges not flipped correctly by ParseModes.")
 	}
 
-	s.log.EXPECT().Warn("Channel.ParseModes(): untracked nick %s "+
-		"received MODE on channel %s", "test2", "#test1")
-	ch.ParseModes("+v", "test2")
-
-	s.log.EXPECT().Warn("Channel.ParseModes(): not enough arguments to "+
-		"process MODE %s %s%c", "#test1", "-", byte('v'))
-	ch.ParseModes("-v")
-
 	// Test a random mix of modes, just to be sure
 	md.Limit = 256
-	s.log.EXPECT().Warn("Channel.ParseModes(): not enough arguments to "+
-		"process MODE %s %s%c", "#test1", "-", byte('h'))
 	ch.ParseModes("+zpt-qsl+kv-h", "test1", "foobar", "test1")
 
 	if !md.Private || md.Secret || !md.ProtectedTopic || !md.NoExternalMsg ||
@@ -184,8 +149,4 @@ func TestChannelParseModes(t *testing.T) {
 		// NOTE: HalfOp not actually unset above thanks to deliberate error.
 		t.Errorf("Channel privileges not flipped correctly by ParseModes (2).")
 	}
-
-	// Finally, check we get an info log for an unrecognised mode character
-	s.log.EXPECT().Info("Channel.ParseModes(): unknown mode char %c", byte('d'))
-	ch.ParseModes("+d")
 }
