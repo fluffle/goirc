@@ -16,9 +16,10 @@ import (
 // An IRC connection is represented by this struct.
 type Conn struct {
 	// Connection Hostname and Nickname
-	Host    string
-	Me      *state.Nick
-	Network string
+	Host     string
+	Me       *state.Nick
+	Network  string
+	Password string
 
 	// Replaceable function to customise the 433 handler's new nick
 	NewNick func(string) string
@@ -50,7 +51,6 @@ type Conn struct {
 
 	// Misc knobs to tweak client behaviour:
 	// Are we connecting via SSL? Do we care about certificate validity?
-	SSL       bool
 	SSLConfig *tls.Config
 
 	// Client->server ping frequency, in seconds. Defaults to 3m.
@@ -60,7 +60,7 @@ type Conn struct {
 	Flood bool
 
 	// Internal counters for flood protection
-	badness time.Duration
+	badness  time.Duration
 	lastsent time.Time
 }
 
@@ -96,7 +96,6 @@ func Client(nick, ident, name string,
 		cSend:     make(chan bool),
 		cLoop:     make(chan bool),
 		cPing:     make(chan bool),
-		SSL:       false,
 		SSLConfig: nil,
 		PingFreq:  3 * time.Minute,
 		Flood:     false,
@@ -145,8 +144,8 @@ func (conn *Conn) initialise() {
 
 // Connect the IRC connection object to "host[:port]" which should be either
 // a hostname or an IP address, with an optional port. To enable explicit SSL
-// on the connection to the IRC server, set Conn.SSL to true before calling
-// Connect(). The port will default to 6697 if ssl is enabled, and 6667
+// on the connection to the IRC server, set Conn.SSLConfig.
+// The port will default to 6697 if SSL is enabled, and 6667
 // otherwise. You can also provide an optional connect password.
 func (conn *Conn) Connect(host string, pass ...string) error {
 	if conn.Connected {
@@ -154,37 +153,48 @@ func (conn *Conn) Connect(host string, pass ...string) error {
 			"irc.Connect(): already connected to %s, cannot connect to %s",
 			conn.Host, host))
 	}
-
-	if conn.SSL {
+	if conn.SSLConfig != nil {
 		if !hasPort(host) {
 			host += ":6697"
-		}
-		conn.l.Info("irc.Connect(): Connecting to %s with SSL.", host)
-		if s, err := tls.Dial("tcp", host, conn.SSLConfig); err == nil {
-			conn.sock = s
-		} else {
-			return err
 		}
 	} else {
 		if !hasPort(host) {
 			host += ":6667"
 		}
-		conn.l.Info("irc.Connect(): Connecting to %s without SSL.", host)
-		if s, err := net.Dial("tcp", host); err == nil {
+	}
+	conn.Host = host
+	if len(pass) > 0 {
+		conn.Password = pass[0]
+	} else {
+		conn.Password = ""
+	}
+
+	return conn.Reconnect()
+}
+
+func (conn *Conn) Reconnect() error {
+	if conn.Connected {
+		return errors.New(fmt.Sprintf(
+			"irc.Reconnect(): already connected to %s, cannot reconnect", conn.Host))
+	}
+	if conn.SSLConfig != nil {
+		conn.l.Info("irc.Connect(): Connecting to %s with SSL.", conn.Host)
+		if s, err := tls.Dial("tcp", conn.Host, conn.SSLConfig); err == nil {
+			conn.sock = s
+		} else {
+			return err
+		}
+	} else {
+		conn.l.Info("irc.Connect(): Connecting to %s without SSL.", conn.Host)
+		if s, err := net.Dial("tcp", conn.Host); err == nil {
 			conn.sock = s
 		} else {
 			return err
 		}
 	}
-	conn.Host = host
 	conn.Connected = true
 	conn.postConnect()
 
-	if len(pass) > 0 {
-		conn.Pass(pass[0])
-	}
-	conn.Nick(conn.Me.Nick)
-	conn.User(conn.Me.Ident, conn.Me.Name)
 	return nil
 }
 
@@ -202,6 +212,7 @@ func (conn *Conn) postConnect() {
 		go func() { <-conn.cPing }()
 	}
 	go conn.runLoop()
+	conn.ED.Dispatch(INIT, conn, &Line{})
 }
 
 // copied from http.client for great justice
@@ -319,7 +330,7 @@ func (conn *Conn) shutdown() {
 	// as calling sock.Close() will cause recv() to recieve EOF in readstring()
 	if conn.Connected {
 		conn.l.Info("irc.shutdown(): Disconnected from server.")
-		conn.ED.Dispatch("disconnected", conn, &Line{})
+		conn.ED.Dispatch(DISCONNECTED, conn, &Line{})
 		conn.Connected = false
 		conn.sock.Close()
 		conn.cSend <- true

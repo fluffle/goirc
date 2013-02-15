@@ -1,11 +1,11 @@
 package main
 
 import (
-	irc "github.com/fluffle/goirc/client"
+	"bufio"
 	"flag"
 	"fmt"
+	irc "github.com/fluffle/goirc/client"
 	"os"
-	"bufio"
 	"strings"
 )
 
@@ -36,6 +36,8 @@ func main() {
 			if err != nil {
 				// wha?, maybe ctrl-D...
 				close(in)
+				reallyquit = true
+				c.Quit("")
 				break
 			}
 			// no point in sending empty lines down the channel
