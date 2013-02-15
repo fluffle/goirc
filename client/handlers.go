@@ -8,6 +8,13 @@ import (
 	"strings"
 )
 
+// Consts for unnamed events.
+const (
+	INIT         = "init"
+	CONNECTED    = "connected"
+	DISCONNECTED = "disconnected"
+)
+
 // An IRC handler looks like this:
 type IRCHandler func(*Conn, *Line)
 
@@ -34,8 +41,10 @@ func NewHandler(f IRCHandler) event.Handler {
 
 // sets up the internal event handlers to do essential IRC protocol things
 var intHandlers map[string]event.Handler
+
 func init() {
 	intHandlers = make(map[string]event.Handler)
+	intHandlers[INIT] = NewHandler((*Conn).h_init)
 	intHandlers["001"] = NewHandler((*Conn).h_001)
 	intHandlers["433"] = NewHandler((*Conn).h_433)
 	intHandlers["CTCP"] = NewHandler((*Conn).h_CTCP)
@@ -49,6 +58,15 @@ func (conn *Conn) addIntHandlers() {
 	}
 }
 
+// Password/User/Nick broadcast on connection.
+func (conn *Conn) h_init(line *Line) {
+	if conn.Password != "" {
+		conn.Pass(conn.Password)
+	}
+	conn.Nick(conn.Me.Nick)
+	conn.User(conn.Me.Ident, conn.Me.Name)
+}
+
 // Basic ping/pong handler
 func (conn *Conn) h_PING(line *Line) {
 	conn.Raw("PONG :" + line.Args[0])
@@ -57,7 +75,7 @@ func (conn *Conn) h_PING(line *Line) {
 // Handler to trigger a "CONNECTED" event on receipt of numeric 001
 func (conn *Conn) h_001(line *Line) {
 	// we're connected!
-	conn.ED.Dispatch("connected", conn, line)
+	conn.ED.Dispatch(CONNECTED, conn, line)
 	// and we're being given our hostname (from the server's perspective)
 	t := line.Args[len(line.Args)-1]
 	if idx := strings.LastIndex(t, " "); idx != -1 {
