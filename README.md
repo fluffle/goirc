@@ -18,17 +18,17 @@ Synopsis:
 
 	func main() {
         flag.Parse() // parses the logging flags.
-		c := irc.SimpleClient("nick")
+		c := irc.Client("nick")
 		// Optionally, enable SSL
 		c.SSL = true
 
 		// Add handlers to do things here!
 		// e.g. join a channel on connect.
-		c.AddHandler("connected",
+		c.HandleFunc("connected",
 			func(conn *irc.Conn, line *irc.Line) { conn.Join("#channel") })
 		// And a signal on disconnect
 		quit := make(chan bool)
-		c.AddHandler("disconnected",
+		c.HandleFunc("disconnected",
 			func(conn *irc.Conn, line *irc.Line) { quit <- true })
 
 		// Tell client to connect
