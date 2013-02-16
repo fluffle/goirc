@@ -3,7 +3,6 @@ package client
 import (
 	"bufio"
 	"code.google.com/p/gomock/gomock"
-	"github.com/fluffle/goevent/event"
 	"github.com/fluffle/golog/logging"
 	"github.com/fluffle/goirc/state"
 	"strings"
@@ -14,7 +13,6 @@ import (
 type testState struct {
 	ctrl *gomock.Controller
 	st   *state.MockStateTracker
-	ed   *event.MockEventDispatcher
 	nc   *mockNetConn
 	c    *Conn
 }
@@ -22,13 +20,10 @@ type testState struct {
 func setUp(t *testing.T, start ...bool) (*Conn, *testState) {
 	ctrl := gomock.NewController(t)
 	st := state.NewMockStateTracker(ctrl)
-	r := event.NewRegistry()
-	ed := event.NewMockEventDispatcher(ctrl)
 	nc := MockNetConn(t)
-	c := Client("test", "test", "Testing IRC", r)
+	c := Client("test", "test", "Testing IRC")
 	logging.SetLogLevel(logging.LogFatal)
 
-	c.ED = ed
 	c.ST = st
 	c.st = true
 	c.sock = nc
@@ -42,15 +37,14 @@ func setUp(t *testing.T, start ...bool) (*Conn, *testState) {
 		<-time.After(1e6)
 	}
 
-	return c, &testState{ctrl, st, ed, nc, c}
+	return c, &testState{ctrl, st, nc, c}
 }
 
 func (s *testState) tearDown() {
-	s.ed.EXPECT().Dispatch("disconnected", s.c, &Line{})
 	s.st.EXPECT().Wipe()
 	s.nc.ExpectNothing()
 	s.c.shutdown()
-	<-time.After(1e6)
+	<-time.After(time.Millisecond)
 	s.ctrl.Finish()
 }
 
@@ -61,56 +55,61 @@ func TestEOF(t *testing.T) {
 	// Since we're not using tearDown() here, manually call Finish()
 	defer s.ctrl.Finish()
 
+	// Set up a handler to detect whether disconnected handlers are called
+	dcon := false
+	c.HandleFunc("disconnected", func (conn *Conn, line *Line) {
+		dcon = true
+	})
+
 	// Simulate EOF from server
-	s.ed.EXPECT().Dispatch("disconnected", c, &Line{})
 	s.st.EXPECT().Wipe()
 	s.nc.Close()
 
 	// Since things happen in different internal goroutines, we need to wait
 	// 1 ms should be enough :-)
-	<-time.After(1e6)
+	<-time.After(time.Millisecond)
 
 	// Verify that the connection no longer thinks it's connected
 	if c.Connected {
 		t.Errorf("Conn still thinks it's connected to the server.")
 	}
+
+	// Verify that disconnected handler was called
+	if !dcon {
+		t.Errorf("Conn did not call disconnected handlers.")
+	}
 }
 
 func TestClientAndStateTracking(t *testing.T) {
-	// This doesn't use setUp() as we want to pass in a mock EventRegistry.
 	ctrl := gomock.NewController(t)
-	r := event.NewMockEventRegistry(ctrl)
 	st := state.NewMockStateTracker(ctrl)
-
-	for n, _ := range intHandlers {
-		// We can't use EXPECT() here as comparisons of functions are
-		// no longer valid in Go, which causes reflect.DeepEqual to bail.
-		// Instead, ignore the function arg and just ensure that all the
-		// handler names are correctly passed to AddHandler.
-		ctrl.RecordCall(r, "AddHandler", gomock.Any(), n)
-	}
-	c := Client("test", "test", "Testing IRC", r)
+	c := Client("test", "test", "Testing IRC")
 
 	// Assert some basic things about the initial state of the Conn struct
-	if c.ER != r || c.ED != r || c.st != false || c.ST != nil {
-		t.Errorf("Conn not correctly initialised with external deps.")
-	}
-	if c.in == nil || c.out == nil || c.cSend == nil || c.cLoop == nil {
-		t.Errorf("Conn control channels not correctly initialised.")
-	}
 	if c.Me.Nick != "test" || c.Me.Ident != "test" ||
 		c.Me.Name != "Testing IRC" || c.Me.Host != "" {
 		t.Errorf("Conn.Me not correctly initialised.")
 	}
-
-	// OK, while we're here with a mock event registry...
-	for n, _ := range stHandlers {
-		// See above.
-		ctrl.RecordCall(r, "AddHandler", gomock.Any(), n)
+	// Check that the internal handlers are correctly set up
+	for k, _ := range intHandlers {
+		if _, ok := c.handlers.set[strings.ToLower(k)]; !ok {
+			t.Errorf("Missing internal handler for '%s'.", k)
+		}
 	}
-	c.EnableStateTracking()
 
-	// We're expecting the untracked me to be replaced by a tracked one.
+	// Now enable the state tracking code and check its handlers
+	c.EnableStateTracking()
+	for k, _ := range stHandlers {
+		if _, ok := c.handlers.set[strings.ToLower(k)]; !ok {
+			t.Errorf("Missing state handler for '%s'.", k)
+		}
+	}
+	if len(c.stRemovers) != len(stHandlers) {
+		t.Errorf("Incorrect number of Removers (%d != %d) when adding state handlers.",
+			len(c.stRemovers), len(stHandlers))
+	}
+
+	// We're expecting the untracked me to be replaced by a tracked one
 	if c.Me.Nick != "test" || c.Me.Ident != "test" ||
 		c.Me.Name != "Testing IRC" || c.Me.Host != "" {
 		t.Errorf("Enabling state tracking did not replace Me correctly.")
@@ -119,17 +118,24 @@ func TestClientAndStateTracking(t *testing.T) {
 		t.Errorf("State tracker not enabled correctly.")
 	}
 
-	// Now, shim in the mock state tracker and test disabling state tracking.
+	// Now, shim in the mock state tracker and test disabling state tracking
 	me := c.Me
 	c.ST = st
 	st.EXPECT().Wipe()
-	for n, _ := range stHandlers {
-		// See above.
-		ctrl.RecordCall(r, "DelHandler", gomock.Any(), n)
-	}
 	c.DisableStateTracking()
 	if c.st || c.ST != nil || c.Me != me {
 		t.Errorf("State tracker not disabled correctly.")
+	}
+
+	// Finally, check state tracking handlers were all removed correctly
+	for k, _ := range stHandlers {
+		if _, ok := c.handlers.set[strings.ToLower(k)]; ok && k != "NICK" {
+			// A bit leaky, because intHandlers adds a NICK handler.
+			t.Errorf("State handler for '%s' not removed correctly.", k)
+		}
+	}
+	if len(c.stRemovers) != 0 {
+		t.Errorf("stRemovers not zeroed correctly when removing state handlers.")
 	}
 	ctrl.Finish()
 }
@@ -202,7 +208,7 @@ func TestRecv(t *testing.T) {
 	// reader is a helper to do a "non-blocking" read of c.in
 	reader := func() *Line {
 		select {
-		case <-time.After(1e6):
+		case <-time.After(time.Millisecond):
 		case l := <-c.in:
 			return l
 		}
@@ -221,7 +227,7 @@ func TestRecv(t *testing.T) {
 
 	// Strangely, recv() needs some time to start up, but *only* when this test
 	// is run standalone with: client/_test/_testmain --test.run TestRecv
-	<-time.After(1e6)
+	<-time.After(time.Millisecond)
 
 	// Now, this should mean that we'll receive our parsed line on c.in
 	if l := reader(); l == nil || l.Cmd != "001" {
@@ -245,7 +251,6 @@ func TestRecv(t *testing.T) {
 	if exited {
 		t.Errorf("Exited before socket close.")
 	}
-	s.ed.EXPECT().Dispatch("disconnected", c, &Line{})
 	s.st.EXPECT().Wipe()
 	s.nc.Close()
 
@@ -255,7 +260,7 @@ func TestRecv(t *testing.T) {
 	<-c.cLoop
 	<-c.cPing
 	// Give things time to shake themselves out...
-	<-time.After(1e6)
+	<-time.After(time.Millisecond)
 	if !exited {
 		t.Errorf("Didn't exit on socket close.")
 	}
@@ -296,7 +301,7 @@ func TestPing(t *testing.T) {
 		exited = true
 	}()
 
-	// The first ping should be after a second,
+	// The first ping should be after 50ms,
 	// so we don't expect anything now on c.in
 	if s := reader(); s != "" {
 		t.Errorf("Line output directly after ping started.")
@@ -349,15 +354,25 @@ func TestRunLoop(t *testing.T) {
 		bufio.NewReader(c.sock),
 		bufio.NewWriter(c.sock))
 
-	// NOTE: here we assert that no Dispatch event has been called yet by
-	// calling s.ctrl.Finish(). There doesn't appear to be any harm in this.
+	// Set up a handler to detect whether 001 handler is called
+	h001 := false
+	c.HandleFunc("001", func (conn *Conn, line *Line) {
+		h001 = true
+	})
+	// Set up a handler to detect whether 002 handler is called
+	h002 := false
+	c.HandleFunc("002", func (conn *Conn, line *Line) {
+		h002 = true
+	})
+
 	l1 := parseLine(":irc.server.org 001 test :First test line.")
 	c.in <- l1
-	s.ctrl.Finish()
+	if h001 {
+		t.Errorf("001 handler called before runLoop started.")
+	}
 
 	// We want to test that the a goroutine calling runLoop will exit correctly.
 	// Now, we can expect the call to Dispatch to take place as runLoop starts.
-	s.ed.EXPECT().Dispatch("001", c, l1)
 	exited := false
 	go func() {
 		c.runLoop()
@@ -365,15 +380,20 @@ func TestRunLoop(t *testing.T) {
 	}()
 	// Here, the opposite seemed to take place, with TestRunLoop failing when
 	// run as part of the suite but passing when run on it's own.
-	<-time.After(1e6)
+	<-time.After(time.Millisecond)
+	if !h001 {
+		t.Errorf("001 handler not called after runLoop started.")
+	}
 
 	// Send another line, just to be sure :-)
 	l2 := parseLine(":irc.server.org 002 test :Second test line.")
-	s.ed.EXPECT().Dispatch("002", c, l2)
 	c.in <- l2
 	// It appears some sleeping is needed after all of these to ensure channel
 	// sends occur before the close signal is sent below...
-	<-time.After(1e6)
+	<-time.After(time.Millisecond)
+	if !h002 {
+		t.Errorf("002 handler not called while runLoop started.")
+	}
 
 	// Now, use the control channel to exit send and kill the goroutine.
 	if exited {
@@ -381,13 +401,17 @@ func TestRunLoop(t *testing.T) {
 	}
 	c.cLoop <- true
 	// Allow propagation time...
-	<-time.After(1e6)
+	<-time.After(time.Millisecond)
 	if !exited {
 		t.Errorf("Didn't exit after signal.")
 	}
 
 	// Sending more on c.in shouldn't dispatch any further events
+	h001 = false
 	c.in <- l1
+	if h001 {
+		t.Errorf("001 handler called after runLoop ended.")
+	}
 }
 
 func TestWrite(t *testing.T) {
@@ -432,8 +456,6 @@ func TestWrite(t *testing.T) {
 		<-c.cPing
 	}()
 	s.nc.Close()
-
-	s.ed.EXPECT().Dispatch("disconnected", c, &Line{})
 	s.st.EXPECT().Wipe()
 	c.write("she can't pass unit tests")
 }
@@ -468,13 +490,14 @@ func TestRateLimit(t *testing.T) {
 	// characters as the line length means we should be increasing badness by
 	// 2.5 seconds minus the delta between the two ratelimit calls. This should
 	// be minimal but it's guaranteed that it won't be zero. Use 10us as a fuzz.
-	if l := c.rateLimit(60); l != 0 || abs(c.badness - 25*1e8) > 10 * time.Microsecond {
+	if l := c.rateLimit(60); l != 0 ||
+		abs(c.badness - 2500*time.Millisecond) > 10 * time.Microsecond {
 		t.Errorf("Rate limit calculating badness incorrectly.")
 	}
 	// At this point, we can tip over the badness scale, with a bit of help.
 	// 720 chars => +8 seconds of badness => 10.5 seconds => ratelimit
 	if l := c.rateLimit(720); l != 8 * time.Second ||
-		abs(c.badness - 105*1e8) > 10 * time.Microsecond {
+		abs(c.badness - 10500*time.Millisecond) > 10 * time.Microsecond {
 		t.Errorf("Rate limit failed to return correct limiting values.")
 		t.Errorf("l=%d, badness=%d", l, c.badness)
 	}

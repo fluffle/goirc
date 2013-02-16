@@ -2,8 +2,10 @@ package client
 
 import (
 	"code.google.com/p/gomock/gomock"
+	"fmt"
 	"github.com/fluffle/goirc/state"
 	"testing"
+	"time"
 )
 
 // This test performs a simple end-to-end verification of correct line parsing
@@ -11,14 +13,10 @@ import (
 // in this file will call their respective handlers synchronously, otherwise
 // testing becomes more difficult.
 func TestPING(t *testing.T) {
-	c, s := setUp(t)
+	_, s := setUp(t)
 	defer s.tearDown()
-	// As this is a real end-to-end test, we need a real end-to-end dispatcher.
-	c.ED = c.ER
 	s.nc.Send("PING :1234567890")
 	s.nc.Expect("PONG :1234567890")
-	// Return mock dispatcher to it's rightful place afterwards for tearDown.
-	c.ED = s.ed
 }
 
 // Test the handler for 001 / RPL_WELCOME
@@ -27,9 +25,18 @@ func Test001(t *testing.T) {
 	defer s.tearDown()
 
 	l := parseLine(":irc.server.org 001 test :Welcome to IRC test!ident@somehost.com")
-	s.ed.EXPECT().Dispatch("connected", c, l)
+	// Set up a handler to detect whether connected handler is called from 001
+	hcon := false
+	c.HandleFunc("connected", func (conn *Conn, line *Line) {
+		hcon = true
+	})
+
 	// Call handler with a valid 001 line
 	c.h_001(l)
+	<-time.After(time.Millisecond)
+	if !hcon {
+		t.Errorf("001 handler did not dispatch connected event.")
+	}
 
 	// Check host parsed correctly
 	if c.Me.Host != "somehost.com" {
@@ -130,6 +137,58 @@ func TestCTCP(t *testing.T) {
 
 	// Call handler with CTCP UNKNOWN
 	c.h_CTCP(parseLine(":blah!moo@cows.com PRIVMSG test :\001UNKNOWN ctcp\001"))
+}
+
+func TestPRIVMSG(t *testing.T){
+	c, s := setUp(t)
+	defer s.tearDown()
+
+	f := func (conn *Conn, line *Line) {
+		conn.Privmsg(line.Args[0], line.Args[1])
+	}
+	c.CommandFunc("prefix", f, "")
+
+	// CommandStripNick and CommandStripPrefix are both false to begin
+	c.h_PRIVMSG(parseLine(":blah!moo@cows.com PRIVMSG #foo :prefix bar"))
+	s.nc.Expect("PRIVMSG #foo :prefix bar")
+	// If we're not stripping off the nick, the prefix won't match.
+	// This might be considered a bug, but then the library currently has a
+	// poor understanding of the concept of "being addressed".
+	c.h_PRIVMSG(parseLine(":blah!moo@cows.com PRIVMSG #foo :test: prefix bar"))
+	s.nc.ExpectNothing()
+
+	c.CommandStripNick = true
+	c.h_PRIVMSG(parseLine(":blah!moo@cows.com PRIVMSG #foo :prefix bar"))
+	s.nc.Expect("PRIVMSG #foo :prefix bar")
+	c.h_PRIVMSG(parseLine(":blah!moo@cows.com PRIVMSG #foo :test: prefix bar"))
+	s.nc.Expect("PRIVMSG #foo :prefix bar")
+
+	c.CommandStripPrefix = true
+	c.h_PRIVMSG(parseLine(":blah!moo@cows.com PRIVMSG #foo :prefix bar"))
+	s.nc.Expect("PRIVMSG #foo :bar")
+	c.h_PRIVMSG(parseLine(":blah!moo@cows.com PRIVMSG #foo :test: prefix bar"))
+	s.nc.Expect("PRIVMSG #foo :bar")
+
+	c.CommandStripNick = false
+	c.h_PRIVMSG(parseLine(":blah!moo@cows.com PRIVMSG #foo :prefix bar"))
+	s.nc.Expect("PRIVMSG #foo :bar")
+	c.h_PRIVMSG(parseLine(":blah!moo@cows.com PRIVMSG #foo :test: prefix bar"))
+	s.nc.ExpectNothing()
+
+	// Check the various nick addressing notations that are supported.
+	c.CommandStripNick = true
+	for _, addr := range []string{":", ";", ",", ">", "-", ""} {
+		c.h_PRIVMSG(parseLine(fmt.Sprintf(
+			":blah!moo@cows.com PRIVMSG #foo :test%s prefix bar", addr)))
+		s.nc.Expect("PRIVMSG #foo :bar")
+		c.h_PRIVMSG(parseLine(fmt.Sprintf(
+			":blah!moo@cows.com PRIVMSG #foo :test%sprefix bar", addr)))
+		s.nc.ExpectNothing()
+	}
+	c.h_PRIVMSG(parseLine(":blah!moo@cows.com PRIVMSG #foo :test! prefix bar"))
+	s.nc.ExpectNothing()
+
+
 }
 
 // Test the handler for JOIN messages
