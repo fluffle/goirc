@@ -75,4 +75,10 @@ func TestClientCommands(t *testing.T) {
 
 	c.Oper("user", "pass")
 	s.nc.Expect("OPER user pass")
+
+	c.Ping("woot")
+	s.nc.Expect("PING :woot")
+
+	c.Pong("pwoot")
+	s.nc.Expect("PONG :pwoot")
 }
