@@ -21,12 +21,12 @@ func setUp(t *testing.T, start ...bool) (*Conn, *testState) {
 	ctrl := gomock.NewController(t)
 	st := state.NewMockTracker(ctrl)
 	nc := MockNetConn(t)
-	c := Client("test", "test", "Testing IRC")
+	c, _ := SimpleClient("test", "test", "Testing IRC")
 	logging.SetLogLevel(logging.LogFatal)
 
 	c.st = st
 	c.sock = nc
-	c.Flood = true // Tests can take a while otherwise
+	c.cfg.Flood = true // Tests can take a while otherwise
 	c.Connected = true
 	if len(start) == 0 {
 		// Hack to allow tests of send, recv, write etc.
@@ -82,7 +82,7 @@ func TestEOF(t *testing.T) {
 func TestClientAndStateTracking(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	st := state.NewMockTracker(ctrl)
-	c := Client("test", "test", "Testing IRC")
+	c, _ := SimpleClient("test", "test", "Testing IRC")
 
 	// Assert some basic things about the initial state of the Conn struct
 	if c.Me.Nick != "test" || c.Me.Ident != "test" ||
@@ -278,7 +278,7 @@ func TestPing(t *testing.T) {
 	defer s.ctrl.Finish()
 
 	// Set a low ping frequency for testing.
-	c.PingFreq = 50 * time.Millisecond
+	c.cfg.PingFreq = 50 * time.Millisecond
 
 	// reader is a helper to do a "non-blocking" read of c.out
 	reader := func() string {
@@ -429,13 +429,13 @@ func TestWrite(t *testing.T) {
 	c.write("yo momma")
 	s.nc.Expect("yo momma")
 
-	// Flood control is disabled -- setUp sets c.Flood = true -- so we should
+	// Flood control is disabled -- setUp sets c.cfg.Flood = true -- so we should
 	// not have set c.badness at this point.
 	if c.badness != 0 {
 		t.Errorf("Flood control used when Flood = true.")
 	}
 
-	c.Flood = false
+	c.cfg.Flood = false
 	c.write("she so useless")
 	s.nc.Expect("she so useless")
 

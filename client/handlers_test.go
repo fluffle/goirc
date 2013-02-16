@@ -157,26 +157,26 @@ func TestPRIVMSG(t *testing.T) {
 	c.h_PRIVMSG(parseLine(":blah!moo@cows.com PRIVMSG #foo :test: prefix bar"))
 	s.nc.ExpectNothing()
 
-	c.CommandStripNick = true
+	c.cfg.CommandStripNick = true
 	c.h_PRIVMSG(parseLine(":blah!moo@cows.com PRIVMSG #foo :prefix bar"))
 	s.nc.Expect("PRIVMSG #foo :prefix bar")
 	c.h_PRIVMSG(parseLine(":blah!moo@cows.com PRIVMSG #foo :test: prefix bar"))
 	s.nc.Expect("PRIVMSG #foo :prefix bar")
 
-	c.CommandStripPrefix = true
+	c.cfg.CommandStripPrefix = true
 	c.h_PRIVMSG(parseLine(":blah!moo@cows.com PRIVMSG #foo :prefix bar"))
 	s.nc.Expect("PRIVMSG #foo :bar")
 	c.h_PRIVMSG(parseLine(":blah!moo@cows.com PRIVMSG #foo :test: prefix bar"))
 	s.nc.Expect("PRIVMSG #foo :bar")
 
-	c.CommandStripNick = false
+	c.cfg.CommandStripNick = false
 	c.h_PRIVMSG(parseLine(":blah!moo@cows.com PRIVMSG #foo :prefix bar"))
 	s.nc.Expect("PRIVMSG #foo :bar")
 	c.h_PRIVMSG(parseLine(":blah!moo@cows.com PRIVMSG #foo :test: prefix bar"))
 	s.nc.ExpectNothing()
 
 	// Check the various nick addressing notations that are supported.
-	c.CommandStripNick = true
+	c.cfg.CommandStripNick = true
 	for _, addr := range []string{":", ";", ",", ">", "-", ""} {
 		c.h_PRIVMSG(parseLine(fmt.Sprintf(
 			":blah!moo@cows.com PRIVMSG #foo :test%s prefix bar", addr)))
