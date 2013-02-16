@@ -185,6 +185,7 @@ func (conn *Conn) Connect(host string, pass ...string) error {
 	}
 	conn.Connected = true
 	conn.postConnect()
+	conn.ED.Dispatch(INIT, conn, &Line{})
 	return nil
 }
 
@@ -202,7 +203,6 @@ func (conn *Conn) postConnect() {
 		go func() { <-conn.cPing }()
 	}
 	go conn.runLoop()
-	conn.ED.Dispatch(INIT, conn, &Line{})
 }
 
 // copied from http.client for great justice
