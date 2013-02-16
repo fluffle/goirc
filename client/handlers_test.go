@@ -27,7 +27,7 @@ func Test001(t *testing.T) {
 	l := parseLine(":irc.server.org 001 test :Welcome to IRC test!ident@somehost.com")
 	// Set up a handler to detect whether connected handler is called from 001
 	hcon := false
-	c.HandleFunc("connected", func (conn *Conn, line *Line) {
+	c.HandleFunc(CONNECTED, func(conn *Conn, line *Line) {
 		hcon = true
 	})
 
@@ -139,11 +139,11 @@ func TestCTCP(t *testing.T) {
 	c.h_CTCP(parseLine(":blah!moo@cows.com PRIVMSG test :\001UNKNOWN ctcp\001"))
 }
 
-func TestPRIVMSG(t *testing.T){
+func TestPRIVMSG(t *testing.T) {
 	c, s := setUp(t)
 	defer s.tearDown()
 
-	f := func (conn *Conn, line *Line) {
+	f := func(conn *Conn, line *Line) {
 		conn.Privmsg(line.Args[0], line.Args[1])
 	}
 	c.CommandFunc("prefix", f, "")
@@ -187,7 +187,6 @@ func TestPRIVMSG(t *testing.T){
 	}
 	c.h_PRIVMSG(parseLine(":blah!moo@cows.com PRIVMSG #foo :test! prefix bar"))
 	s.nc.ExpectNothing()
-
 
 }
 
@@ -316,7 +315,6 @@ func TestMODE(t *testing.T) {
 	if !chan1.Modes.Secret || chan1.Modes.Key != "somekey" {
 		t.Errorf("Channel.ParseModes() not called correctly.")
 	}
-
 
 	// Send a nick mode line, returning Me
 	gomock.InOrder(

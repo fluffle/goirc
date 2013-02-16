@@ -83,7 +83,7 @@ func TestHandlerSet(t *testing.T) {
 	if callcount != 0 {
 		t.Errorf("Something incremented call count before we were expecting it.")
 	}
-	hs.dispatch(nil, &Line{Cmd:"One"})
+	hs.dispatch(nil, &Line{Cmd: "One"})
 	<-time.After(time.Millisecond)
 	if callcount != 4 {
 		t.Errorf("Our handler wasn't called four times :-(")
@@ -107,7 +107,7 @@ func TestHandlerSet(t *testing.T) {
 	}
 
 	// Dispatch should result in 3 additions.
-	hs.dispatch(nil, &Line{Cmd:"One"})
+	hs.dispatch(nil, &Line{Cmd: "One"})
 	<-time.After(time.Millisecond)
 	if callcount != 7 {
 		t.Errorf("Our handler wasn't called three times :-(")
@@ -129,7 +129,7 @@ func TestHandlerSet(t *testing.T) {
 	}
 
 	// Dispatch should result in 2 additions.
-	hs.dispatch(nil, &Line{Cmd:"One"})
+	hs.dispatch(nil, &Line{Cmd: "One"})
 	<-time.After(time.Millisecond)
 	if callcount != 9 {
 		t.Errorf("Our handler wasn't called two times :-(")
@@ -151,7 +151,7 @@ func TestHandlerSet(t *testing.T) {
 	}
 
 	// Dispatch should result in 1 addition.
-	hs.dispatch(nil, &Line{Cmd:"One"})
+	hs.dispatch(nil, &Line{Cmd: "One"})
 	<-time.After(time.Millisecond)
 	if callcount != 10 {
 		t.Errorf("Our handler wasn't called once :-(")
@@ -170,7 +170,7 @@ func TestHandlerSet(t *testing.T) {
 	}
 
 	// Dispatch should result in NO additions.
-	hs.dispatch(nil, &Line{Cmd:"One"})
+	hs.dispatch(nil, &Line{Cmd: "One"})
 	<-time.After(time.Millisecond)
 	if callcount != 10 {
 		t.Errorf("Our handler was called?")
@@ -184,7 +184,7 @@ func TestCommandSet(t *testing.T) {
 	}
 
 	c := &command{
-		fn: func(c *Conn, l *Line) {},
+		fn:   func(c *Conn, l *Line) {},
 		help: "wtf?",
 	}
 
@@ -196,7 +196,7 @@ func TestCommandSet(t *testing.T) {
 	if fail := cs.add("one", c); fail != nil {
 		t.Errorf("Adding a second 'one' command did not fail as expected.")
 	}
-	
+
 	cn2 := cs.add("One Two", c).(*cNode)
 	if _, ok := cs.set["one two"]; !ok || cn2.set != cs || cn2.prefix != "one two" {
 		t.Errorf("Command 'one two' not added to set correctly.")
@@ -208,7 +208,7 @@ func TestCommandSet(t *testing.T) {
 	if c, l := cs.match("one"); c.(*cNode) != cn1 || l != 3 {
 		t.Errorf("Didn't match 'one' when we should have.")
 	}
-	if c, l := cs.match ("one two three"); c.(*cNode) != cn2 || l != 7 {
+	if c, l := cs.match("one two three"); c.(*cNode) != cn2 || l != 7 {
 		t.Errorf("Didn't match 'one two' when we should have.")
 	}
 
@@ -216,14 +216,14 @@ func TestCommandSet(t *testing.T) {
 	if _, ok := cs.set["one two"]; ok || cn2.set != nil {
 		t.Errorf("Command 'one two' not removed correctly.")
 	}
-	if c, l := cs.match ("one two three"); c.(*cNode) != cn1 || l != 3 {
+	if c, l := cs.match("one two three"); c.(*cNode) != cn1 || l != 3 {
 		t.Errorf("Didn't match 'one' when we should have.")
 	}
 	cn1.Remove()
 	if _, ok := cs.set["one"]; ok || cn1.set != nil {
 		t.Errorf("Command 'one' not removed correctly.")
 	}
-	if c, l := cs.match ("one two three"); c != nil || l != 0 {
+	if c, l := cs.match("one two three"); c != nil || l != 0 {
 		t.Errorf("Matched 'one' when we shouldn't have.")
 	}
 }

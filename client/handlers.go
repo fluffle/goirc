@@ -9,8 +9,9 @@ import (
 
 // sets up the internal event handlers to do essential IRC protocol things
 var intHandlers = map[string]HandlerFunc{
-	"001": (*Conn).h_001,
-	"433": (*Conn).h_433,
+	INIT:   (*Conn).h_init,
+	"001":  (*Conn).h_001,
+	"433":  (*Conn).h_433,
 	"CTCP": (*Conn).h_CTCP,
 	"NICK": (*Conn).h_NICK,
 	"PING": (*Conn).h_PING,
@@ -24,6 +25,15 @@ func (conn *Conn) addIntHandlers() {
 	}
 }
 
+// Password/User/Nick broadcast on connection.
+func (conn *Conn) h_init(line *Line) {
+	if conn.password != "" {
+		conn.Pass(conn.password)
+	}
+	conn.Nick(conn.Me.Nick)
+	conn.User(conn.Me.Ident, conn.Me.Name)
+}
+
 // Basic ping/pong handler
 func (conn *Conn) h_PING(line *Line) {
 	conn.Raw("PONG :" + line.Args[0])
@@ -32,7 +42,7 @@ func (conn *Conn) h_PING(line *Line) {
 // Handler to trigger a "CONNECTED" event on receipt of numeric 001
 func (conn *Conn) h_001(line *Line) {
 	// we're connected!
-	conn.dispatch(&Line{Cmd: "connected"})
+	conn.dispatch(&Line{Cmd: CONNECTED})
 	// and we're being given our hostname (from the server's perspective)
 	t := line.Args[len(line.Args)-1]
 	if idx := strings.LastIndex(t, " "); idx != -1 {
@@ -99,7 +109,9 @@ func (conn *Conn) h_PRIVMSG(line *Line) {
 		}
 	}
 	cmd, l := conn.cmdMatch(txt)
-	if cmd == nil { return }
+	if cmd == nil {
+		return
+	}
 	if conn.CommandStripPrefix {
 		txt = strings.TrimSpace(txt[l:])
 	}

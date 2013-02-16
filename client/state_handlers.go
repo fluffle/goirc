@@ -9,19 +9,19 @@ import (
 )
 
 var stHandlers = map[string]HandlerFunc{
-	"JOIN": (*Conn).h_JOIN,
-	"KICK": (*Conn).h_KICK,
-	"MODE": (*Conn).h_MODE,
-	"NICK": (*Conn).h_STNICK,
-	"PART": (*Conn).h_PART,
-	"QUIT": (*Conn).h_QUIT,
+	"JOIN":  (*Conn).h_JOIN,
+	"KICK":  (*Conn).h_KICK,
+	"MODE":  (*Conn).h_MODE,
+	"NICK":  (*Conn).h_STNICK,
+	"PART":  (*Conn).h_PART,
+	"QUIT":  (*Conn).h_QUIT,
 	"TOPIC": (*Conn).h_TOPIC,
-	"311": (*Conn).h_311,
-	"324": (*Conn).h_324,
-	"332": (*Conn).h_332,
-	"352": (*Conn).h_352,
-	"353": (*Conn).h_353,
-	"671": (*Conn).h_671,
+	"311":   (*Conn).h_311,
+	"324":   (*Conn).h_324,
+	"332":   (*Conn).h_332,
+	"352":   (*Conn).h_352,
+	"353":   (*Conn).h_353,
+	"671":   (*Conn).h_671,
 }
 
 func (conn *Conn) addSTHandlers() {
