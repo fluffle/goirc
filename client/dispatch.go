@@ -105,7 +105,9 @@ func (hs *hSet) dispatch(conn *Conn, line *Line) {
 	defer hs.RUnlock()
 	ev := strings.ToLower(line.Cmd)
 	list, ok := hs.set[ev]
-	if !ok { return }
+	if !ok {
+		return
+	}
 	for hn := list.start; hn != nil; hn = hn.next {
 		go hn.Handle(conn, line)
 	}

@@ -3,8 +3,8 @@ package client
 import (
 	"bufio"
 	"code.google.com/p/gomock/gomock"
-	"github.com/fluffle/golog/logging"
 	"github.com/fluffle/goirc/state"
+	"github.com/fluffle/golog/logging"
 	"strings"
 	"testing"
 	"time"
@@ -33,6 +33,10 @@ func setUp(t *testing.T, start ...bool) (*Conn, *testState) {
 		// Hack to allow tests of send, recv, write etc.
 		// NOTE: the value of the boolean doesn't matter.
 		c.postConnect()
+		// All connections start with NICK/USER expect these.
+		nc.Expect("NICK test")
+		nc.Expect("USER test 12 * :Testing IRC")
+
 		// Sleep 1ms to allow background routines to start.
 		<-time.After(1e6)
 	}
@@ -57,7 +61,7 @@ func TestEOF(t *testing.T) {
 
 	// Set up a handler to detect whether disconnected handlers are called
 	dcon := false
-	c.HandleFunc("disconnected", func (conn *Conn, line *Line) {
+	c.HandleFunc(DISCONNECTED, func(conn *Conn, line *Line) {
 		dcon = true
 	})
 
@@ -356,12 +360,12 @@ func TestRunLoop(t *testing.T) {
 
 	// Set up a handler to detect whether 001 handler is called
 	h001 := false
-	c.HandleFunc("001", func (conn *Conn, line *Line) {
+	c.HandleFunc("001", func(conn *Conn, line *Line) {
 		h001 = true
 	})
 	// Set up a handler to detect whether 002 handler is called
 	h002 := false
-	c.HandleFunc("002", func (conn *Conn, line *Line) {
+	c.HandleFunc("002", func(conn *Conn, line *Line) {
 		h002 = true
 	})
 
@@ -470,7 +474,7 @@ func TestRateLimit(t *testing.T) {
 
 	// We'll be needing this later...
 	abs := func(i time.Duration) time.Duration {
-		if (i < 0) {
+		if i < 0 {
 			return -i
 		}
 		return i
@@ -491,13 +495,13 @@ func TestRateLimit(t *testing.T) {
 	// 2.5 seconds minus the delta between the two ratelimit calls. This should
 	// be minimal but it's guaranteed that it won't be zero. Use 10us as a fuzz.
 	if l := c.rateLimit(60); l != 0 ||
-		abs(c.badness - 2500*time.Millisecond) > 10 * time.Microsecond {
+		abs(c.badness-2500*time.Millisecond) > 10*time.Microsecond {
 		t.Errorf("Rate limit calculating badness incorrectly.")
 	}
 	// At this point, we can tip over the badness scale, with a bit of help.
 	// 720 chars => +8 seconds of badness => 10.5 seconds => ratelimit
-	if l := c.rateLimit(720); l != 8 * time.Second ||
-		abs(c.badness - 10500*time.Millisecond) > 10 * time.Microsecond {
+	if l := c.rateLimit(720); l != 8*time.Second ||
+		abs(c.badness-10500*time.Millisecond) > 10*time.Microsecond {
 		t.Errorf("Rate limit failed to return correct limiting values.")
 		t.Errorf("l=%d, badness=%d", l, c.badness)
 	}
