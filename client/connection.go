@@ -15,9 +15,10 @@ import (
 // An IRC connection is represented by this struct.
 type Conn struct {
 	// Connection Hostname and Nickname
-	Host    string
-	Me      *state.Nick
-	Network string
+	Host     string
+	Me       *state.Nick
+	Network  string
+	password string
 
 	// Handlers and Commands
 	handlers *hSet
@@ -60,7 +61,7 @@ type Conn struct {
 	Flood bool
 
 	// Internal counters for flood protection
-	badness time.Duration
+	badness  time.Duration
 	lastsent time.Time
 }
 
@@ -164,13 +165,12 @@ func (conn *Conn) Connect(host string, pass ...string) error {
 	}
 	conn.Host = host
 	conn.Connected = true
-	conn.postConnect()
-
 	if len(pass) > 0 {
-		conn.Pass(pass[0])
+		conn.password = pass[0]
+	} else {
+		conn.password = ""
 	}
-	conn.Nick(conn.Me.Nick)
-	conn.User(conn.Me.Ident, conn.Me.Name)
+	conn.postConnect()
 	return nil
 }
 
@@ -188,6 +188,7 @@ func (conn *Conn) postConnect() {
 		go func() { <-conn.cPing }()
 	}
 	go conn.runLoop()
+	conn.dispatch(&Line{Cmd: INIT})
 }
 
 // copied from http.client for great justice
@@ -305,7 +306,7 @@ func (conn *Conn) shutdown() {
 	// as calling sock.Close() will cause recv() to recieve EOF in readstring()
 	if conn.Connected {
 		logging.Info("irc.shutdown(): Disconnected from server.")
-		conn.dispatch(&Line{Cmd: "disconnected"})
+		conn.dispatch(&Line{Cmd: DISCONNECTED})
 		conn.Connected = false
 		conn.sock.Close()
 		conn.cSend <- true

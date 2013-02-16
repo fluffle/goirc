@@ -7,14 +7,14 @@ import (
 
 func TestCopy(t *testing.T) {
 	l1 := &Line{
-		Nick: "nick",
+		Nick:  "nick",
 		Ident: "ident",
-		Host: "host",
-		Src: "src",
-		Cmd: "cmd",
-		Raw: "raw",
-		Args: []string{"arg", "text"},
-		Time: time.Now(),
+		Host:  "host",
+		Src:   "src",
+		Cmd:   "cmd",
+		Raw:   "raw",
+		Args:  []string{"arg", "text"},
+		Time:  time.Now(),
 	}
 
 	l2 := l1.Copy()

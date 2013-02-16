@@ -2,6 +2,12 @@ package client
 
 import "strings"
 
+const (
+	INIT         = "init"
+	CONNECTED    = "connected"
+	DISCONNECTED = "disconnected"
+)
+
 // this file contains the various commands you can
 // send to the server using an Conn connection
 
