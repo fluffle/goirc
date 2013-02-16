@@ -4,48 +4,23 @@ package client
 // to manage tracking an irc connection etc.
 
 import (
-	"github.com/fluffle/goevent/event"
 	"strings"
 )
 
-// An IRC handler looks like this:
-type IRCHandler func(*Conn, *Line)
-
-// AddHandler() adds an event handler for a specific IRC command.
-//
-// Handlers are triggered on incoming Lines from the server, with the handler
-// "name" being equivalent to Line.Cmd. Read the RFCs for details on what
-// replies could come from the server. They'll generally be things like
-// "PRIVMSG", "JOIN", etc. but all the numeric replies are left as ascii
-// strings of digits like "332" (mainly because I really didn't feel like
-// putting massive constant tables in).
-func (conn *Conn) AddHandler(name string, f IRCHandler) event.Handler {
-	h := NewHandler(f)
-	conn.ER.AddHandler(h, name)
-	return h
-}
-
-// Wrap f in an anonymous unboxing function
-func NewHandler(f IRCHandler) event.Handler {
-	return event.NewHandler(func(ev ...interface{}) {
-		f(ev[0].(*Conn), ev[1].(*Line))
-	})
-}
-
 // sets up the internal event handlers to do essential IRC protocol things
-var intHandlers map[string]event.Handler
-func init() {
-	intHandlers = make(map[string]event.Handler)
-	intHandlers["001"] = NewHandler((*Conn).h_001)
-	intHandlers["433"] = NewHandler((*Conn).h_433)
-	intHandlers["CTCP"] = NewHandler((*Conn).h_CTCP)
-	intHandlers["NICK"] = NewHandler((*Conn).h_NICK)
-	intHandlers["PING"] = NewHandler((*Conn).h_PING)
+var intHandlers = map[string]HandlerFunc{
+	"001": (*Conn).h_001,
+	"433": (*Conn).h_433,
+	"CTCP": (*Conn).h_CTCP,
+	"NICK": (*Conn).h_NICK,
+	"PING": (*Conn).h_PING,
 }
 
 func (conn *Conn) addIntHandlers() {
 	for n, h := range intHandlers {
-		conn.ER.AddHandler(h, n)
+		// internal handlers are essential for the IRC client
+		// to function, so we don't save their Removers here
+		conn.Handle(n, h)
 	}
 }
 
@@ -57,7 +32,7 @@ func (conn *Conn) h_PING(line *Line) {
 // Handler to trigger a "CONNECTED" event on receipt of numeric 001
 func (conn *Conn) h_001(line *Line) {
 	// we're connected!
-	conn.ED.Dispatch("connected", conn, line)
+	conn.dispatch(&Line{Cmd: "connected"})
 	// and we're being given our hostname (from the server's perspective)
 	t := line.Args[len(line.Args)-1]
 	if idx := strings.LastIndex(t, " "); idx != -1 {
@@ -106,5 +81,37 @@ func (conn *Conn) h_CTCP(line *Line) {
 func (conn *Conn) h_NICK(line *Line) {
 	if !conn.st && line.Nick == conn.Me.Nick {
 		conn.Me.Nick = line.Args[0]
+	}
+}
+
+// Handle PRIVMSGs that trigger Commands
+func (conn *Conn) h_PRIVMSG(line *Line) {
+	txt := line.Args[1]
+	if conn.CommandStripNick && strings.HasPrefix(txt, conn.Me.Nick) {
+		// Look for '^${nick}[:;>,-]? '
+		l := len(conn.Me.Nick)
+		switch txt[l] {
+		case ':', ';', '>', ',', '-':
+			l++
+		}
+		if txt[l] == ' ' {
+			txt = strings.TrimSpace(txt[l:])
+		}
+	}
+	cmd, l := conn.cmdMatch(txt)
+	if cmd == nil { return }
+	if conn.CommandStripPrefix {
+		txt = strings.TrimSpace(txt[l:])
+	}
+	if txt != line.Args[1] {
+		line = line.Copy()
+		line.Args[1] = txt
+	}
+	cmd.Execute(conn, line)
+}
+
+func (conn *Conn) c_HELP(line *Line) {
+	if cmd, _ := conn.cmdMatch(line.Args[1]); cmd != nil {
+		conn.Privmsg(line.Args[0], cmd.Help())
 	}
 }

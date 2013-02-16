@@ -4,40 +4,37 @@ package client
 // to manage tracking state for an IRC connection
 
 import (
-	"github.com/fluffle/goevent/event"
 	"github.com/fluffle/golog/logging"
 	"strings"
 )
 
-var stHandlers map[string]event.Handler
-
-func init() {
-	stHandlers = make(map[string]event.Handler)
-	stHandlers["JOIN"] = NewHandler((*Conn).h_JOIN)
-	stHandlers["KICK"] = NewHandler((*Conn).h_KICK)
-	stHandlers["MODE"] = NewHandler((*Conn).h_MODE)
-	stHandlers["NICK"] = NewHandler((*Conn).h_STNICK)
-	stHandlers["PART"] = NewHandler((*Conn).h_PART)
-	stHandlers["QUIT"] = NewHandler((*Conn).h_QUIT)
-	stHandlers["TOPIC"] = NewHandler((*Conn).h_TOPIC)
-	stHandlers["311"] = NewHandler((*Conn).h_311)
-	stHandlers["324"] = NewHandler((*Conn).h_324)
-	stHandlers["332"] = NewHandler((*Conn).h_332)
-	stHandlers["352"] = NewHandler((*Conn).h_352)
-	stHandlers["353"] = NewHandler((*Conn).h_353)
-	stHandlers["671"] = NewHandler((*Conn).h_671)
+var stHandlers = map[string]HandlerFunc{
+	"JOIN": (*Conn).h_JOIN,
+	"KICK": (*Conn).h_KICK,
+	"MODE": (*Conn).h_MODE,
+	"NICK": (*Conn).h_STNICK,
+	"PART": (*Conn).h_PART,
+	"QUIT": (*Conn).h_QUIT,
+	"TOPIC": (*Conn).h_TOPIC,
+	"311": (*Conn).h_311,
+	"324": (*Conn).h_324,
+	"332": (*Conn).h_332,
+	"352": (*Conn).h_352,
+	"353": (*Conn).h_353,
+	"671": (*Conn).h_671,
 }
 
 func (conn *Conn) addSTHandlers() {
 	for n, h := range stHandlers {
-		conn.ER.AddHandler(h, n)
+		conn.stRemovers = append(conn.stRemovers, conn.Handle(n, h))
 	}
 }
 
 func (conn *Conn) delSTHandlers() {
-	for n, h := range stHandlers {
-		conn.ER.DelHandler(h, n)
+	for _, h := range conn.stRemovers {
+		h.Remove()
 	}
+	conn.stRemovers = conn.stRemovers[:0]
 }
 
 // Handle NICK messages that need to update the state tracker

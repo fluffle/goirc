@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"github.com/fluffle/goevent/event"
 	"github.com/fluffle/goirc/state"
 	"github.com/fluffle/golog/logging"
 	"net"
@@ -20,16 +19,14 @@ type Conn struct {
 	Me      *state.Nick
 	Network string
 
-	// Replaceable function to customise the 433 handler's new nick
-	NewNick func(string) string
-
-	// Event handler registry and dispatcher
-	ER event.EventRegistry
-	ED event.EventDispatcher
+	// Handlers and Commands
+	handlers *hSet
+	commands *cSet
 
 	// State tracker for nicks and channels
-	ST state.StateTracker
-	st bool
+	ST         state.StateTracker
+	st         bool
+	stRemovers []Remover
 
 	// Use the State field to store external state that handlers might need.
 	// Remember ... you might need locking for this ;-)
@@ -50,8 +47,14 @@ type Conn struct {
 	SSL       bool
 	SSLConfig *tls.Config
 
+	// Replaceable function to customise the 433 handler's new nick
+	NewNick func(string) string
+
 	// Client->server ping frequency, in seconds. Defaults to 3m.
 	PingFreq time.Duration
+
+	// Controls what is stripped from line.Args[1] for Commands
+	CommandStripNick, CommandStripPrefix bool
 
 	// Set this to true to disable flood protection and false to re-enable
 	Flood bool
@@ -62,9 +65,9 @@ type Conn struct {
 }
 
 // Creates a new IRC connection object, but doesn't connect to anything so
-// that you can add event handlers to it. See AddHandler() for details.
-func SimpleClient(nick string, args ...string) *Conn {
-	r := event.NewRegistry()
+// that you can add event handlers to it. See AddHandler() for details
+func Client(nick string, args ...string) *Conn {
+	logging.InitFromFlags()
 	ident := "goirc"
 	name := "Powered by GoIRC"
 
@@ -74,30 +77,18 @@ func SimpleClient(nick string, args ...string) *Conn {
 	if len(args) > 1 && args[1] != "" {
 		name = args[1]
 	}
-	return Client(nick, ident, name, r)
-}
-
-func Client(nick, ident, name string, r event.EventRegistry) *Conn {
-	if r == nil {
-		return nil
-	}
-	logging.InitFromFlags()
 	conn := &Conn{
-		ER:        r,
-		ED:        r,
-		st:        false,
-		in:        make(chan *Line, 32),
-		out:       make(chan string, 32),
-		cSend:     make(chan bool),
-		cLoop:     make(chan bool),
-		cPing:     make(chan bool),
-		SSL:       false,
-		SSLConfig: nil,
-		PingFreq:  3 * time.Minute,
-		Flood:     false,
-		NewNick:   func(s string) string { return s + "_" },
-		badness:   0,
-		lastsent:  time.Now(),
+		in:         make(chan *Line, 32),
+		out:        make(chan string, 32),
+		cSend:      make(chan bool),
+		cLoop:      make(chan bool),
+		cPing:      make(chan bool),
+		handlers:   handlerSet(),
+		commands:   commandSet(),
+		stRemovers: make([]Remover, 0, len(stHandlers)),
+		PingFreq:   3 * time.Minute,
+		NewNick:    func(s string) string { return s + "_" },
+		lastsent:   time.Now(),
 	}
 	conn.addIntHandlers()
 	conn.Me = state.NewNick(nick)
@@ -257,7 +248,7 @@ func (conn *Conn) runLoop() {
 	for {
 		select {
 		case line := <-conn.in:
-			conn.ED.Dispatch(line.Cmd, conn, line)
+			conn.dispatch(line)
 		case <-conn.cLoop:
 			// strobe on control channel, bail out
 			return
@@ -314,7 +305,7 @@ func (conn *Conn) shutdown() {
 	// as calling sock.Close() will cause recv() to recieve EOF in readstring()
 	if conn.Connected {
 		logging.Info("irc.shutdown(): Disconnected from server.")
-		conn.ED.Dispatch("disconnected", conn, &Line{})
+		conn.dispatch(&Line{Cmd: "disconnected"})
 		conn.Connected = false
 		conn.sock.Close()
 		conn.cSend <- true
