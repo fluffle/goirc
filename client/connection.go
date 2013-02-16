@@ -171,6 +171,7 @@ func (conn *Conn) Connect(host string, pass ...string) error {
 		conn.password = ""
 	}
 	conn.postConnect()
+	conn.dispatch(&Line{Cmd: INIT})
 	return nil
 }
 
@@ -188,7 +189,6 @@ func (conn *Conn) postConnect() {
 		go func() { <-conn.cPing }()
 	}
 	go conn.runLoop()
-	conn.dispatch(&Line{Cmd: INIT})
 }
 
 // copied from http.client for great justice
