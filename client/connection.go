@@ -16,10 +16,9 @@ import (
 // An IRC connection is represented by this struct.
 type Conn struct {
 	// Connection Hostname and Nickname
-	Host     string
-	Me       *state.Nick
-	Network  string
-	password string
+	Host    string
+	Me      *state.Nick
+	Network string
 
 	// Replaceable function to customise the 433 handler's new nick
 	NewNick func(string) string
@@ -173,12 +172,9 @@ func (conn *Conn) Connect(host string, pass ...string) error {
 		}
 	}
 	conn.Host = host
-	if len(pass) > 0 {
-		conn.password = pass[0]
-	}
 	conn.Connected = true
 	conn.postConnect()
-	conn.ED.Dispatch(INIT, conn, &Line{})
+	conn.ED.Dispatch(INIT, conn, &Line{Args: pass})
 	return nil
 }
 
