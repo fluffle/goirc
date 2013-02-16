@@ -167,5 +167,5 @@ func (conn *Conn) Oper(user, pass string) { conn.out <- OPER + " " + user + " " 
 // A PONG response is to be expected afterwards
 func (conn *Conn) Ping(message string) { conn.out <- PING + " :" + message }
 
-// Ping() sends a PONG command to the server
+// Pong() sends a PONG command to the server
 func (conn *Conn) Pong(message string) { conn.out <- PONG + " :" + message }
