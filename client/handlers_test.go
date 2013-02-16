@@ -158,7 +158,7 @@ func TestJOIN(t *testing.T) {
 	defer s.tearDown()
 
 	// The state tracker should be creating a new channel in this first test
-	chan1 := state.NewChannel("#test1", s.log)
+	chan1 := state.NewChannel("#test1")
 
 	gomock.InOrder(
 		s.st.EXPECT().GetChannel("#test1").Return(nil),
@@ -176,7 +176,7 @@ func TestJOIN(t *testing.T) {
 	s.nc.Expect("WHO #test1")
 
 	// In this second test, we should be creating a new nick
-	nick1 := state.NewNick("user1", s.log)
+	nick1 := state.NewNick("user1")
 
 	gomock.InOrder(
 		s.st.EXPECT().GetChannel("#test1").Return(chan1),
@@ -192,7 +192,7 @@ func TestJOIN(t *testing.T) {
 	s.nc.Expect("WHO user1")
 
 	// In this third test, we'll be pretending we know about the nick already.
-	nick2 := state.NewNick("user2", c.l)
+	nick2 := state.NewNick("user2")
 	gomock.InOrder(
 		s.st.EXPECT().GetChannel("#test1").Return(chan1),
 		s.st.EXPECT().GetNick("user2").Return(nick2),
@@ -205,13 +205,9 @@ func TestJOIN(t *testing.T) {
 		// unknown channel, unknown nick
 		s.st.EXPECT().GetChannel("#test2").Return(nil),
 		s.st.EXPECT().GetNick("blah").Return(nil),
-		s.log.EXPECT().Warn("irc.JOIN(): JOIN to unknown channel %s "+
-			"received from (non-me) nick %s", "#test2", "blah"),
 		// unknown channel, known nick that isn't Me.
 		s.st.EXPECT().GetChannel("#test2").Return(nil),
 		s.st.EXPECT().GetNick("user2").Return(nick2),
-		s.log.EXPECT().Warn("irc.JOIN(): JOIN to unknown channel %s "+
-			"received from (non-me) nick %s", "#test2", "user2"),
 	)
 	c.h_JOIN(parseLine(":blah!moo@cows.com JOIN :#test2"))
 	c.h_JOIN(parseLine(":user2!ident2@host2.com JOIN :#test2"))
@@ -223,8 +219,8 @@ func TestPART(t *testing.T) {
 	defer s.tearDown()
 
 	// We need some valid and associated nicks / channels to PART with.
-	chan1 := state.NewChannel("#test1", s.log)
-	nick1 := state.NewNick("user1", s.log)
+	chan1 := state.NewChannel("#test1")
+	nick1 := state.NewNick("user1")
 
 	// PART should dissociate a nick from a channel.
 	gomock.InOrder(
@@ -242,8 +238,8 @@ func TestKICK(t *testing.T) {
 	defer s.tearDown()
 
 	// We need some valid and associated nicks / channels to KICK.
-	chan1 := state.NewChannel("#test1", s.log)
-	nick1 := state.NewNick("user1", s.log)
+	chan1 := state.NewChannel("#test1")
+	nick1 := state.NewNick("user1")
 
 	// KICK should dissociate a nick from a channel.
 	gomock.InOrder(
@@ -269,8 +265,8 @@ func TestMODE(t *testing.T) {
 	c, s := setUp(t)
 	defer s.tearDown()
 
-	chan1 := state.NewChannel("#test1", s.log)
-	nick1 := state.NewNick("user1", s.log)
+	chan1 := state.NewChannel("#test1")
+	nick1 := state.NewNick("user1")
 
 	// Send a channel mode line. Inconveniently, Channel and Nick objects
 	// aren't mockable with gomock as they're not interface types (and I
@@ -298,13 +294,9 @@ func TestMODE(t *testing.T) {
 		// send a valid user mode that's not us
 		s.st.EXPECT().GetChannel("user1").Return(nil),
 		s.st.EXPECT().GetNick("user1").Return(nick1),
-		s.log.EXPECT().Warn("irc.MODE(): recieved MODE %s for (non-me) nick %s",
-			"+w", "user1"),
 		// Send a random mode for an unknown channel
 		s.st.EXPECT().GetChannel("#test2").Return(nil),
 		s.st.EXPECT().GetNick("#test2").Return(nil),
-		s.log.EXPECT().Warn("irc.MODE(): not sure what to do with MODE %s",
-			"#test2 +is"),
 	)
 	c.h_MODE(parseLine(":user1!ident1@host1.com MODE user1 +w"))
 	c.h_MODE(parseLine(":user1!ident1@host1.com MODE #test2 +is"))
@@ -315,7 +307,7 @@ func TestTOPIC(t *testing.T) {
 	c, s := setUp(t)
 	defer s.tearDown()
 
-	chan1 := state.NewChannel("#test1", s.log)
+	chan1 := state.NewChannel("#test1")
 
 	// Assert that it has no topic originally
 	if chan1.Topic != "" {
@@ -332,11 +324,7 @@ func TestTOPIC(t *testing.T) {
 	}
 
 	// Check error paths -- send a topic for an unknown channel
-	gomock.InOrder(
-		s.st.EXPECT().GetChannel("#test2").Return(nil),
-		s.log.EXPECT().Warn("irc.TOPIC(): topic change on unknown channel %s",
-			"#test2"),
-	)
+	s.st.EXPECT().GetChannel("#test2").Return(nil)
 	c.h_TOPIC(parseLine(":user1!ident1@host1.com TOPIC #test2 :dark side"))
 }
 
@@ -346,7 +334,7 @@ func Test311(t *testing.T) {
 	defer s.tearDown()
 
 	// Create user1, who we know little about
-	nick1 := state.NewNick("user1", s.log)
+	nick1 := state.NewNick("user1")
 
 	// Send a 311 reply
 	s.st.EXPECT().GetNick("user1").Return(nick1)
@@ -360,11 +348,7 @@ func Test311(t *testing.T) {
 	}
 
 	// Check error paths -- send a 311 for an unknown nick
-	gomock.InOrder(
-		s.st.EXPECT().GetNick("user2").Return(nil),
-		s.log.EXPECT().Warn("irc.311(): received WHOIS info for unknown nick %s",
-			"user2"),
-	)
+	s.st.EXPECT().GetNick("user2").Return(nil)
 	c.h_311(parseLine(":irc.server.org 311 test user2 ident2 host2.com * :dongs"))
 }
 
@@ -374,7 +358,7 @@ func Test324(t *testing.T) {
 	defer s.tearDown()
 
 	// Create #test1, whose modes we don't know
-	chan1 := state.NewChannel("#test1", s.log)
+	chan1 := state.NewChannel("#test1")
 
 	// Send a 324 reply
 	s.st.EXPECT().GetChannel("#test1").Return(chan1)
@@ -383,12 +367,8 @@ func Test324(t *testing.T) {
 		t.Errorf("Channel.ParseModes() not called correctly.")
 	}
 
-	// Check unknown channel causes an error
-	gomock.InOrder(
-		s.st.EXPECT().GetChannel("#test2").Return(nil),
-		s.log.EXPECT().Warn("irc.324(): received MODE settings for unknown "+
-			"channel %s", "#test2"),
-	)
+	// Check error paths -- send 324 for an unknown channel
+	s.st.EXPECT().GetChannel("#test2").Return(nil)
 	c.h_324(parseLine(":irc.server.org 324 test #test2 +pmt"))
 }
 
@@ -398,7 +378,7 @@ func Test332(t *testing.T) {
 	defer s.tearDown()
 
 	// Create #test1, whose topic we don't know
-	chan1 := state.NewChannel("#test1", s.log)
+	chan1 := state.NewChannel("#test1")
 
 	// Assert that it has no topic originally
 	if chan1.Topic != "" {
@@ -414,12 +394,8 @@ func Test332(t *testing.T) {
 		t.Errorf("Topic of test channel not set correctly.")
 	}
 
-	// Check unknown channel causes an error
-	gomock.InOrder(
-		s.st.EXPECT().GetChannel("#test2").Return(nil),
-		s.log.EXPECT().Warn("irc.332(): received TOPIC value for unknown "+
-			"channel %s", "#test2"),
-	)
+	// Check error paths -- send 332 for an unknown channel
+	s.st.EXPECT().GetChannel("#test2").Return(nil)
 	c.h_332(parseLine(":irc.server.org 332 test #test2 :dark side"))
 }
 
@@ -429,7 +405,7 @@ func Test352(t *testing.T) {
 	defer s.tearDown()
 
 	// Create user1, who we know little about
-	nick1 := state.NewNick("user1", s.log)
+	nick1 := state.NewNick("user1")
 
 	// Send a 352 reply
 	s.st.EXPECT().GetNick("user1").Return(nick1)
@@ -453,11 +429,7 @@ func Test352(t *testing.T) {
 	}
 
 	// Check error paths -- send a 352 for an unknown nick
-	gomock.InOrder(
-		s.st.EXPECT().GetNick("user2").Return(nil),
-		s.log.EXPECT().Warn("irc.352(): received WHO reply for unknown nick %s",
-			"user2"),
-	)
+	s.st.EXPECT().GetNick("user2").Return(nil)
 	c.h_352(parseLine(":irc.server.org 352 test #test2 ident2 host2.com irc.server.org user2 G :0 fooo"))
 }
 
@@ -467,7 +439,7 @@ func Test353(t *testing.T) {
 	defer s.tearDown()
 
 	// Create #test1, whose user list we're mostly unfamiliar with
-	chan1 := state.NewChannel("#test1", s.log)
+	chan1 := state.NewChannel("#test1")
 
 	// Create maps for testing -- this is what the mock ST calls will return
 	nicks := make(map[string]*state.Nick)
@@ -478,7 +450,7 @@ func Test353(t *testing.T) {
 
 	for _, n := range []string{"user1", "user2", "voice", "halfop",
 		"op", "admin", "owner"} {
-		nicks[n] = state.NewNick(n, s.log)
+		nicks[n] = state.NewNick(n)
 		privs[n] = new(state.ChanPrivs)
 	}
 
@@ -515,12 +487,8 @@ func Test353(t *testing.T) {
 		t.Errorf("353 handler failed to set correct modes for nicks.")
 	}
 
-	// Check unknown channel causes a warning
-	gomock.InOrder(
-		s.st.EXPECT().GetChannel("#test2").Return(nil),
-		s.log.EXPECT().Warn("irc.353(): received NAMES list for unknown "+
-			"channel %s", "#test2"),
-	)
+	// Check error paths -- send 353 for an unknown channel
+	s.st.EXPECT().GetChannel("#test2").Return(nil)
 	c.h_353(parseLine(":irc.server.org 353 test = #test2 :test ~user3"))
 }
 
@@ -530,7 +498,7 @@ func Test671(t *testing.T) {
 	defer s.tearDown()
 
 	// Create user1, who should not be secure
-	nick1 := state.NewNick("user1", s.log)
+	nick1 := state.NewNick("user1")
 	if nick1.Modes.SSL {
 		t.Errorf("Test nick user1 is already using SSL?")
 	}
@@ -545,10 +513,6 @@ func Test671(t *testing.T) {
 	}
 
 	// Check error paths -- send a 671 for an unknown nick
-	gomock.InOrder(
-		s.st.EXPECT().GetNick("user2").Return(nil),
-		s.log.EXPECT().Warn("irc.671(): received WHOIS SSL info for unknown "+
-			"nick %s", "user2"),
-	)
+	s.st.EXPECT().GetNick("user2").Return(nil)
 	c.h_671(parseLine(":irc.server.org 671 test user2 :some ignored text"))
 }

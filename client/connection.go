@@ -32,9 +32,6 @@ type Conn struct {
 	ST state.StateTracker
 	st bool
 
-	// Logger for debugging/warning/etc output
-	l logging.Logger
-
 	// Use the State field to store external state that handlers might need.
 	// Remember ... you might need locking for this ;-)
 	State interface{}
@@ -69,7 +66,6 @@ type Conn struct {
 // that you can add event handlers to it. See AddHandler() for details.
 func SimpleClient(nick string, args ...string) *Conn {
 	r := event.NewRegistry()
-	l := logging.InitFromFlags()
 	ident := "goirc"
 	name := "Powered by GoIRC"
 
@@ -79,18 +75,17 @@ func SimpleClient(nick string, args ...string) *Conn {
 	if len(args) > 1 && args[1] != "" {
 		name = args[1]
 	}
-	return Client(nick, ident, name, r, l)
+	return Client(nick, ident, name, r)
 }
 
-func Client(nick, ident, name string,
-	r event.EventRegistry, l logging.Logger) *Conn {
-	if r == nil || l == nil {
+func Client(nick, ident, name string, r event.EventRegistry) *Conn {
+	if r == nil {
 		return nil
 	}
+	logging.InitFromFlags()
 	conn := &Conn{
 		ER:        r,
 		ED:        r,
-		l:         l,
 		st:        false,
 		in:        make(chan *Line, 32),
 		out:       make(chan string, 32),
@@ -106,7 +101,7 @@ func Client(nick, ident, name string,
 		lastsent:  time.Now(),
 	}
 	conn.addIntHandlers()
-	conn.Me = state.NewNick(nick, l)
+	conn.Me = state.NewNick(nick)
 	conn.Me.Ident = ident
 	conn.Me.Name = name
 
@@ -117,7 +112,7 @@ func Client(nick, ident, name string,
 func (conn *Conn) EnableStateTracking() {
 	if !conn.st {
 		n := conn.Me
-		conn.ST = state.NewTracker(n.Nick, conn.l)
+		conn.ST = state.NewTracker(n.Nick)
 		conn.Me = conn.ST.Me()
 		conn.Me.Ident = n.Ident
 		conn.Me.Name = n.Name
@@ -160,7 +155,7 @@ func (conn *Conn) Connect(host string, pass ...string) error {
 		if !hasPort(host) {
 			host += ":6697"
 		}
-		conn.l.Info("irc.Connect(): Connecting to %s with SSL.", host)
+		logging.Info("irc.Connect(): Connecting to %s with SSL.", host)
 		if s, err := tls.Dial("tcp", host, conn.SSLConfig); err == nil {
 			conn.sock = s
 		} else {
@@ -170,7 +165,7 @@ func (conn *Conn) Connect(host string, pass ...string) error {
 		if !hasPort(host) {
 			host += ":6667"
 		}
-		conn.l.Info("irc.Connect(): Connecting to %s without SSL.", host)
+		logging.Info("irc.Connect(): Connecting to %s without SSL.", host)
 		if s, err := net.Dial("tcp", host); err == nil {
 			conn.sock = s
 		} else {
@@ -226,18 +221,18 @@ func (conn *Conn) recv() {
 	for {
 		s, err := conn.io.ReadString('\n')
 		if err != nil {
-			conn.l.Error("irc.recv(): %s", err.Error())
+			logging.Error("irc.recv(): %s", err.Error())
 			conn.shutdown()
 			return
 		}
 		s = strings.Trim(s, "\r\n")
-		conn.l.Debug("<- %s", s)
+		logging.Debug("<- %s", s)
 
 		if line := parseLine(s); line != nil {
 			line.Time = time.Now()
 			conn.in <- line
 		} else {
-			conn.l.Warn("irc.recv(): problems parsing line:\n  %s", s)
+			logging.Warn("irc.recv(): problems parsing line:\n  %s", s)
 		}
 	}
 }
@@ -275,23 +270,23 @@ func (conn *Conn) write(line string) {
 	if !conn.Flood {
 		if t := conn.rateLimit(len(line)); t != 0 {
 			// sleep for the current line's time value before sending it
-			conn.l.Debug("irc.rateLimit(): Flood! Sleeping for %.2f secs.",
+			logging.Debug("irc.rateLimit(): Flood! Sleeping for %.2f secs.",
 				t.Seconds())
 			<-time.After(t)
 		}
 	}
 
 	if _, err := conn.io.WriteString(line + "\r\n"); err != nil {
-		conn.l.Error("irc.send(): %s", err.Error())
+		logging.Error("irc.send(): %s", err.Error())
 		conn.shutdown()
 		return
 	}
 	if err := conn.io.Flush(); err != nil {
-		conn.l.Error("irc.send(): %s", err.Error())
+		logging.Error("irc.send(): %s", err.Error())
 		conn.shutdown()
 		return
 	}
-	conn.l.Debug("-> %s", line)
+	logging.Debug("-> %s", line)
 }
 
 // Implement Hybrid's flood control algorithm to rate-limit outgoing lines.
@@ -317,7 +312,7 @@ func (conn *Conn) shutdown() {
 	// Guard against double-call of shutdown() if we get an error in send()
 	// as calling sock.Close() will cause recv() to recieve EOF in readstring()
 	if conn.Connected {
-		conn.l.Info("irc.shutdown(): Disconnected from server.")
+		logging.Info("irc.shutdown(): Disconnected from server.")
 		conn.ED.Dispatch(DISCONNECTED, conn, &Line{})
 		conn.Connected = false
 		conn.sock.Close()
