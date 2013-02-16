@@ -5,6 +5,7 @@ package client
 
 import (
 	"github.com/fluffle/goevent/event"
+	"github.com/fluffle/golog/logging"
 	"strings"
 )
 
@@ -53,7 +54,7 @@ func (conn *Conn) h_JOIN(line *Line) {
 		// first we've seen of this channel, so should be us joining it
 		// NOTE this will also take care of nk == nil && ch == nil
 		if nk != conn.Me {
-			conn.l.Warn("irc.JOIN(): JOIN to unknown channel %s received "+
+			logging.Warn("irc.JOIN(): JOIN to unknown channel %s received "+
 				"from (non-me) nick %s", line.Args[0], line.Nick)
 			return
 		}
@@ -105,13 +106,13 @@ func (conn *Conn) h_MODE(line *Line) {
 	} else if nk := conn.ST.GetNick(line.Args[0]); nk != nil {
 		// nick mode change, should be us
 		if nk != conn.Me {
-			conn.l.Warn("irc.MODE(): recieved MODE %s for (non-me) nick %s",
+			logging.Warn("irc.MODE(): recieved MODE %s for (non-me) nick %s",
 				line.Args[1], line.Args[0])
 			return
 		}
 		nk.ParseModes(line.Args[1])
 	} else {
-		conn.l.Warn("irc.MODE(): not sure what to do with MODE %s",
+		logging.Warn("irc.MODE(): not sure what to do with MODE %s",
 			strings.Join(line.Args, " "))
 	}
 }
@@ -121,7 +122,7 @@ func (conn *Conn) h_TOPIC(line *Line) {
 	if ch := conn.ST.GetChannel(line.Args[0]); ch != nil {
 		ch.Topic = line.Args[1]
 	} else {
-		conn.l.Warn("irc.TOPIC(): topic change on unknown channel %s",
+		logging.Warn("irc.TOPIC(): topic change on unknown channel %s",
 			line.Args[0])
 	}
 }
@@ -133,7 +134,7 @@ func (conn *Conn) h_311(line *Line) {
 		nk.Host = line.Args[3]
 		nk.Name = line.Args[5]
 	} else {
-		conn.l.Warn("irc.311(): received WHOIS info for unknown nick %s",
+		logging.Warn("irc.311(): received WHOIS info for unknown nick %s",
 			line.Args[1])
 	}
 }
@@ -143,7 +144,7 @@ func (conn *Conn) h_324(line *Line) {
 	if ch := conn.ST.GetChannel(line.Args[1]); ch != nil {
 		ch.ParseModes(line.Args[2], line.Args[3:]...)
 	} else {
-		conn.l.Warn("irc.324(): received MODE settings for unknown channel %s",
+		logging.Warn("irc.324(): received MODE settings for unknown channel %s",
 			line.Args[1])
 	}
 }
@@ -153,7 +154,7 @@ func (conn *Conn) h_332(line *Line) {
 	if ch := conn.ST.GetChannel(line.Args[1]); ch != nil {
 		ch.Topic = line.Args[2]
 	} else {
-		conn.l.Warn("irc.332(): received TOPIC value for unknown channel %s",
+		logging.Warn("irc.332(): received TOPIC value for unknown channel %s",
 			line.Args[1])
 	}
 }
@@ -175,7 +176,7 @@ func (conn *Conn) h_352(line *Line) {
 			nk.Modes.Invisible = true
 		}
 	} else {
-		conn.l.Warn("irc.352(): received WHO reply for unknown nick %s",
+		logging.Warn("irc.352(): received WHO reply for unknown nick %s",
 			line.Args[5])
 	}
 }
@@ -219,7 +220,7 @@ func (conn *Conn) h_353(line *Line) {
 			}
 		}
 	} else {
-		conn.l.Warn("irc.353(): received NAMES list for unknown channel %s",
+		logging.Warn("irc.353(): received NAMES list for unknown channel %s",
 			line.Args[2])
 	}
 }
@@ -229,7 +230,7 @@ func (conn *Conn) h_671(line *Line) {
 	if nk := conn.ST.GetNick(line.Args[1]); nk != nil {
 		nk.Modes.SSL = true
 	} else {
-		conn.l.Warn("irc.671(): received WHOIS SSL info for unknown nick %s",
+		logging.Warn("irc.671(): received WHOIS SSL info for unknown nick %s",
 			line.Args[1])
 	}
 }
