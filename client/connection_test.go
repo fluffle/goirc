@@ -33,6 +33,10 @@ func setUp(t *testing.T, start ...bool) (*Conn, *testState) {
 		// Hack to allow tests of send, recv, write etc.
 		// NOTE: the value of the boolean doesn't matter.
 		c.postConnect()
+		// All connections start with NICK/USER expect these.
+		nc.Expect("NICK test")
+		nc.Expect("USER test 12 * :Testing IRC")
+
 		// Sleep 1ms to allow background routines to start.
 		<-time.After(1e6)
 	}
