@@ -74,14 +74,14 @@ func Test433(t *testing.T) {
 	}
 
 	// Test the code path that *doesn't* involve state tracking.
-	c.st = false
+	c.st = nil
 	c.h_433(parseLine(":irc.server.org 433 test test :Nickname is already in use."))
 	s.nc.Expect("NICK test_")
 
 	if c.Me.Nick != "test_" {
 		t.Errorf("My nick not updated from '%s'.", c.Me.Nick)
 	}
-	c.st = true
+	c.st = s.st
 }
 
 // Test the handler for NICK messages when state tracking is disabled
@@ -90,7 +90,7 @@ func TestNICK(t *testing.T) {
 	defer s.tearDown()
 
 	// State tracking is enabled by default in setUp
-	c.st = false
+	c.st = nil
 
 	// Call handler with a NICK line changing "our" nick to test1.
 	c.h_NICK(parseLine(":test!test@somehost.com NICK :test1"))
@@ -109,7 +109,7 @@ func TestNICK(t *testing.T) {
 	}
 
 	// Re-enable state tracking and send a line that *should* change nick.
-	c.st = true
+	c.st = s.st
 	c.h_NICK(parseLine(":test1!test@somehost.com NICK :test2"))
 
 	// Verify that our Nick hasn't changed (should be handled by h_STNICK).

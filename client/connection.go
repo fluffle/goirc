@@ -24,8 +24,7 @@ type Conn struct {
 	commands *cSet
 
 	// State tracker for nicks and channels
-	ST         state.StateTracker
-	st         bool
+	st         state.Tracker
 	stRemovers []Remover
 
 	// Use the State field to store external state that handlers might need.
@@ -100,32 +99,34 @@ func Client(nick string, args ...string) *Conn {
 }
 
 func (conn *Conn) EnableStateTracking() {
-	if !conn.st {
+	if conn.st == nil {
 		n := conn.Me
-		conn.ST = state.NewTracker(n.Nick)
-		conn.Me = conn.ST.Me()
+		conn.st = state.NewTracker(n.Nick)
+		conn.Me = conn.st.Me()
 		conn.Me.Ident = n.Ident
 		conn.Me.Name = n.Name
 		conn.addSTHandlers()
-		conn.st = true
 	}
 }
 
 func (conn *Conn) DisableStateTracking() {
-	if conn.st {
-		conn.st = false
+	if conn.st != nil {
 		conn.delSTHandlers()
-		conn.ST.Wipe()
-		conn.ST = nil
+		conn.st.Wipe()
+		conn.st = nil
 	}
+}
+
+func (conn *Conn) StateTracker() state.Tracker {
+	return conn.st
 }
 
 // Per-connection state initialisation.
 func (conn *Conn) initialise() {
 	conn.io = nil
 	conn.sock = nil
-	if conn.st {
-		conn.ST.Wipe()
+	if conn.st != nil {
+		conn.st.Wipe()
 	}
 }
 
@@ -328,8 +329,8 @@ func (conn *Conn) String() string {
 		str += "Not currently connected!\n\n"
 	}
 	str += conn.Me.String() + "\n"
-	if conn.st {
-		str += conn.ST.String() + "\n"
+	if conn.st != nil {
+		str += conn.st.String() + "\n"
 	}
 	return str
 }

@@ -12,20 +12,19 @@ import (
 
 type testState struct {
 	ctrl *gomock.Controller
-	st   *state.MockStateTracker
+	st   *state.MockTracker
 	nc   *mockNetConn
 	c    *Conn
 }
 
 func setUp(t *testing.T, start ...bool) (*Conn, *testState) {
 	ctrl := gomock.NewController(t)
-	st := state.NewMockStateTracker(ctrl)
+	st := state.NewMockTracker(ctrl)
 	nc := MockNetConn(t)
 	c := Client("test", "test", "Testing IRC")
 	logging.SetLogLevel(logging.LogFatal)
 
-	c.ST = st
-	c.st = true
+	c.st = st
 	c.sock = nc
 	c.Flood = true // Tests can take a while otherwise
 	c.Connected = true
@@ -82,7 +81,7 @@ func TestEOF(t *testing.T) {
 
 func TestClientAndStateTracking(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	st := state.NewMockStateTracker(ctrl)
+	st := state.NewMockTracker(ctrl)
 	c := Client("test", "test", "Testing IRC")
 
 	// Assert some basic things about the initial state of the Conn struct
@@ -114,16 +113,16 @@ func TestClientAndStateTracking(t *testing.T) {
 		c.Me.Name != "Testing IRC" || c.Me.Host != "" {
 		t.Errorf("Enabling state tracking did not replace Me correctly.")
 	}
-	if !c.st || c.ST == nil || c.Me != c.ST.Me() {
+	if c.st == nil || c.Me != c.st.Me() {
 		t.Errorf("State tracker not enabled correctly.")
 	}
 
 	// Now, shim in the mock state tracker and test disabling state tracking
 	me := c.Me
-	c.ST = st
+	c.st = st
 	st.EXPECT().Wipe()
 	c.DisableStateTracking()
-	if c.st || c.ST != nil || c.Me != me {
+	if c.st != nil || c.Me != me {
 		t.Errorf("State tracker not disabled correctly.")
 	}
 

@@ -7,144 +7,144 @@ import (
 	gomock "code.google.com/p/gomock/gomock"
 )
 
-// Mock of StateTracker interface
-type MockStateTracker struct {
+// Mock of Tracker interface
+type MockTracker struct {
 	ctrl     *gomock.Controller
-	recorder *_MockStateTrackerRecorder
+	recorder *_MockTrackerRecorder
 }
 
-// Recorder for MockStateTracker (not exported)
-type _MockStateTrackerRecorder struct {
-	mock *MockStateTracker
+// Recorder for MockTracker (not exported)
+type _MockTrackerRecorder struct {
+	mock *MockTracker
 }
 
-func NewMockStateTracker(ctrl *gomock.Controller) *MockStateTracker {
-	mock := &MockStateTracker{ctrl: ctrl}
-	mock.recorder = &_MockStateTrackerRecorder{mock}
+func NewMockTracker(ctrl *gomock.Controller) *MockTracker {
+	mock := &MockTracker{ctrl: ctrl}
+	mock.recorder = &_MockTrackerRecorder{mock}
 	return mock
 }
 
-func (_m *MockStateTracker) EXPECT() *_MockStateTrackerRecorder {
+func (_m *MockTracker) EXPECT() *_MockTrackerRecorder {
 	return _m.recorder
 }
 
-func (_m *MockStateTracker) NewNick(nick string) *Nick {
+func (_m *MockTracker) NewNick(nick string) *Nick {
 	ret := _m.ctrl.Call(_m, "NewNick", nick)
 	ret0, _ := ret[0].(*Nick)
 	return ret0
 }
 
-func (_mr *_MockStateTrackerRecorder) NewNick(arg0 interface{}) *gomock.Call {
+func (_mr *_MockTrackerRecorder) NewNick(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "NewNick", arg0)
 }
 
-func (_m *MockStateTracker) GetNick(nick string) *Nick {
+func (_m *MockTracker) GetNick(nick string) *Nick {
 	ret := _m.ctrl.Call(_m, "GetNick", nick)
 	ret0, _ := ret[0].(*Nick)
 	return ret0
 }
 
-func (_mr *_MockStateTrackerRecorder) GetNick(arg0 interface{}) *gomock.Call {
+func (_mr *_MockTrackerRecorder) GetNick(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetNick", arg0)
 }
 
-func (_m *MockStateTracker) ReNick(old string, neu string) {
+func (_m *MockTracker) ReNick(old string, neu string) {
 	_m.ctrl.Call(_m, "ReNick", old, neu)
 }
 
-func (_mr *_MockStateTrackerRecorder) ReNick(arg0, arg1 interface{}) *gomock.Call {
+func (_mr *_MockTrackerRecorder) ReNick(arg0, arg1 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "ReNick", arg0, arg1)
 }
 
-func (_m *MockStateTracker) DelNick(nick string) {
+func (_m *MockTracker) DelNick(nick string) {
 	_m.ctrl.Call(_m, "DelNick", nick)
 }
 
-func (_mr *_MockStateTrackerRecorder) DelNick(arg0 interface{}) *gomock.Call {
+func (_mr *_MockTrackerRecorder) DelNick(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "DelNick", arg0)
 }
 
-func (_m *MockStateTracker) NewChannel(channel string) *Channel {
+func (_m *MockTracker) NewChannel(channel string) *Channel {
 	ret := _m.ctrl.Call(_m, "NewChannel", channel)
 	ret0, _ := ret[0].(*Channel)
 	return ret0
 }
 
-func (_mr *_MockStateTrackerRecorder) NewChannel(arg0 interface{}) *gomock.Call {
+func (_mr *_MockTrackerRecorder) NewChannel(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "NewChannel", arg0)
 }
 
-func (_m *MockStateTracker) GetChannel(channel string) *Channel {
+func (_m *MockTracker) GetChannel(channel string) *Channel {
 	ret := _m.ctrl.Call(_m, "GetChannel", channel)
 	ret0, _ := ret[0].(*Channel)
 	return ret0
 }
 
-func (_mr *_MockStateTrackerRecorder) GetChannel(arg0 interface{}) *gomock.Call {
+func (_mr *_MockTrackerRecorder) GetChannel(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetChannel", arg0)
 }
 
-func (_m *MockStateTracker) DelChannel(channel string) {
+func (_m *MockTracker) DelChannel(channel string) {
 	_m.ctrl.Call(_m, "DelChannel", channel)
 }
 
-func (_mr *_MockStateTrackerRecorder) DelChannel(arg0 interface{}) *gomock.Call {
+func (_mr *_MockTrackerRecorder) DelChannel(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "DelChannel", arg0)
 }
 
-func (_m *MockStateTracker) Me() *Nick {
+func (_m *MockTracker) Me() *Nick {
 	ret := _m.ctrl.Call(_m, "Me")
 	ret0, _ := ret[0].(*Nick)
 	return ret0
 }
 
-func (_mr *_MockStateTrackerRecorder) Me() *gomock.Call {
+func (_mr *_MockTrackerRecorder) Me() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Me")
 }
 
-func (_m *MockStateTracker) IsOn(channel string, nick string) (*ChanPrivs, bool) {
+func (_m *MockTracker) IsOn(channel string, nick string) (*ChanPrivs, bool) {
 	ret := _m.ctrl.Call(_m, "IsOn", channel, nick)
 	ret0, _ := ret[0].(*ChanPrivs)
 	ret1, _ := ret[1].(bool)
 	return ret0, ret1
 }
 
-func (_mr *_MockStateTrackerRecorder) IsOn(arg0, arg1 interface{}) *gomock.Call {
+func (_mr *_MockTrackerRecorder) IsOn(arg0, arg1 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "IsOn", arg0, arg1)
 }
 
-func (_m *MockStateTracker) Associate(channel *Channel, nick *Nick) *ChanPrivs {
+func (_m *MockTracker) Associate(channel *Channel, nick *Nick) *ChanPrivs {
 	ret := _m.ctrl.Call(_m, "Associate", channel, nick)
 	ret0, _ := ret[0].(*ChanPrivs)
 	return ret0
 }
 
-func (_mr *_MockStateTrackerRecorder) Associate(arg0, arg1 interface{}) *gomock.Call {
+func (_mr *_MockTrackerRecorder) Associate(arg0, arg1 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Associate", arg0, arg1)
 }
 
-func (_m *MockStateTracker) Dissociate(channel *Channel, nick *Nick) {
+func (_m *MockTracker) Dissociate(channel *Channel, nick *Nick) {
 	_m.ctrl.Call(_m, "Dissociate", channel, nick)
 }
 
-func (_mr *_MockStateTrackerRecorder) Dissociate(arg0, arg1 interface{}) *gomock.Call {
+func (_mr *_MockTrackerRecorder) Dissociate(arg0, arg1 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Dissociate", arg0, arg1)
 }
 
-func (_m *MockStateTracker) Wipe() {
+func (_m *MockTracker) Wipe() {
 	_m.ctrl.Call(_m, "Wipe")
 }
 
-func (_mr *_MockStateTrackerRecorder) Wipe() *gomock.Call {
+func (_mr *_MockTrackerRecorder) Wipe() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Wipe")
 }
 
-func (_m *MockStateTracker) String() string {
+func (_m *MockTracker) String() string {
 	ret := _m.ctrl.Call(_m, "String")
 	ret0, _ := ret[0].(string)
 	return ret0
 }
 
-func (_mr *_MockStateTrackerRecorder) String() *gomock.Call {
+func (_mr *_MockTrackerRecorder) String() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "String")
 }

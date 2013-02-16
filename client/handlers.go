@@ -60,8 +60,8 @@ func (conn *Conn) h_433(line *Line) {
 	// we sent in the initial NICK command is in use) we will not receive
 	// a NICK message to confirm our change of nick, so ReNick here...
 	if line.Args[1] == conn.Me.Nick {
-		if conn.st {
-			conn.ST.ReNick(conn.Me.Nick, neu)
+		if conn.st != nil {
+			conn.st.ReNick(conn.Me.Nick, neu)
 		} else {
 			conn.Me.Nick = neu
 		}
@@ -79,7 +79,7 @@ func (conn *Conn) h_CTCP(line *Line) {
 
 // Handle updating our own NICK if we're not using the state tracker
 func (conn *Conn) h_NICK(line *Line) {
-	if !conn.st && line.Nick == conn.Me.Nick {
+	if conn.st == nil && line.Nick == conn.Me.Nick {
 		conn.Me.Nick = line.Args[0]
 	}
 }
