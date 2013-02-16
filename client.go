@@ -1,11 +1,11 @@
 package main
 
 import (
-	irc "github.com/fluffle/goirc/client"
+	"bufio"
 	"flag"
 	"fmt"
+	irc "github.com/fluffle/goirc/client"
 	"os"
-	"bufio"
 	"strings"
 )
 
@@ -18,12 +18,12 @@ func main() {
 	// create new IRC connection
 	c := irc.SimpleClient("GoTest", "gotest")
 	c.EnableStateTracking()
-	c.AddHandler("connected",
+	c.AddHandler(irc.CONNECTED,
 		func(conn *irc.Conn, line *irc.Line) { conn.Join(*channel) })
 
 	// Set up a handler to notify of disconnect events.
 	quit := make(chan bool)
-	c.AddHandler("disconnected",
+	c.AddHandler(irc.DISCONNECTED,
 		func(conn *irc.Conn, line *irc.Line) { quit <- true })
 
 	// set up a goroutine to read commands from stdin
@@ -36,6 +36,8 @@ func main() {
 			if err != nil {
 				// wha?, maybe ctrl-D...
 				close(in)
+				reallyquit = true
+				c.Quit("")
 				break
 			}
 			// no point in sending empty lines down the channel

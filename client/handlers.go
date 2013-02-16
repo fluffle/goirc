@@ -8,8 +8,15 @@ import (
 	"strings"
 )
 
+// Consts for unnamed events.
+const (
+	INIT         = "init"
+	CONNECTED    = "connected"
+	DISCONNECTED = "disconnected"
+)
+
 // An IRC handler looks like this:
-type IRCHandler func(*Conn, *Line)
+type Handler func(*Conn, *Line)
 
 // AddHandler() adds an event handler for a specific IRC command.
 //
@@ -19,14 +26,14 @@ type IRCHandler func(*Conn, *Line)
 // "PRIVMSG", "JOIN", etc. but all the numeric replies are left as ascii
 // strings of digits like "332" (mainly because I really didn't feel like
 // putting massive constant tables in).
-func (conn *Conn) AddHandler(name string, f IRCHandler) event.Handler {
+func (conn *Conn) AddHandler(name string, f Handler) event.Handler {
 	h := NewHandler(f)
 	conn.ER.AddHandler(h, name)
 	return h
 }
 
 // Wrap f in an anonymous unboxing function
-func NewHandler(f IRCHandler) event.Handler {
+func NewHandler(f Handler) event.Handler {
 	return event.NewHandler(func(ev ...interface{}) {
 		f(ev[0].(*Conn), ev[1].(*Line))
 	})
@@ -34,8 +41,10 @@ func NewHandler(f IRCHandler) event.Handler {
 
 // sets up the internal event handlers to do essential IRC protocol things
 var intHandlers map[string]event.Handler
+
 func init() {
 	intHandlers = make(map[string]event.Handler)
+	intHandlers[INIT] = NewHandler((*Conn).h_init)
 	intHandlers["001"] = NewHandler((*Conn).h_001)
 	intHandlers["433"] = NewHandler((*Conn).h_433)
 	intHandlers["CTCP"] = NewHandler((*Conn).h_CTCP)
@@ -49,6 +58,15 @@ func (conn *Conn) addIntHandlers() {
 	}
 }
 
+// Password/User/Nick broadcast on connection.
+func (conn *Conn) h_init(line *Line) {
+	if conn.password != "" {
+		conn.Pass(conn.password)
+	}
+	conn.Nick(conn.Me.Nick)
+	conn.User(conn.Me.Ident, conn.Me.Name)
+}
+
 // Basic ping/pong handler
 func (conn *Conn) h_PING(line *Line) {
 	conn.Raw("PONG :" + line.Args[0])
@@ -57,7 +75,7 @@ func (conn *Conn) h_PING(line *Line) {
 // Handler to trigger a "CONNECTED" event on receipt of numeric 001
 func (conn *Conn) h_001(line *Line) {
 	// we're connected!
-	conn.ED.Dispatch("connected", conn, line)
+	conn.ED.Dispatch(CONNECTED, conn, line)
 	// and we're being given our hostname (from the server's perspective)
 	t := line.Args[len(line.Args)-1]
 	if idx := strings.LastIndex(t, " "); idx != -1 {
