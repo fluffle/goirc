@@ -13,7 +13,6 @@ import (
 
 type testState struct {
 	ctrl *gomock.Controller
-	log  *logging.MockLogger
 	st   *state.MockStateTracker
 	ed   *event.MockEventDispatcher
 	nc   *mockNetConn
@@ -25,13 +24,9 @@ func setUp(t *testing.T, start ...bool) (*Conn, *testState) {
 	st := state.NewMockStateTracker(ctrl)
 	r := event.NewRegistry()
 	ed := event.NewMockEventDispatcher(ctrl)
-	l := logging.NewMockLogger(ctrl)
 	nc := MockNetConn(t)
-	c := Client("test", "test", "Testing IRC", r, l)
-
-	// We don't want to have to specify s.log.EXPECT().Debug() for all the
-	// random crap that gets logged. This mocks it all out nicely.
-	ctrl.RecordCall(l, "Debug", gomock.Any(), gomock.Any()).AnyTimes()
+	c := Client("test", "test", "Testing IRC", r)
+	logging.SetLogLevel(logging.LogFatal)
 
 	c.ED = ed
 	c.ST = st
@@ -47,14 +42,12 @@ func setUp(t *testing.T, start ...bool) (*Conn, *testState) {
 		<-time.After(1e6)
 	}
 
-	return c, &testState{ctrl, l, st, ed, nc, c}
+	return c, &testState{ctrl, st, ed, nc, c}
 }
 
 func (s *testState) tearDown() {
 	s.ed.EXPECT().Dispatch("disconnected", s.c, &Line{})
 	s.st.EXPECT().Wipe()
-	s.log.EXPECT().Error("irc.recv(): %s", "EOF")
-	s.log.EXPECT().Info("irc.shutdown(): Disconnected from server.")
 	s.nc.ExpectNothing()
 	s.c.shutdown()
 	<-time.After(1e6)
@@ -71,8 +64,6 @@ func TestEOF(t *testing.T) {
 	// Simulate EOF from server
 	s.ed.EXPECT().Dispatch("disconnected", c, &Line{})
 	s.st.EXPECT().Wipe()
-	s.log.EXPECT().Info("irc.shutdown(): Disconnected from server.")
-	s.log.EXPECT().Error("irc.recv(): %s", "EOF")
 	s.nc.Close()
 
 	// Since things happen in different internal goroutines, we need to wait
@@ -89,7 +80,6 @@ func TestClientAndStateTracking(t *testing.T) {
 	// This doesn't use setUp() as we want to pass in a mock EventRegistry.
 	ctrl := gomock.NewController(t)
 	r := event.NewMockEventRegistry(ctrl)
-	l := logging.NewMockLogger(ctrl)
 	st := state.NewMockStateTracker(ctrl)
 
 	for n, _ := range intHandlers {
@@ -99,10 +89,10 @@ func TestClientAndStateTracking(t *testing.T) {
 		// handler names are correctly passed to AddHandler.
 		ctrl.RecordCall(r, "AddHandler", gomock.Any(), n)
 	}
-	c := Client("test", "test", "Testing IRC", r, l)
+	c := Client("test", "test", "Testing IRC", r)
 
 	// Assert some basic things about the initial state of the Conn struct
-	if c.ER != r || c.ED != r || c.l != l || c.st != false || c.ST != nil {
+	if c.ER != r || c.ED != r || c.st != false || c.ST != nil {
 		t.Errorf("Conn not correctly initialised with external deps.")
 	}
 	if c.in == nil || c.out == nil || c.cSend == nil || c.cLoop == nil {
@@ -246,8 +236,6 @@ func TestRecv(t *testing.T) {
 
 	// Test that recv does something useful with a line it can't parse
 	// (not that there are many, parseLine is forgiving).
-	s.log.EXPECT().Warn("irc.recv(): problems parsing line:\n  %s",
-		":textwithnospaces")
 	s.nc.Send(":textwithnospaces")
 	if l := reader(); l != nil {
 		t.Errorf("Bad line still caused receive on input channel.")
@@ -259,8 +247,6 @@ func TestRecv(t *testing.T) {
 	}
 	s.ed.EXPECT().Dispatch("disconnected", c, &Line{})
 	s.st.EXPECT().Wipe()
-	s.log.EXPECT().Info("irc.shutdown(): Disconnected from server.")
-	s.log.EXPECT().Error("irc.recv(): %s", "EOF")
 	s.nc.Close()
 
 	// Since send and runloop aren't actually running, we need to empty their
@@ -449,8 +435,6 @@ func TestWrite(t *testing.T) {
 
 	s.ed.EXPECT().Dispatch("disconnected", c, &Line{})
 	s.st.EXPECT().Wipe()
-	s.log.EXPECT().Info("irc.shutdown(): Disconnected from server.")
-	s.log.EXPECT().Error("irc.send(): %s", "invalid argument")
 	c.write("she can't pass unit tests")
 }
 
