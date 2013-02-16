@@ -31,10 +31,9 @@ func TestINIT(t *testing.T) {
 	s.nc.Expect("USER test 12 * :Testing IRC")
 	s.nc.ExpectNothing()
 
-	c.password = "12345"
 	c.Me.Ident = "idiot"
 	c.Me.Name = "I've got the same combination on my luggage!"
-	c.h_INIT(&Line{})
+	c.h_INIT(&Line{Args: []string{"12345"}})
 	s.nc.Expect("PASS 12345")
 	s.nc.Expect("NICK test")
 	s.nc.Expect("USER idiot 12 * :I've got the same combination on my luggage!")
@@ -277,7 +276,6 @@ func TestMODE(t *testing.T) {
 	if !chan1.Modes.Secret || chan1.Modes.Key != "somekey" {
 		t.Errorf("Channel.ParseModes() not called correctly.")
 	}
-
 
 	// Send a nick mode line, returning Me
 	gomock.InOrder(

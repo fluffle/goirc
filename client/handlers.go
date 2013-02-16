@@ -60,8 +60,8 @@ func (conn *Conn) addIntHandlers() {
 
 // Password/User/Nick broadcast on connection.
 func (conn *Conn) h_INIT(line *Line) {
-	if conn.password != "" {
-		conn.Pass(conn.password)
+	if len(line.Args) > 0 {
+		conn.Pass(line.Args[0])
 	}
 	conn.Nick(conn.Me.Nick)
 	conn.User(conn.Me.Ident, conn.Me.Name)
