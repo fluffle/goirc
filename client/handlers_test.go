@@ -21,6 +21,26 @@ func TestPING(t *testing.T) {
 	c.ED = s.ed
 }
 
+// Test that the inbuilt INIT handler does the right things
+func TestINIT(t *testing.T) {
+	c, s := setUp(t)
+	defer s.tearDown()
+
+	c.h_INIT(&Line{})
+	s.nc.Expect("NICK test")
+	s.nc.Expect("USER test 12 * :Testing IRC")
+	s.nc.ExpectNothing()
+
+	c.password = "12345"
+	c.Me.Ident = "idiot"
+	c.Me.Name = "I've got the same combination on my luggage!"
+	c.h_INIT(&Line{})
+	s.nc.Expect("PASS 12345")
+	s.nc.Expect("NICK test")
+	s.nc.Expect("USER idiot 12 * :I've got the same combination on my luggage!")
+	s.nc.ExpectNothing()
+}
+
 // Test the handler for 001 / RPL_WELCOME
 func Test001(t *testing.T) {
 	c, s := setUp(t)

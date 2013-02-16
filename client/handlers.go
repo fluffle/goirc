@@ -44,7 +44,7 @@ var intHandlers map[string]event.Handler
 
 func init() {
 	intHandlers = make(map[string]event.Handler)
-	intHandlers[INIT] = NewHandler((*Conn).h_init)
+	intHandlers[INIT] = NewHandler((*Conn).h_INIT)
 	intHandlers["001"] = NewHandler((*Conn).h_001)
 	intHandlers["433"] = NewHandler((*Conn).h_433)
 	intHandlers["CTCP"] = NewHandler((*Conn).h_CTCP)
@@ -59,7 +59,7 @@ func (conn *Conn) addIntHandlers() {
 }
 
 // Password/User/Nick broadcast on connection.
-func (conn *Conn) h_init(line *Line) {
+func (conn *Conn) h_INIT(line *Line) {
 	if conn.password != "" {
 		conn.Pass(conn.password)
 	}

@@ -180,8 +180,6 @@ func (conn *Conn) Connect(host string, pass ...string) error {
 	conn.Host = host
 	if len(pass) > 0 {
 		conn.password = pass[0]
-	} else {
-		conn.password = ""
 	}
 	conn.Connected = true
 	conn.postConnect()
