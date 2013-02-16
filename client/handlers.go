@@ -9,8 +9,8 @@ import (
 
 // sets up the internal event handlers to do essential IRC protocol things
 var intHandlers = map[string]HandlerFunc{
-	"001": (*Conn).h_001,
-	"433": (*Conn).h_433,
+	"001":  (*Conn).h_001,
+	"433":  (*Conn).h_433,
 	"CTCP": (*Conn).h_CTCP,
 	"NICK": (*Conn).h_NICK,
 	"PING": (*Conn).h_PING,
@@ -99,7 +99,9 @@ func (conn *Conn) h_PRIVMSG(line *Line) {
 		}
 	}
 	cmd, l := conn.cmdMatch(txt)
-	if cmd == nil { return }
+	if cmd == nil {
+		return
+	}
 	if conn.CommandStripPrefix {
 		txt = strings.TrimSpace(txt[l:])
 	}

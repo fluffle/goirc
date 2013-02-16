@@ -1,11 +1,11 @@
 package main
 
 import (
-	irc "github.com/fluffle/goirc/client"
+	"bufio"
 	"flag"
 	"fmt"
+	irc "github.com/fluffle/goirc/client"
 	"os"
-	"bufio"
 	"strings"
 )
 

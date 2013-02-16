@@ -60,7 +60,7 @@ type Conn struct {
 	Flood bool
 
 	// Internal counters for flood protection
-	badness time.Duration
+	badness  time.Duration
 	lastsent time.Time
 }
 
