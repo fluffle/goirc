@@ -26,6 +26,9 @@ func main() {
 	c.HandleFunc(irc.DISCONNECTED,
 		func(conn *irc.Conn, line *irc.Line) { quit <- true })
 
+	c.HandleFunc(irc.PRIVMSG, YouTubeFunc)
+	c.HandleFunc(irc.PRIVMSG, UrlFunc)
+
 	// set up a goroutine to read commands from stdin
 	in := make(chan string, 4)
 	reallyquit := false

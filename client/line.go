@@ -88,3 +88,26 @@ func parseLine(s string) *Line {
 	}
 	return line
 }
+
+// Return the contents of the message portion of a line.
+// This only really makes sense for messages with a :message portion, but there
+// are a lot of them.
+func (line *Line) Message() string {
+	if len(line.Args) > 0 {
+		return line.Args[len(line.Args)-1]
+	}
+	return ""
+}
+
+// Return the target of the line. This only really makes sense for PRIVMSG.
+// If the line was broadcast from a channel, the target will be that channel.
+// If the line was broadcast by a user, the target will be that user.
+func (line *Line) Target() string {
+	if line.Cmd == PRIVMSG {
+		if !strings.HasPrefix(line.Args[0], "#") {
+			return line.Nick
+		}
+		return line.Args[0]
+	}
+	return ""
+}
