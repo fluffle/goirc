@@ -73,17 +73,16 @@ type Config struct {
 
 func NewConfig(nick string, args ...string) *Config {
 	ident := "goirc"
-	name := "Powered by GoIRC"
-
 	if len(args) > 0 && args[0] != "" {
 		ident = args[0]
 	}
+	name := "Powered by GoIRC"
 	if len(args) > 1 && args[1] != "" {
 		name = args[1]
 	}
 	cfg := &Config{
-		PingFreq:   3 * time.Minute,
-		NewNick:    func(s string) string { return s + "_" },
+		PingFreq: 3 * time.Minute,
+		NewNick:  func(s string) string { return s + "_" },
 	}
 	cfg.Me = state.NewNick(nick)
 	cfg.Me.Ident = ident
