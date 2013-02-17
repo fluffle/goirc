@@ -259,7 +259,7 @@ func (conn *Conn) dispatch(line *Line) {
 func (conn *Conn) command(line *Line) {
 	command := conn.commands.match(strings.ToLower(line.Message()))
 	if command != nil {
-		command.Handle(conn, line)
+		go command.Handle(conn, line)
 	}
 
 }
