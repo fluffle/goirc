@@ -14,6 +14,12 @@ type Handler interface {
 	Handle(*Conn, *Line)
 }
 
+type HandlerFunc func(*Conn, *Line)
+
+func (hf HandlerFunc) Handle(conn *Conn, line *Line) {
+	hf(conn, line)
+}
+
 // And when they've been added to the client they are removable.
 type Remover interface {
 	Remove()
@@ -23,12 +29,6 @@ type RemoverFunc func()
 
 func (r RemoverFunc) Remove() {
 	r()
-}
-
-type HandlerFunc func(*Conn, *Line)
-
-func (hf HandlerFunc) Handle(conn *Conn, line *Line) {
-	hf(conn, line)
 }
 
 type hList struct {
@@ -124,7 +124,7 @@ func (hs *hSet) dispatch(conn *Conn, line *Line) {
 
 type command struct {
 	handler  Handler
-	set      *commandSet
+	set      *commandList
 	regex    string
 	priority int
 }
@@ -137,42 +137,42 @@ func (c *command) Remove() {
 	c.set.remove(c)
 }
 
-type commandSet struct {
+type commandList struct {
 	set []*command
 	sync.RWMutex
 }
 
-func newCommandSet() *commandSet {
-	return &commandSet{}
+func newCommandList() *commandList {
+	return &commandList{}
 }
 
-func (cs *commandSet) add(regex string, handler Handler, priority int) Remover {
-	cs.Lock()
-	defer cs.Unlock()
+func (cl *commandList) add(regex string, handler Handler, priority int) Remover {
+	cl.Lock()
+	defer cl.Unlock()
 	c := &command{
 		handler:  handler,
-		set:      cs,
+		set:      cl,
 		regex:    regex,
 		priority: priority,
 	}
 	// Check for exact regex matches. This will filter out any repeated SimpleCommands.
-	for _, c := range cs.set {
+	for _, c := range cl.set {
 		if c.regex == regex {
 			logging.Error("Command prefix '%s' already registered.", regex)
 			return nil
 		}
 	}
-	cs.set = append(cs.set, c)
+	cl.set = append(cl.set, c)
 	return c
 }
 
-func (cs *commandSet) remove(c *command) {
-	cs.Lock()
-	defer cs.Unlock()
-	for index, value := range cs.set {
+func (cl *commandList) remove(c *command) {
+	cl.Lock()
+	defer cl.Unlock()
+	for index, value := range cl.set {
 		if value == c {
-			copy(cs.set[index:], cs.set[index+1:])
-			cs.set = cs.set[:len(cs.set)-1]
+			copy(cl.set[index:], cl.set[index+1:])
+			cl.set = cl.set[:len(cl.set)-1]
 			c.set = nil
 			return
 		}
@@ -180,11 +180,11 @@ func (cs *commandSet) remove(c *command) {
 }
 
 // Matches the command with the highest priority.
-func (cs *commandSet) match(txt string) (handler Handler) {
-	cs.RLock()
-	defer cs.RUnlock()
+func (cl *commandList) match(txt string) (handler Handler) {
+	cl.RLock()
+	defer cl.RUnlock()
 	maxPriority := math.MinInt32
-	for _, c := range cs.set {
+	for _, c := range cl.set {
 		if c.priority > maxPriority {
 			if regex, error := regexp.Compile(c.regex); error == nil {
 				if regex.MatchString(txt) {
@@ -203,12 +203,12 @@ func (cs *commandSet) match(txt string) (handler Handler) {
 // "PRIVMSG", "JOIN", etc. but all the numeric replies are left as ascii
 // strings of digits like "332" (mainly because I really didn't feel like
 // putting massive constant tables in).
-func (conn *Conn) Handle(name string, h Handler) Remover {
-	return conn.handlers.add(name, h)
+func (conn *Conn) Handle(name string, handler Handler) Remover {
+	return conn.handlers.add(name, handler)
 }
 
-func (conn *Conn) HandleFunc(name string, hf HandlerFunc) Remover {
-	return conn.Handle(name, hf)
+func (conn *Conn) HandleFunc(name string, handlerFunc HandlerFunc) Remover {
+	return conn.Handle(name, handlerFunc)
 }
 
 func (conn *Conn) Command(regex string, handler Handler, priority int) Remover {

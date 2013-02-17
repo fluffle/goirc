@@ -22,7 +22,7 @@ type Conn struct {
 
 	// Handlers and Commands
 	handlers *hSet
-	commands *commandSet
+	commands *commandList
 
 	// State tracker for nicks and channels
 	ST         state.StateTracker
@@ -82,7 +82,7 @@ func Client(nick string, args ...string) *Conn {
 		cLoop:      make(chan bool),
 		cPing:      make(chan bool),
 		handlers:   handlerSet(),
-		commands:   newCommandSet(),
+		commands:   newCommandList(),
 		stRemovers: make([]Remover, 0, len(stHandlers)),
 		PingFreq:   3 * time.Minute,
 		NewNick:    func(s string) string { return s + "_" },

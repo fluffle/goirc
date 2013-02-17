@@ -32,6 +32,7 @@ func main() {
 		func(conn *irc.Conn, line *irc.Line) { quit <- true })
 
 	// Set up some simple commands, !bark and !roll.
+	// The !roll command will also get the  "!help roll" command also.
 	c.SimpleCommandFunc("bark", func(conn *irc.Conn, line *irc.Line) { conn.Privmsg(line.Target(), "Woof Woof") })
 	c.SimpleCommandHelpFunc("roll", `Rolls a d6, "roll <n>" to roll n dice at once.`, func(conn *irc.Conn, line *irc.Line) {
 		count := 1
@@ -50,6 +51,9 @@ func main() {
 	})
 
 	// Set up some commands that are triggered by a regex in a message.
+	// It is important to see that UrlRegex could actually respond to some
+	// of the Url's that YouTubeRegex listens to, because of this we put the
+	// YouTube command at a higher priority, this way it will take precedence.
 	c.CommandFunc(irc.YouTubeRegex, irc.YouTubeFunc, 10)
 	c.CommandFunc(irc.UrlRegex, irc.UrlFunc, 0)
 
