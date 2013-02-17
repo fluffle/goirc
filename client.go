@@ -5,18 +5,23 @@ import (
 	"flag"
 	"fmt"
 	irc "github.com/fluffle/goirc/client"
+	"math/rand"
 	"os"
+	"strconv"
 	"strings"
 )
 
-var host *string = flag.String("host", "irc.freenode.net", "IRC server")
+var host *string = flag.String("host", "irc.synirc.net", "IRC server")
 var channel *string = flag.String("channel", "#go-nuts", "IRC channel")
+var nick *string = flag.String("nick", "Septapus", "Nick")
+var ident *string = flag.String("ident", "Septapus", "Ident")
+var name *string = flag.String("name", "Septapus v9", "Name")
 
 func main() {
 	flag.Parse()
 
 	// create new IRC connection
-	c := irc.Client("GoTest", "gotest")
+	c := irc.Client(*nick, *ident, *name)
 	c.EnableStateTracking()
 	c.HandleFunc(irc.CONNECTED,
 		func(conn *irc.Conn, line *irc.Line) { conn.Join(*channel) })
@@ -26,8 +31,27 @@ func main() {
 	c.HandleFunc(irc.DISCONNECTED,
 		func(conn *irc.Conn, line *irc.Line) { quit <- true })
 
-	c.HandleFunc(irc.PRIVMSG, YouTubeFunc)
-	c.HandleFunc(irc.PRIVMSG, UrlFunc)
+	// Set up some simple commands, !bark and !roll.
+	c.SimpleCommandFunc("bark", func(conn *irc.Conn, line *irc.Line) { conn.Privmsg(line.Target(), "Woof Woof") })
+	c.SimpleCommandHelpFunc("roll", `Rolls a d6, "roll <n>" to roll n dice at once.`, func(conn *irc.Conn, line *irc.Line) {
+		count := 1
+		fields := strings.Fields(line.Message())
+		if len(fields) > 1 {
+			var err error
+			if count, err = strconv.Atoi(fields[len(fields)-1]); err != nil {
+				count = 1
+			}
+		}
+		total := 0
+		for i := 0; i < count; i++ {
+			total += rand.Intn(6) + 1
+		}
+		conn.Privmsg(line.Target(), fmt.Sprintf("%d", total))
+	})
+
+	// Set up some commands that are triggered by a regex in a message.
+	c.CommandFunc(irc.YouTubeRegex, irc.YouTubeFunc, 10)
+	c.CommandFunc(irc.UrlRegex, irc.UrlFunc, 0)
 
 	// set up a goroutine to read commands from stdin
 	in := make(chan string, 4)
@@ -87,10 +111,9 @@ func main() {
 	for !reallyquit {
 		// connect to server
 		if err := c.Connect(*host); err != nil {
-			fmt.Printf("Connection error: %s\n", err)
+			fmt.Printf("Error %v", err)
 			return
 		}
-
 		// wait on quit channel
 		<-quit
 	}

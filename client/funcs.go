@@ -29,9 +29,11 @@ type youTubeVideo struct {
 	} `json:entry`
 }
 
+var UrlRegex string = `(\s|^)(http://|https://)(.*?)(\s|$)`
+
 func UrlFunc(conn *Conn, line *Line) {
 	text := line.Message()
-	if regex, err := regexp.Compile(`(\s|^)(http://|https://)(.*?)(\s|$)`); err == nil {
+	if regex, err := regexp.Compile(UrlRegex); err == nil {
 		url := strings.TrimSpace(regex.FindString(text))
 		if url != "" {
 			if resp, err := http.Get(url); err == nil {
@@ -50,9 +52,11 @@ func UrlFunc(conn *Conn, line *Line) {
 	}
 }
 
+var YouTubeRegex string = `(\s|^)(http://|https://)?(www.)?(youtube.com/watch\?v=|youtu.be/)(.*?)(\s|$|\&|#)`
+
 func YouTubeFunc(conn *Conn, line *Line) {
 	text := line.Message()
-	if regex, err := regexp.Compile(`(\s|^)(http://|https://)?(www.)?(youtube.com/watch\?v=|youtu.be/)(.*?)(\s|$|\&|#)`); err == nil {
+	if regex, err := regexp.Compile(YouTubeRegex); err == nil {
 		if regex.Match([]byte(text)) {
 			matches := regex.FindStringSubmatch(text)
 			id := matches[len(matches)-2]

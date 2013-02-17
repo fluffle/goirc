@@ -9,12 +9,13 @@ import (
 
 // sets up the internal event handlers to do essential IRC protocol things
 var intHandlers = map[string]HandlerFunc{
-	INIT:  (*Conn).h_init,
-	"001": (*Conn).h_001,
-	"433": (*Conn).h_433,
-	CTCP:  (*Conn).h_CTCP,
-	NICK:  (*Conn).h_NICK,
-	PING:  (*Conn).h_PING,
+	INIT:    (*Conn).h_init,
+	"001":   (*Conn).h_001,
+	"433":   (*Conn).h_433,
+	CTCP:    (*Conn).h_CTCP,
+	NICK:    (*Conn).h_NICK,
+	PING:    (*Conn).h_PING,
+	PRIVMSG: (*Conn).h_PRIVMSG,
 }
 
 func (conn *Conn) addIntHandlers() {
@@ -96,34 +97,5 @@ func (conn *Conn) h_NICK(line *Line) {
 
 // Handle PRIVMSGs that trigger Commands
 func (conn *Conn) h_PRIVMSG(line *Line) {
-	txt := line.Args[1]
-	if conn.CommandStripNick && strings.HasPrefix(txt, conn.Me.Nick) {
-		// Look for '^${nick}[:;>,-]? '
-		l := len(conn.Me.Nick)
-		switch txt[l] {
-		case ':', ';', '>', ',', '-':
-			l++
-		}
-		if txt[l] == ' ' {
-			txt = strings.TrimSpace(txt[l:])
-		}
-	}
-	cmd, l := conn.cmdMatch(txt)
-	if cmd == nil {
-		return
-	}
-	if conn.CommandStripPrefix {
-		txt = strings.TrimSpace(txt[l:])
-	}
-	if txt != line.Args[1] {
-		line = line.Copy()
-		line.Args[1] = txt
-	}
-	cmd.Execute(conn, line)
-}
-
-func (conn *Conn) c_HELP(line *Line) {
-	if cmd, _ := conn.cmdMatch(line.Args[1]); cmd != nil {
-		conn.Privmsg(line.Args[0], cmd.Help())
-	}
+	conn.command(line)
 }
