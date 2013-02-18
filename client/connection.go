@@ -121,6 +121,10 @@ func (conn *Conn) Config() *Config {
 	return conn.cfg
 }
 
+func (conn *Conn) Me() *state.Nick {
+	return conn.cfg.Me
+}
+
 func (conn *Conn) StateTracker() state.Tracker {
 	return conn.st
 }
