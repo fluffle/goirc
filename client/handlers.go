@@ -7,8 +7,15 @@ import (
 	"strings"
 )
 
+const (
+	REGISTER = "REGISTER"
+	CONNECTED = "CONNECTED"
+	DISCONNECTED = "DISCONNECTED"
+)
+
 // sets up the internal event handlers to do essential IRC protocol things
 var intHandlers = map[string]HandlerFunc{
+	REGISTER: (*Conn).h_REGISTER,
 	"001":  (*Conn).h_001,
 	"433":  (*Conn).h_433,
 	"CTCP": (*Conn).h_CTCP,
@@ -29,16 +36,25 @@ func (conn *Conn) h_PING(line *Line) {
 	conn.Raw("PONG :" + line.Args[0])
 }
 
-// Handler to trigger a "CONNECTED" event on receipt of numeric 001
+// Handler for initial registration with server once tcp connection is made.
+func (conn *Conn) h_REGISTER(line *Line) {
+	if conn.cfg.Pass != "" {
+		conn.Pass(conn.cfg.Pass)
+	}
+	conn.Nick(conn.cfg.Me.Nick)
+	conn.User(conn.cfg.Me.Ident, conn.cfg.Me.Name)
+}
+
+// Handler to trigger a CONNECTED event on receipt of numeric 001
 func (conn *Conn) h_001(line *Line) {
 	// we're connected!
-	conn.dispatch(&Line{Cmd: "connected"})
+	conn.dispatch(&Line{Cmd: CONNECTED})
 	// and we're being given our hostname (from the server's perspective)
 	t := line.Args[len(line.Args)-1]
 	if idx := strings.LastIndex(t, " "); idx != -1 {
 		t = t[idx+1:]
 		if idx = strings.Index(t, "@"); idx != -1 {
-			conn.Me.Host = t[idx+1:]
+			conn.cfg.Me.Host = t[idx+1:]
 		}
 	}
 }
@@ -59,11 +75,11 @@ func (conn *Conn) h_433(line *Line) {
 	// if this is happening before we're properly connected (i.e. the nick
 	// we sent in the initial NICK command is in use) we will not receive
 	// a NICK message to confirm our change of nick, so ReNick here...
-	if line.Args[1] == conn.Me.Nick {
+	if line.Args[1] == conn.cfg.Me.Nick {
 		if conn.st != nil {
-			conn.st.ReNick(conn.Me.Nick, neu)
+			conn.st.ReNick(conn.cfg.Me.Nick, neu)
 		} else {
-			conn.Me.Nick = neu
+			conn.cfg.Me.Nick = neu
 		}
 	}
 }
@@ -79,17 +95,17 @@ func (conn *Conn) h_CTCP(line *Line) {
 
 // Handle updating our own NICK if we're not using the state tracker
 func (conn *Conn) h_NICK(line *Line) {
-	if conn.st == nil && line.Nick == conn.Me.Nick {
-		conn.Me.Nick = line.Args[0]
+	if conn.st == nil && line.Nick == conn.cfg.Me.Nick {
+		conn.cfg.Me.Nick = line.Args[0]
 	}
 }
 
 // Handle PRIVMSGs that trigger Commands
 func (conn *Conn) h_PRIVMSG(line *Line) {
 	txt := line.Args[1]
-	if conn.cfg.CommandStripNick && strings.HasPrefix(txt, conn.Me.Nick) {
+	if conn.cfg.CommandStripNick && strings.HasPrefix(txt, conn.cfg.Me.Nick) {
 		// Look for '^${nick}[:;>,-]? '
-		l := len(conn.Me.Nick)
+		l := len(conn.cfg.Me.Nick)
 		switch txt[l] {
 		case ':', ';', '>', ',', '-':
 			l++

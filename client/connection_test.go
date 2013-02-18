@@ -27,7 +27,7 @@ func setUp(t *testing.T, start ...bool) (*Conn, *testState) {
 	c.st = st
 	c.sock = nc
 	c.cfg.Flood = true // Tests can take a while otherwise
-	c.Connected = true
+	c.connected = true
 	if len(start) == 0 {
 		// Hack to allow tests of send, recv, write etc.
 		// NOTE: the value of the boolean doesn't matter.
@@ -69,7 +69,7 @@ func TestEOF(t *testing.T) {
 	<-time.After(time.Millisecond)
 
 	// Verify that the connection no longer thinks it's connected
-	if c.Connected {
+	if c.connected {
 		t.Errorf("Conn still thinks it's connected to the server.")
 	}
 
@@ -85,9 +85,9 @@ func TestClientAndStateTracking(t *testing.T) {
 	c, _ := SimpleClient("test", "test", "Testing IRC")
 
 	// Assert some basic things about the initial state of the Conn struct
-	if c.Me.Nick != "test" || c.Me.Ident != "test" ||
-		c.Me.Name != "Testing IRC" || c.Me.Host != "" {
-		t.Errorf("Conn.Me not correctly initialised.")
+	if me := c.cfg.Me; me.Nick != "test" || me.Ident != "test" ||
+		me.Name != "Testing IRC" || me.Host != "" {
+		t.Errorf("Conn.cfg.Me not correctly initialised.")
 	}
 	// Check that the internal handlers are correctly set up
 	for k, _ := range intHandlers {
@@ -109,20 +109,20 @@ func TestClientAndStateTracking(t *testing.T) {
 	}
 
 	// We're expecting the untracked me to be replaced by a tracked one
-	if c.Me.Nick != "test" || c.Me.Ident != "test" ||
-		c.Me.Name != "Testing IRC" || c.Me.Host != "" {
+	if me := c.cfg.Me; me.Nick != "test" || me.Ident != "test" ||
+		me.Name != "Testing IRC" || me.Host != "" {
 		t.Errorf("Enabling state tracking did not replace Me correctly.")
 	}
-	if c.st == nil || c.Me != c.st.Me() {
+	if c.st == nil || c.cfg.Me != c.st.Me() {
 		t.Errorf("State tracker not enabled correctly.")
 	}
 
 	// Now, shim in the mock state tracker and test disabling state tracking
-	me := c.Me
+	me := c.cfg.Me
 	c.st = st
 	st.EXPECT().Wipe()
 	c.DisableStateTracking()
-	if c.st != nil || c.Me != me {
+	if c.st != nil || c.cfg.Me != me {
 		t.Errorf("State tracker not disabled correctly.")
 	}
 

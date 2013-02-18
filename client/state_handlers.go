@@ -50,7 +50,7 @@ func (conn *Conn) h_JOIN(line *Line) {
 	if ch == nil {
 		// first we've seen of this channel, so should be us joining it
 		// NOTE this will also take care of nk == nil && ch == nil
-		if nk != conn.Me {
+		if nk != conn.cfg.Me {
 			logging.Warn("irc.JOIN(): JOIN to unknown channel %s received "+
 				"from (non-me) nick %s", line.Args[0], line.Nick)
 			return
@@ -102,7 +102,7 @@ func (conn *Conn) h_MODE(line *Line) {
 		ch.ParseModes(line.Args[1], line.Args[2:]...)
 	} else if nk := conn.st.GetNick(line.Args[0]); nk != nil {
 		// nick mode change, should be us
-		if nk != conn.Me {
+		if nk != conn.cfg.Me {
 			logging.Warn("irc.MODE(): recieved MODE %s for (non-me) nick %s",
 				line.Args[1], line.Args[0])
 			return
