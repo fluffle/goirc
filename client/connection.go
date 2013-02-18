@@ -66,6 +66,12 @@ type Config struct {
 
 	// Set this to true to disable flood protection and false to re-enable
 	Flood bool
+
+	// Sent as the reply to a CTCP VERSION message
+	Version string
+
+	// Sent as the QUIT message.
+	QuitMessage string
 }
 
 func NewConfig(nick string, args ...string) *Config {
@@ -82,6 +88,8 @@ func NewConfig(nick string, args ...string) *Config {
 	if len(args) > 1 && args[1] != "" {
 		cfg.Me.Name = args[1]
 	}
+	cfg.Version = "Powered by GoIRC"
+	cfg.QuitMessage = "GoBye!"
 	return cfg
 }
 
