@@ -9,13 +9,13 @@ import (
 
 // sets up the internal event handlers to do essential IRC protocol things
 var intHandlers = map[string]HandlerFunc{
-	INIT:    (*Conn).h_init,
-	"001":   (*Conn).h_001,
-	"433":   (*Conn).h_433,
-	CTCP:    (*Conn).h_CTCP,
-	NICK:    (*Conn).h_NICK,
-	PING:    (*Conn).h_PING,
-	PRIVMSG: (*Conn).h_PRIVMSG,
+	REGISTER: (*Conn).h_REGISTER,
+	"001":    (*Conn).h_001,
+	"433":    (*Conn).h_433,
+	CTCP:     (*Conn).h_CTCP,
+	NICK:     (*Conn).h_NICK,
+	PING:     (*Conn).h_PING,
+	PRIVMSG:  (*Conn).h_PRIVMSG,
 }
 
 func (conn *Conn) addIntHandlers() {
@@ -26,18 +26,18 @@ func (conn *Conn) addIntHandlers() {
 	}
 }
 
-// Password/User/Nick broadcast on connection.
-func (conn *Conn) h_init(line *Line) {
-	if conn.password != "" {
-		conn.Pass(conn.password)
-	}
-	conn.Nick(conn.Me.Nick)
-	conn.User(conn.Me.Ident, conn.Me.Name)
-}
-
 // Basic ping/pong handler
 func (conn *Conn) h_PING(line *Line) {
 	conn.Pong(line.Args[0])
+}
+
+// Handler for initial registration with server once tcp connection is made.
+func (conn *Conn) h_REGISTER(line *Line) {
+	if conn.cfg.Pass != "" {
+		conn.Pass(conn.cfg.Pass)
+	}
+	conn.Nick(conn.cfg.Me.Nick)
+	conn.User(conn.cfg.Me.Ident, conn.cfg.Me.Name)
 }
 
 // Handler to trigger a "CONNECTED" event on receipt of numeric 001
@@ -65,14 +65,14 @@ func (conn *Conn) h_001(line *Line) {
 // Handler to deal with "433 :Nickname already in use"
 func (conn *Conn) h_433(line *Line) {
 	// Args[1] is the new nick we were attempting to acquire
-	neu := conn.NewNick(line.Args[1])
+	neu := conn.cfg.NewNick(line.Args[1])
 	conn.Nick(neu)
 	// if this is happening before we're properly connected (i.e. the nick
 	// we sent in the initial NICK command is in use) we will not receive
 	// a NICK message to confirm our change of nick, so ReNick here...
 	if line.Args[1] == conn.Me.Nick {
-		if conn.st {
-			conn.ST.ReNick(conn.Me.Nick, neu)
+		if conn.st != nil {
+			conn.st.ReNick(conn.Me.Nick, neu)
 		} else {
 			conn.Me.Nick = neu
 		}
@@ -90,15 +90,15 @@ func (conn *Conn) h_CTCP(line *Line) {
 
 // Handle updating our own NICK if we're not using the state tracker
 func (conn *Conn) h_NICK(line *Line) {
-	if !conn.st && line.Nick == conn.Me.Nick {
-		conn.Me.Nick = line.Args[0]
+	if conn.st == nil && line.Nick == conn.cfg.Me.Nick {
+		conn.cfg.Me.Nick = line.Args[0]
 	}
 }
 
 // Handle PRIVMSGs that trigger Commands
 func (conn *Conn) h_PRIVMSG(line *Line) {
 	text := line.Message()
-	if conn.CommandStripNick && strings.HasPrefix(text, conn.Me.Nick) {
+	if conn.cfg.CommandStripNick && strings.HasPrefix(text, conn.Me.Nick) {
 		// Look for '^${nick}[:;>,-]? '
 		l := len(conn.Me.Nick)
 		switch text[l] {

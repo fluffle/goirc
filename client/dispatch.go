@@ -185,7 +185,7 @@ var SimpleCommandRegex string = `^!%v(\s|$)`
 func (conn *Conn) SimpleCommand(prefix string, handler Handler) Remover {
 	stripHandler := func(conn *Conn, line *Line) {
 		text := line.Message()
-		if conn.SimpleCommandStripPrefix {
+		if conn.cfg.SimpleCommandStripPrefix {
 			text = strings.TrimSpace(text[len(prefix):])
 		}
 		if text != line.Message() {

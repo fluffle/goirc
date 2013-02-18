@@ -14,36 +14,46 @@ import (
 
 // An IRC connection is represented by this struct.
 type Conn struct {
-	// Connection Hostname and Nickname
-	Host     string
-	Me       *state.Nick
-	Network  string
-	password string
+	// Connection related vars people will care about
+	Me        *state.Nick
+	Host      string
+	Network   string
+	Connected bool
+
+	// Deprecated: future work to turn Conn into an interface will break this.
+	// Use the State field to store external state that handlers might need.
+	State interface{}
+
+	// Contains parameters that people can tweak to change client behaviour.
+	cfg *Config
 
 	// Handlers and Commands
 	handlers *handlerSet
 	commands *commandList
 
 	// State tracker for nicks and channels
-	ST         state.StateTracker
-	st         bool
+	st         state.Tracker
 	stRemovers []Remover
 
-	// Use the State field to store external state that handlers might need.
-	// Remember ... you might need locking for this ;-)
-	State interface{}
-
 	// I/O stuff to server
-	sock      net.Conn
-	io        *bufio.ReadWriter
-	in        chan *Line
-	out       chan string
-	Connected bool
+	sock net.Conn
+	io   *bufio.ReadWriter
+	in   chan *Line
+	out  chan string
 
 	// Control channels to goroutines
 	cSend, cLoop, cPing chan bool
 
-	// Misc knobs to tweak client behaviour:
+	// Internal counters for flood protection
+	badness  time.Duration
+	lastsent time.Time
+}
+
+// Misc knobs to tweak client behaviour go in here
+type Config struct {
+	// Set this to provide the Nick, Ident and Name for the client to use.
+	Me *state.Nick
+
 	// Are we connecting via SSL? Do we care about certificate validity?
 	SSL       bool
 	SSLConfig *tls.Config
@@ -59,16 +69,9 @@ type Conn struct {
 
 	// Set this to true to disable flood protection and false to re-enable
 	Flood bool
-
-	// Internal counters for flood protection
-	badness  time.Duration
-	lastsent time.Time
 }
 
-// Creates a new IRC connection object, but doesn't connect to anything so
-// that you can add event handlers to it. See AddHandler() for details
-func Client(nick string, args ...string) *Conn {
-	logging.InitFromFlags()
+func NewConfig(nick string, args ...string) *Config {
 	ident := "goirc"
 	name := "Powered by GoIRC"
 
@@ -78,7 +81,30 @@ func Client(nick string, args ...string) *Conn {
 	if len(args) > 1 && args[1] != "" {
 		name = args[1]
 	}
+	cfg := &Config{
+		PingFreq: 3 * time.Minute,
+		NewNick:  func(s string) string { return s + "_" },
+	}
+	cfg.Me = state.NewNick(nick)
+	cfg.Me.Ident = ident
+	cfg.Me.Name = name
+	return cfg
+}
+
+// Creates a new IRC connection object, but doesn't connect to anything so
+// that you can add event handlers to it. See AddHandler() for details
+func SimpleClient(nick string, args ...string) (*Conn, error) {
+	return Client(NewConfig(nick, args...))
+}
+
+func Client(cfg *Config) (*Conn, error) {
+	logging.InitFromFlags()
+	if cfg.Me == nil || cfg.Me.Nick == "" || cfg.Me.Ident == "" {
+		return nil, fmt.Errorf("Must provide a valid state.Nick in cfg.Me.")
+	}
 	conn := &Conn{
+		Me:         cfg.Me,
+		cfg:        cfg,
 		in:         make(chan *Line, 32),
 		out:        make(chan string, 32),
 		cSend:      make(chan bool),
@@ -87,46 +113,46 @@ func Client(nick string, args ...string) *Conn {
 		handlers:   newHandlerSet(),
 		commands:   newCommandList(),
 		stRemovers: make([]Remover, 0, len(stHandlers)),
-		PingFreq:   3 * time.Minute,
-		NewNick:    func(s string) string { return s + "_" },
 		lastsent:   time.Now(),
 	}
 	conn.addIntHandlers()
-	conn.Me = state.NewNick(nick)
-	conn.Me.Ident = ident
-	conn.Me.Name = name
-
 	conn.initialise()
-	return conn
+	return conn, nil
+}
+
+func (conn *Conn) Config() *Config {
+	return conn.cfg
 }
 
 func (conn *Conn) EnableStateTracking() {
-	if !conn.st {
+	if conn.st == nil {
 		n := conn.Me
-		conn.ST = state.NewTracker(n.Nick)
-		conn.Me = conn.ST.Me()
+		conn.st = state.NewTracker(n.Nick)
+		conn.Me = conn.st.Me()
 		conn.Me.Ident = n.Ident
 		conn.Me.Name = n.Name
 		conn.addSTHandlers()
-		conn.st = true
 	}
 }
 
 func (conn *Conn) DisableStateTracking() {
-	if conn.st {
-		conn.st = false
+	if conn.st != nil {
 		conn.delSTHandlers()
-		conn.ST.Wipe()
-		conn.ST = nil
+		conn.st.Wipe()
+		conn.st = nil
 	}
+}
+
+func (conn *Conn) StateTracker() state.Tracker {
+	return conn.st
 }
 
 // Per-connection state initialisation.
 func (conn *Conn) initialise() {
 	conn.io = nil
 	conn.sock = nil
-	if conn.st {
-		conn.ST.Wipe()
+	if conn.st != nil {
+		conn.st.Wipe()
 	}
 }
 
@@ -142,12 +168,12 @@ func (conn *Conn) Connect(host string, pass ...string) error {
 			conn.Host, host))
 	}
 
-	if conn.SSL {
+	if conn.cfg.SSL {
 		if !hasPort(host) {
 			host += ":6697"
 		}
 		logging.Info("irc.Connect(): Connecting to %s with SSL.", host)
-		if s, err := tls.Dial("tcp", host, conn.SSLConfig); err == nil {
+		if s, err := tls.Dial("tcp", host, conn.cfg.SSLConfig); err == nil {
 			conn.sock = s
 		} else {
 			return err
@@ -165,13 +191,13 @@ func (conn *Conn) Connect(host string, pass ...string) error {
 	}
 	conn.Host = host
 	conn.Connected = true
-	if len(pass) > 0 {
-		conn.password = pass[0]
-	} else {
-		conn.password = ""
-	}
 	conn.postConnect()
-	conn.dispatch(&Line{Cmd: INIT})
+
+	if len(pass) > 0 {
+		conn.Pass(pass[0])
+	}
+	conn.Nick(conn.Me.Nick)
+	conn.User(conn.Me.Ident, conn.Me.Name)
 	return nil
 }
 
@@ -182,7 +208,7 @@ func (conn *Conn) postConnect() {
 		bufio.NewWriter(conn.sock))
 	go conn.send()
 	go conn.recv()
-	if conn.PingFreq > 0 {
+	if conn.cfg.PingFreq > 0 {
 		go conn.ping()
 	} else {
 		// Otherwise the send in shutdown will hang :-/
@@ -232,11 +258,11 @@ func (conn *Conn) recv() {
 
 // Repeatedly pings the server every PingFreq seconds (no matter what)
 func (conn *Conn) ping() {
-	tick := time.NewTicker(conn.PingFreq)
+	tick := time.NewTicker(conn.cfg.PingFreq)
 	for {
 		select {
 		case <-tick.C:
-			conn.Ping(fmt.Sprintf("%d", time.Now().UnixNano()))
+			conn.Raw(fmt.Sprintf("PING :%d", time.Now().UnixNano()))
 		case <-conn.cPing:
 			tick.Stop()
 			return
@@ -258,9 +284,9 @@ func (conn *Conn) runLoop() {
 }
 
 // Write a \r\n terminated line of output to the connected server,
-// using Hybrid's algorithm to rate limit if conn.Flood is false.
+// using Hybrid's algorithm to rate limit if conn.cfg.Flood is false.
 func (conn *Conn) write(line string) {
-	if !conn.Flood {
+	if !conn.cfg.Flood {
 		if t := conn.rateLimit(len(line)); t != 0 {
 			// sleep for the current line's time value before sending it
 			logging.Debug("irc.rateLimit(): Flood! Sleeping for %.2f secs.",
@@ -303,10 +329,10 @@ func (conn *Conn) rateLimit(chars int) time.Duration {
 
 func (conn *Conn) shutdown() {
 	// Guard against double-call of shutdown() if we get an error in send()
-	// as calling sock.Close() will cause recv() to recieve EOF in readstring()
+	// as calling sock.Close() will cause recv() to receive EOF in readstring()
 	if conn.Connected {
 		logging.Info("irc.shutdown(): Disconnected from server.")
-		conn.dispatch(&Line{Cmd: DISCONNECTED})
+		conn.dispatch(&Line{Cmd: "disconnected"})
 		conn.Connected = false
 		conn.sock.Close()
 		conn.cSend <- true
@@ -329,8 +355,8 @@ func (conn *Conn) String() string {
 		str += "Not currently connected!\n\n"
 	}
 	str += conn.Me.String() + "\n"
-	if conn.st {
-		str += conn.ST.String() + "\n"
+	if conn.st != nil {
+		str += conn.st.String() + "\n"
 	}
 	return str
 }

@@ -3,9 +3,9 @@ package client
 import "strings"
 
 const (
-	INIT         = "init"
-	CONNECTED    = "connected"
-	DISCONNECTED = "disconnected"
+	REGISTER     = "REGISTER"
+	CONNECTED    = "CONNECTED"
+	DISCONNECTED = "DISCONNECTED"
 	ACTION       = "ACTION"
 	AWAY         = "AWAY"
 	CTCP         = "CTCP"
