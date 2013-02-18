@@ -197,7 +197,7 @@ func (conn *Conn) SimpleCommand(prefix string, handler Handler) Remover {
 		}
 		handler.Handle(conn, line)
 	}
-	return conn.Command(fmt.Sprintf(SimpleCommandRegex, strings.ToLower(prefix)), HandlerFunc(stripHandler), math.MaxInt32)
+	return conn.CommandFunc(fmt.Sprintf(SimpleCommandRegex, strings.ToLower(prefix)), stripHandler, math.MaxInt32)
 }
 
 func (conn *Conn) SimpleCommandFunc(prefix string, handlerFunc HandlerFunc) Remover {
