@@ -111,13 +111,8 @@ func main() {
 
 	for !reallyquit {
 		// connect to server
-<<<<<<< HEAD
-		if err := c.Connect(*host); err != nil {
-			fmt.Printf("Error %v", err)
-=======
 		if err := c.ConnectTo(*host); err != nil {
 			fmt.Printf("Connection error: %s\n", err)
->>>>>>> fluffle/master
 			return
 		}
 		// wait on quit channel
