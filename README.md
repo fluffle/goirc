@@ -28,19 +28,11 @@ Synopsis:
 
 		// Add handlers to do things here!
 		// e.g. join a channel on connect.
-<<<<<<< HEAD
 		c.HandleFunc(irc.CONNECTED,
 			func(conn *irc.Conn, line *irc.Line) { conn.Join("#channel") })
 		// And a signal on disconnect
 		quit := make(chan bool)
 		c.HandleFunc(irc.DISCONNECTED,
-=======
-		c.HandleFunc("connected",
-			func(conn *irc.Conn, line *irc.Line) { conn.Join("#channel") })
-		// And a signal on disconnect
-		quit := make(chan bool)
-		c.HandleFunc("disconnected",
->>>>>>> fluffle/master
 			func(conn *irc.Conn, line *irc.Line) { quit <- true })
 
 		// Tell client to connect.
