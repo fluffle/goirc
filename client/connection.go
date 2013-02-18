@@ -8,11 +8,14 @@ import (
 	"github.com/fluffle/golog/logging"
 	"net"
 	"strings"
+	"sync"
 	"time"
 )
 
 // An IRC connection is represented by this struct.
 type Conn struct {
+	// For preventing races on (dis)connect.
+	mu sync.Mutex
 
 	// Contains parameters that people can tweak to change client behaviour.
 	cfg *Config
@@ -164,6 +167,9 @@ func (conn *Conn) ConnectTo(host string, pass ...string) error {
 }
 
 func (conn *Conn) Connect() error {
+	conn.mu.Lock()
+	defer conn.mu.Unlock()
+
 	if conn.cfg.Server == "" {
 		return fmt.Errorf("irc.Connect(): cfg.Server must be non-empty")
 	}
@@ -326,18 +332,21 @@ func (conn *Conn) rateLimit(chars int) time.Duration {
 func (conn *Conn) shutdown() {
 	// Guard against double-call of shutdown() if we get an error in send()
 	// as calling sock.Close() will cause recv() to receive EOF in readstring()
-	if conn.Connected {
-		logging.Info("irc.shutdown(): Disconnected from server.")
-		conn.dispatch(&Line{Cmd: "disconnected"})
-		conn.Connected = false
-		conn.sock.Close()
-		conn.cSend <- true
-		conn.cLoop <- true
-		conn.cPing <- true
-		// reinit datastructures ready for next connection
-		// do this here rather than after runLoop()'s for due to race
-		conn.initialise()
+	conn.mu.Lock()
+	defer conn.mu.Unlock()
+	if !conn.connected {
+		return
 	}
+	logging.Info("irc.shutdown(): Disconnected from server.")
+	conn.dispatch(&Line{Cmd: DISCONNECTED})
+	conn.connected = false
+	conn.sock.Close()
+	conn.cSend <- true
+	conn.cLoop <- true
+	conn.cPing <- true
+	// reinit datastructures ready for next connection
+	// do this here rather than after runLoop()'s for due to race
+	conn.initialise()
 }
 
 // Dumps a load of information about the current state of the connection to a
