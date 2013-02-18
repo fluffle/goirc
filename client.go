@@ -11,17 +11,14 @@ import (
 	"strings"
 )
 
-var host *string = flag.String("host", "irc.synirc.net", "IRC server")
+var host *string = flag.String("host", "irc.freenode.net", "IRC server")
 var channel *string = flag.String("channel", "#go-nuts", "IRC channel")
-var nick *string = flag.String("nick", "Septapus", "Nick")
-var ident *string = flag.String("ident", "Septapus", "Ident")
-var name *string = flag.String("name", "Septapus v9", "Name")
 
 func main() {
 	flag.Parse()
 
 	// create new IRC connection
-	c := irc.SimpleClient(*nick, *ident, *name)
+	c := irc.SimpleClient("GoTest", "gotest")
 	c.EnableStateTracking()
 	c.HandleFunc(irc.CONNECTED,
 		func(conn *irc.Conn, line *irc.Line) { conn.Join(*channel) })
