@@ -3,26 +3,19 @@ package client
 import (
 	"bufio"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"github.com/fluffle/goirc/state"
 	"github.com/fluffle/golog/logging"
 	"net"
 	"strings"
+	"sync"
 	"time"
 )
 
 // An IRC connection is represented by this struct.
 type Conn struct {
-	// Connection related vars people will care about
-	Me        *state.Nick
-	Host      string
-	Network   string
-	Connected bool
-
-	// Deprecated: future work to turn Conn into an interface will break this.
-	// Use the State field to store external state that handlers might need.
-	State interface{}
+	// For preventing races on (dis)connect.
+	mu sync.Mutex
 
 	// Contains parameters that people can tweak to change client behaviour.
 	cfg *Config
@@ -36,10 +29,11 @@ type Conn struct {
 	stRemovers []Remover
 
 	// I/O stuff to server
-	sock net.Conn
-	io   *bufio.ReadWriter
-	in   chan *Line
-	out  chan string
+	sock      net.Conn
+	io        *bufio.ReadWriter
+	in        chan *Line
+	out       chan string
+	connected bool
 
 	// Control channels to goroutines
 	cSend, cLoop, cPing chan bool
@@ -53,6 +47,9 @@ type Conn struct {
 type Config struct {
 	// Set this to provide the Nick, Ident and Name for the client to use.
 	Me *state.Nick
+
+	// Hostname to connect to and optional connect password.
+	Server, Pass string
 
 	// Are we connecting via SSL? Do we care about certificate validity?
 	SSL       bool
@@ -72,38 +69,35 @@ type Config struct {
 }
 
 func NewConfig(nick string, args ...string) *Config {
-	ident := "goirc"
-	name := "Powered by GoIRC"
-
-	if len(args) > 0 && args[0] != "" {
-		ident = args[0]
-	}
-	if len(args) > 1 && args[1] != "" {
-		name = args[1]
-	}
 	cfg := &Config{
+		Me:       state.NewNick(nick),
 		PingFreq: 3 * time.Minute,
 		NewNick:  func(s string) string { return s + "_" },
 	}
-	cfg.Me = state.NewNick(nick)
-	cfg.Me.Ident = ident
-	cfg.Me.Name = name
+	cfg.Me.Ident = "goirc"
+	if len(args) > 0 && args[0] != "" {
+		cfg.Me.Ident = args[0]
+	}
+	cfg.Me.Name = "Powered by GoIRC"
+	if len(args) > 1 && args[1] != "" {
+		cfg.Me.Name = args[1]
+	}
 	return cfg
 }
 
 // Creates a new IRC connection object, but doesn't connect to anything so
 // that you can add event handlers to it. See AddHandler() for details
-func SimpleClient(nick string, args ...string) (*Conn, error) {
-	return Client(NewConfig(nick, args...))
+func SimpleClient(nick string, args ...string) *Conn {
+	conn, _ := Client(NewConfig(nick, args...))
+	return conn
 }
 
 func Client(cfg *Config) (*Conn, error) {
 	logging.InitFromFlags()
 	if cfg.Me == nil || cfg.Me.Nick == "" || cfg.Me.Ident == "" {
-		return nil, fmt.Errorf("Must provide a valid state.Nick in cfg.Me.")
+		return nil, fmt.Errorf("irc.Client(): Both cfg.Nick and cfg.Ident must be non-empty.")
 	}
 	conn := &Conn{
-		Me:         cfg.Me,
 		cfg:        cfg,
 		in:         make(chan *Line, 32),
 		out:        make(chan string, 32),
@@ -120,17 +114,29 @@ func Client(cfg *Config) (*Conn, error) {
 	return conn, nil
 }
 
+func (conn *Conn) Connected() bool {
+	return conn.connected
+}
+
 func (conn *Conn) Config() *Config {
 	return conn.cfg
 }
 
+func (conn *Conn) Me() *state.Nick {
+	return conn.cfg.Me
+}
+
+func (conn *Conn) StateTracker() state.Tracker {
+	return conn.st
+}
+
 func (conn *Conn) EnableStateTracking() {
 	if conn.st == nil {
-		n := conn.Me
+		n := conn.cfg.Me
 		conn.st = state.NewTracker(n.Nick)
-		conn.Me = conn.st.Me()
-		conn.Me.Ident = n.Ident
-		conn.Me.Name = n.Name
+		conn.cfg.Me = conn.st.Me()
+		conn.cfg.Me.Ident = n.Ident
+		conn.cfg.Me.Name = n.Name
 		conn.addSTHandlers()
 	}
 }
@@ -141,10 +147,6 @@ func (conn *Conn) DisableStateTracking() {
 		conn.st.Wipe()
 		conn.st = nil
 	}
-}
-
-func (conn *Conn) StateTracker() state.Tracker {
-	return conn.st
 }
 
 // Per-connection state initialisation.
@@ -161,43 +163,48 @@ func (conn *Conn) initialise() {
 // on the connection to the IRC server, set Conn.SSL to true before calling
 // Connect(). The port will default to 6697 if ssl is enabled, and 6667
 // otherwise. You can also provide an optional connect password.
-func (conn *Conn) Connect(host string, pass ...string) error {
-	if conn.Connected {
-		return errors.New(fmt.Sprintf(
-			"irc.Connect(): already connected to %s, cannot connect to %s",
-			conn.Host, host))
+func (conn *Conn) ConnectTo(host string, pass ...string) error {
+	conn.cfg.Server = host
+	if len(pass) > 0 {
+		conn.cfg.Pass = pass[0]
 	}
+	return conn.Connect()
+}
 
+func (conn *Conn) Connect() error {
+	conn.mu.Lock()
+	defer conn.mu.Unlock()
+
+	if conn.cfg.Server == "" {
+		return fmt.Errorf("irc.Connect(): cfg.Server must be non-empty")
+	}
+	if conn.connected {
+		return fmt.Errorf("irc.Connect(): Cannot connect to %s, already connected.", conn.cfg.Server)
+	}
 	if conn.cfg.SSL {
-		if !hasPort(host) {
-			host += ":6697"
+		if !hasPort(conn.cfg.Server) {
+			conn.cfg.Server += ":6697"
 		}
-		logging.Info("irc.Connect(): Connecting to %s with SSL.", host)
-		if s, err := tls.Dial("tcp", host, conn.cfg.SSLConfig); err == nil {
+		logging.Info("irc.Connect(): Connecting to %s with SSL.", conn.cfg.Server)
+		if s, err := tls.Dial("tcp", conn.cfg.Server, conn.cfg.SSLConfig); err == nil {
 			conn.sock = s
 		} else {
 			return err
 		}
 	} else {
-		if !hasPort(host) {
-			host += ":6667"
+		if !hasPort(conn.cfg.Server) {
+			conn.cfg.Server += ":6667"
 		}
-		logging.Info("irc.Connect(): Connecting to %s without SSL.", host)
-		if s, err := net.Dial("tcp", host); err == nil {
+		logging.Info("irc.Connect(): Connecting to %s without SSL.", conn.cfg.Server)
+		if s, err := net.Dial("tcp", conn.cfg.Server); err == nil {
 			conn.sock = s
 		} else {
 			return err
 		}
 	}
-	conn.Host = host
-	conn.Connected = true
+	conn.connected = true
 	conn.postConnect()
-
-	if len(pass) > 0 {
-		conn.Pass(pass[0])
-	}
-	conn.Nick(conn.Me.Nick)
-	conn.User(conn.Me.Ident, conn.Me.Name)
+	conn.dispatch(&Line{Cmd: REGISTER})
 	return nil
 }
 
@@ -330,18 +337,21 @@ func (conn *Conn) rateLimit(chars int) time.Duration {
 func (conn *Conn) shutdown() {
 	// Guard against double-call of shutdown() if we get an error in send()
 	// as calling sock.Close() will cause recv() to receive EOF in readstring()
-	if conn.Connected {
-		logging.Info("irc.shutdown(): Disconnected from server.")
-		conn.dispatch(&Line{Cmd: "disconnected"})
-		conn.Connected = false
-		conn.sock.Close()
-		conn.cSend <- true
-		conn.cLoop <- true
-		conn.cPing <- true
-		// reinit datastructures ready for next connection
-		// do this here rather than after runLoop()'s for due to race
-		conn.initialise()
+	conn.mu.Lock()
+	defer conn.mu.Unlock()
+	if !conn.connected {
+		return
 	}
+	logging.Info("irc.shutdown(): Disconnected from server.")
+	conn.dispatch(&Line{Cmd: DISCONNECTED})
+	conn.connected = false
+	conn.sock.Close()
+	conn.cSend <- true
+	conn.cLoop <- true
+	conn.cPing <- true
+	// reinit datastructures ready for next connection
+	// do this here rather than after runLoop()'s for due to race
+	conn.initialise()
 }
 
 // Dumps a load of information about the current state of the connection to a
@@ -349,12 +359,12 @@ func (conn *Conn) shutdown() {
 func (conn *Conn) String() string {
 	str := "GoIRC Connection\n"
 	str += "----------------\n\n"
-	if conn.Connected {
-		str += "Connected to " + conn.Host + "\n\n"
+	if conn.connected {
+		str += "Connected to " + conn.cfg.Server + "\n\n"
 	} else {
 		str += "Not currently connected!\n\n"
 	}
-	str += conn.Me.String() + "\n"
+	str += conn.cfg.Me.String() + "\n"
 	if conn.st != nil {
 		str += conn.st.String() + "\n"
 	}

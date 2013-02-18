@@ -40,7 +40,7 @@ func (conn *Conn) h_REGISTER(line *Line) {
 	conn.User(conn.cfg.Me.Ident, conn.cfg.Me.Name)
 }
 
-// Handler to trigger a "CONNECTED" event on receipt of numeric 001
+// Handler to trigger a CONNECTED event on receipt of numeric 001
 func (conn *Conn) h_001(line *Line) {
 	// we're connected!
 	conn.dispatch(&Line{Cmd: CONNECTED})
@@ -49,7 +49,7 @@ func (conn *Conn) h_001(line *Line) {
 	if idx := strings.LastIndex(t, " "); idx != -1 {
 		t = t[idx+1:]
 		if idx = strings.Index(t, "@"); idx != -1 {
-			conn.Me.Host = t[idx+1:]
+			conn.cfg.Me.Host = t[idx+1:]
 		}
 	}
 }
@@ -70,11 +70,11 @@ func (conn *Conn) h_433(line *Line) {
 	// if this is happening before we're properly connected (i.e. the nick
 	// we sent in the initial NICK command is in use) we will not receive
 	// a NICK message to confirm our change of nick, so ReNick here...
-	if line.Args[1] == conn.Me.Nick {
+	if line.Args[1] == conn.cfg.Me.Nick {
 		if conn.st != nil {
-			conn.st.ReNick(conn.Me.Nick, neu)
+			conn.st.ReNick(conn.cfg.Me.Nick, neu)
 		} else {
-			conn.Me.Nick = neu
+			conn.cfg.Me.Nick = neu
 		}
 	}
 }
@@ -98,9 +98,9 @@ func (conn *Conn) h_NICK(line *Line) {
 // Handle PRIVMSGs that trigger Commands
 func (conn *Conn) h_PRIVMSG(line *Line) {
 	text := line.Message()
-	if conn.cfg.CommandStripNick && strings.HasPrefix(text, conn.Me.Nick) {
+	if conn.cfg.CommandStripNick && strings.HasPrefix(text, conn.cfg.Me.Nick) {
 		// Look for '^${nick}[:;>,-]? '
-		l := len(conn.Me.Nick)
+		l := len(conn.cfg.Me.Nick)
 		switch text[l] {
 		case ':', ';', '>', ',', '-':
 			l++

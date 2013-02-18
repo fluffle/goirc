@@ -19,6 +19,26 @@ func TestPING(t *testing.T) {
 	s.nc.Expect("PONG :1234567890")
 }
 
+// Test the REGISTER handler matches section 3.1 of rfc2812
+func TestREGISTER(t *testing.T) {
+	c, s := setUp(t)
+	defer s.tearDown()
+
+	c.h_REGISTER(&Line{Cmd: REGISTER})
+	s.nc.Expect("NICK test")
+	s.nc.Expect("USER test 12 * :Testing IRC")
+	s.nc.ExpectNothing()
+
+	c.cfg.Pass = "12345"
+	c.cfg.Me.Ident = "idiot"
+	c.cfg.Me.Name = "I've got the same combination on my luggage!"
+	c.h_REGISTER(&Line{Cmd: REGISTER})
+	s.nc.Expect("PASS 12345")
+	s.nc.Expect("NICK test")
+	s.nc.Expect("USER idiot 12 * :I've got the same combination on my luggage!")
+	s.nc.ExpectNothing()
+}
+
 // Test the handler for 001 / RPL_WELCOME
 func Test001(t *testing.T) {
 	c, s := setUp(t)
@@ -39,8 +59,8 @@ func Test001(t *testing.T) {
 	}
 
 	// Check host parsed correctly
-	if c.Me.Host != "somehost.com" {
-		t.Errorf("Host parsing failed, host is '%s'.", c.Me.Host)
+	if c.cfg.Me.Host != "somehost.com" {
+		t.Errorf("Host parsing failed, host is '%s'.", c.cfg.Me.Host)
 	}
 }
 
@@ -49,13 +69,13 @@ func Test433(t *testing.T) {
 	c, s := setUp(t)
 	defer s.tearDown()
 
-	// Call handler with a 433 line, not triggering c.Me.Renick()
+	// Call handler with a 433 line, not triggering c.cfg.Me.Renick()
 	c.h_433(parseLine(":irc.server.org 433 test new :Nickname is already in use."))
 	s.nc.Expect("NICK new_")
 
 	// In this case, we're expecting the server to send a NICK line
-	if c.Me.Nick != "test" {
-		t.Errorf("ReNick() called unexpectedly, Nick == '%s'.", c.Me.Nick)
+	if c.cfg.Me.Nick != "test" {
+		t.Errorf("ReNick() called unexpectedly, Nick == '%s'.", c.cfg.Me.Nick)
 	}
 
 	// Send a line that will trigger a renick. This happens when our wanted
@@ -66,11 +86,11 @@ func Test433(t *testing.T) {
 	c.h_433(parseLine(":irc.server.org 433 test test :Nickname is already in use."))
 	s.nc.Expect("NICK test_")
 
-	// Counter-intuitively, c.Me.Nick will not change in this case. This is an
-	// artifact of the test set-up, with a mocked out state tracker that
+	// Counter-intuitively, c.cfg.Me.Nick will not change in this case. This
+	// is an artifact of the test set-up, with a mocked out state tracker that
 	// doesn't actually change any state. Normally, this would be fine :-)
-	if c.Me.Nick != "test" {
-		t.Errorf("My nick changed from '%s'.", c.Me.Nick)
+	if c.cfg.Me.Nick != "test" {
+		t.Errorf("My nick changed from '%s'.", c.cfg.Me.Nick)
 	}
 
 	// Test the code path that *doesn't* involve state tracking.
@@ -78,8 +98,8 @@ func Test433(t *testing.T) {
 	c.h_433(parseLine(":irc.server.org 433 test test :Nickname is already in use."))
 	s.nc.Expect("NICK test_")
 
-	if c.Me.Nick != "test_" {
-		t.Errorf("My nick not updated from '%s'.", c.Me.Nick)
+	if c.cfg.Me.Nick != "test_" {
+		t.Errorf("My nick not updated from '%s'.", c.cfg.Me.Nick)
 	}
 	c.st = s.st
 }
@@ -96,7 +116,7 @@ func TestNICK(t *testing.T) {
 	c.h_NICK(parseLine(":test!test@somehost.com NICK :test1"))
 
 	// Verify that our Nick has changed
-	if c.Me.Nick != "test1" {
+	if c.cfg.Me.Nick != "test1" {
 		t.Errorf("NICK did not result in changing our nick.")
 	}
 
@@ -104,7 +124,7 @@ func TestNICK(t *testing.T) {
 	c.h_NICK(parseLine(":blah!moo@cows.com NICK :milk"))
 
 	// Verify that our Nick hasn't changed
-	if c.Me.Nick != "test1" {
+	if c.cfg.Me.Nick != "test1" {
 		t.Errorf("NICK did not result in changing our nick.")
 	}
 
@@ -113,7 +133,7 @@ func TestNICK(t *testing.T) {
 	c.h_NICK(parseLine(":test1!test@somehost.com NICK :test2"))
 
 	// Verify that our Nick hasn't changed (should be handled by h_STNICK).
-	if c.Me.Nick != "test1" {
+	if c.cfg.Me.Nick != "test1" {
 		t.Errorf("NICK changed our nick when state tracking enabled.")
 	}
 }
@@ -202,9 +222,9 @@ func TestJOIN(t *testing.T) {
 
 	gomock.InOrder(
 		s.st.EXPECT().GetChannel("#test1").Return(nil),
-		s.st.EXPECT().GetNick("test").Return(c.Me),
+		s.st.EXPECT().GetNick("test").Return(c.cfg.Me),
 		s.st.EXPECT().NewChannel("#test1").Return(chan1),
-		s.st.EXPECT().Associate(chan1, c.Me),
+		s.st.EXPECT().Associate(chan1, c.cfg.Me),
 	)
 
 	// Use #test1 to test expected behaviour
@@ -321,10 +341,10 @@ func TestMODE(t *testing.T) {
 	// Send a nick mode line, returning Me
 	gomock.InOrder(
 		s.st.EXPECT().GetChannel("test").Return(nil),
-		s.st.EXPECT().GetNick("test").Return(c.Me),
+		s.st.EXPECT().GetNick("test").Return(c.cfg.Me),
 	)
 	c.h_MODE(parseLine(":test!test@somehost.com MODE test +i"))
-	if !c.Me.Modes.Invisible {
+	if !c.cfg.Me.Modes.Invisible {
 		t.Errorf("Nick.ParseModes() not called correctly.")
 	}
 
@@ -484,7 +504,7 @@ func Test353(t *testing.T) {
 	nicks := make(map[string]*state.Nick)
 	privs := make(map[string]*state.ChanPrivs)
 
-	nicks["test"] = c.Me
+	nicks["test"] = c.cfg.Me
 	privs["test"] = new(state.ChanPrivs)
 
 	for _, n := range []string{"user1", "user2", "voice", "halfop",
@@ -497,7 +517,7 @@ func Test353(t *testing.T) {
 	s.st.EXPECT().GetChannel("#test1").Return(chan1).Times(2)
 	gomock.InOrder(
 		// "test" is Me, i am known, and already on the channel
-		s.st.EXPECT().GetNick("test").Return(c.Me),
+		s.st.EXPECT().GetNick("test").Return(c.cfg.Me),
 		s.st.EXPECT().IsOn("#test1", "test").Return(privs["test"], true),
 		// user1 is known, but not on the channel, so should be associated
 		s.st.EXPECT().GetNick("user1").Return(nicks["user1"]),
