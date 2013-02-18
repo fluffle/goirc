@@ -111,9 +111,5 @@ func (conn *Conn) h_PRIVMSG(line *Line) {
 		line = line.Copy()
 		line.Args[1] = text
 	}
-	cmd := conn.command(line)
-	if cmd == nil {
-		return
-	}
-	cmd.Handle(conn, line)
+	conn.command(line)
 }

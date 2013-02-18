@@ -224,6 +224,9 @@ func (conn *Conn) dispatch(line *Line) {
 	conn.handlers.dispatch(conn, line)
 }
 
-func (conn *Conn) command(line *Line) Handler {
-	return conn.commands.match(line.Message())
+func (conn *Conn) command(line *Line) {
+	command := conn.commands.match(line.Message())
+	if command != nil {
+		go command.Handle(conn, line)
+	}
 }
