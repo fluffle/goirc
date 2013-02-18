@@ -16,7 +16,7 @@ func main() {
 	flag.Parse()
 
 	// create new IRC connection
-	c := irc.Client("GoTest", "gotest")
+	c := irc.SimpleClient("GoTest", "gotest")
 	c.EnableStateTracking()
 	c.HandleFunc("connected",
 		func(conn *irc.Conn, line *irc.Line) { conn.Join(*channel) })
@@ -55,10 +55,10 @@ func main() {
 				case cmd[1] == 'f':
 					if len(cmd) > 2 && cmd[2] == 'e' {
 						// enable flooding
-						c.Flood = true
+						c.Config().Flood = true
 					} else if len(cmd) > 2 && cmd[2] == 'd' {
 						// disable flooding
-						c.Flood = false
+						c.Config().Flood = false
 					}
 					for i := 0; i < 20; i++ {
 						c.Privmsg("#", "flood test!")
@@ -81,7 +81,7 @@ func main() {
 
 	for !reallyquit {
 		// connect to server
-		if err := c.Connect(*host); err != nil {
+		if err := c.ConnectTo(*host); err != nil {
 			fmt.Printf("Connection error: %s\n", err)
 			return
 		}

@@ -13,14 +13,18 @@ There is some example code that demonstrates usage of the library in `client.go`
 
 Synopsis:
 
-    import "flag"
 	import irc "github.com/fluffle/goirc/client"
 
 	func main() {
-        flag.Parse() // parses the logging flags.
-		c := irc.Client("nick")
-		// Optionally, enable SSL
-		c.SSL = true
+		// Creating a simple IRC client is simple.
+		c := irc.SimpleClient("nick")
+
+		// Or, create a config and fiddle with it first:
+		cfg := irc.NewConfig("nick")
+		cfg.SSL = true
+		cfg.Server = "irc.freenode.net:7000"
+		cfg.NewNick = func(n string) string { return n + "^" }
+		c := irc.Client(cfg)
 
 		// Add handlers to do things here!
 		// e.g. join a channel on connect.
@@ -31,8 +35,16 @@ Synopsis:
 		c.HandleFunc("disconnected",
 			func(conn *irc.Conn, line *irc.Line) { quit <- true })
 
-		// Tell client to connect
-		if err := c.Connect("irc.freenode.net"); err != nil {
+		// Tell client to connect.
+		if err := c.Connect(); err != nil {
+			fmt.Printf("Connection error: %s\n", err.String())
+		}
+
+		// With a "simple" client, set Server before calling Connect...
+		c.Config().Server = "irc.freenode.net"
+
+		// ... or, use ConnectTo instead.
+		if err := c.ConnectTo("irc.freenode.net"); err != nil {
 			fmt.Printf("Connection error: %s\n", err.String())
 		}
 
