@@ -46,7 +46,7 @@ func newHandlerSet() *handlerSet {
 	return &handlerSet{set: make(map[string]*list.List)}
 }
 
-func (hs *handlerSet) add(event string, handler Handler) Remover {
+func (hs *handlerSet) add(event string, handler Handler) (*list.Element, Remover) {
 	hs.Lock()
 	defer hs.Unlock()
 	event = strings.ToLower(event)
@@ -56,7 +56,7 @@ func (hs *handlerSet) add(event string, handler Handler) Remover {
 		hs.set[event] = l
 	}
 	element := l.PushBack(&handlerElement{event, handler})
-	return RemoverFunc(func() {
+	return element, RemoverFunc(func() {
 		hs.remove(element)
 	})
 }
@@ -106,7 +106,7 @@ func newCommandList() *commandList {
 	return &commandList{list: list.New()}
 }
 
-func (cl *commandList) add(regex string, handler Handler, priority int) Remover {
+func (cl *commandList) add(regex string, handler Handler, priority int) (element *list.Element, remover Remover) {
 	cl.Lock()
 	defer cl.Unlock()
 	c := &commandElement{
@@ -119,13 +119,14 @@ func (cl *commandList) add(regex string, handler Handler, priority int) Remover 
 		c := e.Value.(*commandElement)
 		if c.regex == regex {
 			logging.Error("Command prefix '%s' already registered.", regex)
-			return nil
+			return
 		}
 	}
-	element := cl.list.PushBack(c)
-	return RemoverFunc(func() {
+	element = cl.list.PushBack(c)
+	remover = RemoverFunc(func() {
 		cl.remove(element)
 	})
+	return
 }
 
 func (cl *commandList) remove(element *list.Element) {
@@ -161,7 +162,8 @@ func (cl *commandList) match(text string) (handler Handler) {
 // strings of digits like "332" (mainly because I really didn't feel like
 // putting massive constant tables in).
 func (conn *Conn) Handle(name string, handler Handler) Remover {
-	return conn.handlers.add(name, handler)
+	_, remover := conn.handlers.add(name, handler)
+	return remover
 }
 
 func (conn *Conn) HandleFunc(name string, handlerFunc HandlerFunc) Remover {
@@ -169,7 +171,8 @@ func (conn *Conn) HandleFunc(name string, handlerFunc HandlerFunc) Remover {
 }
 
 func (conn *Conn) Command(regex string, handler Handler, priority int) Remover {
-	return conn.commands.add(regex, handler, priority)
+	_, remover := conn.commands.add(regex, handler, priority)
+	return remover
 }
 
 func (conn *Conn) CommandFunc(regex string, handlerFunc HandlerFunc, priority int) Remover {

@@ -17,7 +17,7 @@ func TestHandlerSet(t *testing.T) {
 	}
 
 	// Add one
-	hn1 := hs.add("ONE", HandlerFunc(f))
+	_, hn1 := hs.add("ONE", HandlerFunc(f))
 	hl, ok := hs.set["one"]
 	if len(hs.set) != 1 || !ok {
 		t.Errorf("Set doesn't contain 'one' list after add().")
@@ -27,7 +27,7 @@ func TestHandlerSet(t *testing.T) {
 	}
 
 	// Add another one...
-	hn2 := hs.add("one", HandlerFunc(f))
+	_, hn2 := hs.add("one", HandlerFunc(f))
 	if len(hs.set) != 1 {
 		t.Errorf("Set contains more than 'one' list after add().")
 	}
@@ -36,7 +36,7 @@ func TestHandlerSet(t *testing.T) {
 	}
 
 	// Add a third one!
-	hn3 := hs.add("one", HandlerFunc(f))
+	_, hn3 := hs.add("one", HandlerFunc(f))
 	if len(hs.set) != 1 {
 		t.Errorf("Set contains more than 'one' list after add().")
 	}
@@ -45,7 +45,7 @@ func TestHandlerSet(t *testing.T) {
 	}
 
 	// And finally a fourth one!
-	hn4 := hs.add("one", HandlerFunc(f))
+	_, hn4 := hs.add("one", HandlerFunc(f))
 	if len(hs.set) != 1 {
 		t.Errorf("Set contains more than 'one' list after add().")
 	}
@@ -131,12 +131,12 @@ func TestCommandSet(t *testing.T) {
 		t.Errorf("New list contains things!")
 	}
 
-	cn1 := cl.add("one", HandlerFunc(func(c *Conn, l *Line) {}), 0)
+	_, cn1 := cl.add("one", HandlerFunc(func(c *Conn, l *Line) {}), 0)
 	if cl.list.Len() != 1 {
 		t.Errorf("Command 'one' not added to list correctly.")
 	}
 
-	cn2 := cl.add("one two", HandlerFunc(func(c *Conn, l *Line) {}), 0)
+	_, cn2 := cl.add("one two", HandlerFunc(func(c *Conn, l *Line) {}), 0)
 	if cl.list.Len() != 2 {
 		t.Errorf("Command 'one two' not added to set correctly.")
 	}
