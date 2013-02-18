@@ -21,7 +21,7 @@ type Conn struct {
 	password string
 
 	// Handlers and Commands
-	handlers *hSet
+	handlers *handlerSet
 	commands *commandList
 
 	// State tracker for nicks and channels
@@ -54,6 +54,9 @@ type Conn struct {
 	// Client->server ping frequency, in seconds. Defaults to 3m.
 	PingFreq time.Duration
 
+	// Controls what is stripped from line.Args[1] for Commands
+	CommandStripNick, SimpleCommandStripPrefix bool
+
 	// Set this to true to disable flood protection and false to re-enable
 	Flood bool
 
@@ -81,7 +84,7 @@ func Client(nick string, args ...string) *Conn {
 		cSend:      make(chan bool),
 		cLoop:      make(chan bool),
 		cPing:      make(chan bool),
-		handlers:   handlerSet(),
+		handlers:   newHandlerSet(),
 		commands:   newCommandList(),
 		stRemovers: make([]Remover, 0, len(stHandlers)),
 		PingFreq:   3 * time.Minute,

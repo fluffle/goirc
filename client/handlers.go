@@ -97,5 +97,23 @@ func (conn *Conn) h_NICK(line *Line) {
 
 // Handle PRIVMSGs that trigger Commands
 func (conn *Conn) h_PRIVMSG(line *Line) {
-	conn.command(line)
+	text := line.Message()
+	if conn.CommandStripNick && strings.HasPrefix(text, conn.Me.Nick) {
+		// Look for '^${nick}[:;>,-]? '
+		l := len(conn.Me.Nick)
+		switch text[l] {
+		case ':', ';', '>', ',', '-':
+			l++
+		}
+		if text[l] == ' ' {
+			text = strings.TrimSpace(text[l:])
+		}
+		line = line.Copy()
+		line.Args[1] = text
+	}
+	cmd := conn.command(line)
+	if cmd == nil {
+		return
+	}
+	cmd.Handle(conn, line)
 }

@@ -1,6 +1,7 @@
 package client
 
 import (
+	"container/list"
 	"fmt"
 	"github.com/fluffle/golog/logging"
 	"math"
@@ -31,163 +32,119 @@ func (r RemoverFunc) Remove() {
 	r()
 }
 
-type hList struct {
-	start, end *hNode
+type handlerElement struct {
+	event   string
+	handler Handler
 }
 
-type hNode struct {
-	next, prev *hNode
-	set        *hSet
-	event      string
-	handler    Handler
-}
-
-func (hn *hNode) Handle(conn *Conn, line *Line) {
-	hn.handler.Handle(conn, line)
-}
-
-func (hn *hNode) Remove() {
-	hn.set.remove(hn)
-}
-
-type hSet struct {
-	set map[string]*hList
+type handlerSet struct {
+	set map[string]*list.List
 	sync.RWMutex
 }
 
-func handlerSet() *hSet {
-	return &hSet{set: make(map[string]*hList)}
+func newHandlerSet() *handlerSet {
+	return &handlerSet{set: make(map[string]*list.List)}
 }
 
-func (hs *hSet) add(ev string, h Handler) Remover {
+func (hs *handlerSet) add(event string, handler Handler) Remover {
 	hs.Lock()
 	defer hs.Unlock()
-	ev = strings.ToLower(ev)
-	l, ok := hs.set[ev]
+	event = strings.ToLower(event)
+	l, ok := hs.set[event]
 	if !ok {
-		l = &hList{}
+		l = list.New()
+		hs.set[event] = l
 	}
-	hn := &hNode{
-		set:     hs,
-		event:   ev,
-		handler: h,
-	}
-	if !ok {
-		l.start = hn
-	} else {
-		hn.prev = l.end
-		l.end.next = hn
-	}
-	l.end = hn
-	hs.set[ev] = l
-	return hn
+	element := l.PushBack(&handlerElement{event, handler})
+	return RemoverFunc(func() {
+		hs.remove(element)
+	})
 }
 
-func (hs *hSet) remove(hn *hNode) {
+func (hs *handlerSet) remove(element *list.Element) {
 	hs.Lock()
 	defer hs.Unlock()
-	l, ok := hs.set[hn.event]
+	h := element.Value.(*handlerElement)
+	l, ok := hs.set[h.event]
 	if !ok {
-		logging.Error("Removing node for unknown event '%s'", hn.event)
+		logging.Error("Removing node for unknown event '%s'", h.event)
 		return
 	}
-	if hn.next == nil {
-		l.end = hn.prev
-	} else {
-		hn.next.prev = hn.prev
-	}
-	if hn.prev == nil {
-		l.start = hn.next
-	} else {
-		hn.prev.next = hn.next
-	}
-	hn.next = nil
-	hn.prev = nil
-	hn.set = nil
-	if l.start == nil || l.end == nil {
-		delete(hs.set, hn.event)
+	l.Remove(element)
+	if l.Len() == 0 {
+		delete(hs.set, h.event)
 	}
 }
 
-func (hs *hSet) dispatch(conn *Conn, line *Line) {
+func (hs *handlerSet) dispatch(conn *Conn, line *Line) {
 	hs.RLock()
 	defer hs.RUnlock()
-	ev := strings.ToLower(line.Cmd)
-	list, ok := hs.set[ev]
+	event := strings.ToLower(line.Cmd)
+	l, ok := hs.set[event]
 	if !ok {
 		return
 	}
-	for hn := list.start; hn != nil; hn = hn.next {
-		go hn.Handle(conn, line)
+
+	for e := l.Front(); e != nil; e = e.Next() {
+		h := e.Value.(*handlerElement)
+		go h.handler.Handle(conn, line)
 	}
 }
 
-type command struct {
-	handler  Handler
-	set      *commandList
+type commandElement struct {
 	regex    string
+	handler  Handler
 	priority int
 }
 
-func (c *command) Handle(conn *Conn, line *Line) {
-	c.handler.Handle(conn, line)
-}
-
-func (c *command) Remove() {
-	c.set.remove(c)
-}
-
 type commandList struct {
-	set []*command
+	list *list.List
 	sync.RWMutex
 }
 
 func newCommandList() *commandList {
-	return &commandList{}
+	return &commandList{list: list.New()}
 }
 
 func (cl *commandList) add(regex string, handler Handler, priority int) Remover {
 	cl.Lock()
 	defer cl.Unlock()
-	c := &command{
-		handler:  handler,
-		set:      cl,
+	c := &commandElement{
 		regex:    regex,
+		handler:  handler,
 		priority: priority,
 	}
 	// Check for exact regex matches. This will filter out any repeated SimpleCommands.
-	for _, c := range cl.set {
+	for e := cl.list.Front(); e != nil; e = e.Next() {
+		c := e.Value.(*commandElement)
 		if c.regex == regex {
 			logging.Error("Command prefix '%s' already registered.", regex)
 			return nil
 		}
 	}
-	cl.set = append(cl.set, c)
-	return c
+	element := cl.list.PushBack(c)
+	return RemoverFunc(func() {
+		cl.remove(element)
+	})
 }
 
-func (cl *commandList) remove(c *command) {
+func (cl *commandList) remove(element *list.Element) {
 	cl.Lock()
 	defer cl.Unlock()
-	for index, value := range cl.set {
-		if value == c {
-			copy(cl.set[index:], cl.set[index+1:])
-			cl.set = cl.set[:len(cl.set)-1]
-			c.set = nil
-			return
-		}
-	}
+	cl.list.Remove(element)
 }
 
 // Matches the command with the highest priority.
-func (cl *commandList) match(txt string) (handler Handler) {
+func (cl *commandList) match(text string) (handler Handler) {
 	cl.RLock()
 	defer cl.RUnlock()
 	maxPriority := math.MinInt32
-	for _, c := range cl.set {
+	text = strings.ToLower(text)
+	for e := cl.list.Front(); e != nil; e = e.Next() {
+		c := e.Value.(*commandElement)
 		if c.priority > maxPriority {
 			if regex, error := regexp.Compile(c.regex); error == nil {
-				if regex.MatchString(txt) {
+				if regex.MatchString(text) {
 					maxPriority = c.priority
 					handler = c.handler
 				}
@@ -226,7 +183,18 @@ var SimpleCommandRegex string = `^!%v(\s|$)`
 // !roll
 // Because simple commands are simple, they get the highest priority.
 func (conn *Conn) SimpleCommand(prefix string, handler Handler) Remover {
-	return conn.Command(fmt.Sprintf(SimpleCommandRegex, strings.ToLower(prefix)), handler, math.MaxInt32)
+	stripHandler := func(conn *Conn, line *Line) {
+		text := line.Message()
+		if conn.SimpleCommandStripPrefix {
+			text = strings.TrimSpace(text[len(prefix):])
+		}
+		if text != line.Message() {
+			line = line.Copy()
+			line.Args[1] = text
+		}
+		handler.Handle(conn, line)
+	}
+	return conn.Command(fmt.Sprintf(SimpleCommandRegex, strings.ToLower(prefix)), HandlerFunc(stripHandler), math.MaxInt32)
 }
 
 func (conn *Conn) SimpleCommandFunc(prefix string, handlerFunc HandlerFunc) Remover {
@@ -256,10 +224,6 @@ func (conn *Conn) dispatch(line *Line) {
 	conn.handlers.dispatch(conn, line)
 }
 
-func (conn *Conn) command(line *Line) {
-	command := conn.commands.match(strings.ToLower(line.Message()))
-	if command != nil {
-		command.Handle(conn, line)
-	}
-
+func (conn *Conn) command(line *Line) Handler {
+	return conn.commands.match(line.Message())
 }
