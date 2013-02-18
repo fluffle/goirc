@@ -87,8 +87,9 @@ func NewConfig(nick string, args ...string) *Config {
 
 // Creates a new IRC connection object, but doesn't connect to anything so
 // that you can add event handlers to it. See AddHandler() for details
-func SimpleClient(nick string, args ...string) (*Conn, error) {
-	return Client(NewConfig(nick, args...))
+func SimpleClient(nick string, args ...string) *Conn {
+	conn, _ := Client(NewConfig(nick, args...))
+	return conn
 }
 
 func Client(cfg *Config) (*Conn, error) {

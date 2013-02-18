@@ -21,7 +21,7 @@ func setUp(t *testing.T, start ...bool) (*Conn, *testState) {
 	ctrl := gomock.NewController(t)
 	st := state.NewMockTracker(ctrl)
 	nc := MockNetConn(t)
-	c, _ := SimpleClient("test", "test", "Testing IRC")
+	c := SimpleClient("test", "test", "Testing IRC")
 	logging.SetLogLevel(logging.LogFatal)
 
 	c.st = st
@@ -82,7 +82,7 @@ func TestEOF(t *testing.T) {
 func TestClientAndStateTracking(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	st := state.NewMockTracker(ctrl)
-	c, _ := SimpleClient("test", "test", "Testing IRC")
+	c := SimpleClient("test", "test", "Testing IRC")
 
 	// Assert some basic things about the initial state of the Conn struct
 	if me := c.cfg.Me; me.Nick != "test" || me.Ident != "test" ||
