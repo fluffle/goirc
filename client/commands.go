@@ -49,7 +49,7 @@ func (conn *Conn) Kick(channel, nick string, message ...string) {
 func (conn *Conn) Quit(message ...string) {
 	msg := strings.Join(message, " ")
 	if msg == "" {
-		msg = "GoBye!"
+		msg = conn.cfg.QuitMessage
 	}
 	conn.out <- "QUIT :" + msg
 }

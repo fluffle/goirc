@@ -8,19 +8,19 @@ import (
 )
 
 const (
-	REGISTER = "REGISTER"
-	CONNECTED = "CONNECTED"
+	REGISTER     = "REGISTER"
+	CONNECTED    = "CONNECTED"
 	DISCONNECTED = "DISCONNECTED"
 )
 
 // sets up the internal event handlers to do essential IRC protocol things
 var intHandlers = map[string]HandlerFunc{
 	REGISTER: (*Conn).h_REGISTER,
-	"001":  (*Conn).h_001,
-	"433":  (*Conn).h_433,
-	"CTCP": (*Conn).h_CTCP,
-	"NICK": (*Conn).h_NICK,
-	"PING": (*Conn).h_PING,
+	"001":    (*Conn).h_001,
+	"433":    (*Conn).h_433,
+	"CTCP":   (*Conn).h_CTCP,
+	"NICK":   (*Conn).h_NICK,
+	"PING":   (*Conn).h_PING,
 }
 
 func (conn *Conn) addIntHandlers() {
@@ -87,7 +87,7 @@ func (conn *Conn) h_433(line *Line) {
 // Handle VERSION requests and CTCP PING
 func (conn *Conn) h_CTCP(line *Line) {
 	if line.Args[0] == "VERSION" {
-		conn.CtcpReply(line.Nick, "VERSION", "powered by goirc...")
+		conn.CtcpReply(line.Nick, "VERSION", conn.cfg.Version)
 	} else if line.Args[0] == "PING" {
 		conn.CtcpReply(line.Nick, "PING", line.Args[2])
 	}
