@@ -29,7 +29,7 @@ type youTubeVideo struct {
 	} `json:entry`
 }
 
-var UrlRegex string = `(\s|^)(http://|https://)(.*?)(\s|$)`
+const UrlRegex string = `(\s|^)(http://|https://)(.*?)(\s|$)`
 
 func UrlFunc(conn *Conn, line *Line) {
 	text := line.Message()
@@ -52,7 +52,7 @@ func UrlFunc(conn *Conn, line *Line) {
 	}
 }
 
-var YouTubeRegex string = `(\s|^)(http://|https://)?(www.)?(youtube.com/watch\?v=|youtu.be/)(.*?)(\s|$|\&|#)`
+const YouTubeRegex string = `(\s|^)(http://|https://)?(www.)?(youtube.com/watch\?v=|youtu.be/)(.*?)(\s|$|\&|#)`
 
 func YouTubeFunc(conn *Conn, line *Line) {
 	text := line.Message()
