@@ -1,7 +1,11 @@
 package client
 
 import (
+	"container/list"
+	"fmt"
 	"github.com/fluffle/golog/logging"
+	"math"
+	"regexp"
 	"strings"
 	"sync"
 )
@@ -11,189 +15,141 @@ type Handler interface {
 	Handle(*Conn, *Line)
 }
 
-// And when they've been added to the client they are removable.
-type Remover interface {
-	Remove()
-}
-
 type HandlerFunc func(*Conn, *Line)
 
 func (hf HandlerFunc) Handle(conn *Conn, line *Line) {
 	hf(conn, line)
 }
 
-type hList struct {
-	start, end *hNode
+// And when they've been added to the client they are removable.
+type Remover interface {
+	Remove()
 }
 
-type hNode struct {
-	next, prev *hNode
-	set        *hSet
-	event      string
-	handler    Handler
+type RemoverFunc func()
+
+func (r RemoverFunc) Remove() {
+	r()
 }
 
-func (hn *hNode) Handle(conn *Conn, line *Line) {
-	hn.handler.Handle(conn, line)
+type handlerElement struct {
+	event   string
+	handler Handler
 }
 
-func (hn *hNode) Remove() {
-	hn.set.remove(hn)
-}
-
-type hSet struct {
-	set map[string]*hList
+type handlerSet struct {
+	set map[string]*list.List
 	sync.RWMutex
 }
 
-func handlerSet() *hSet {
-	return &hSet{set: make(map[string]*hList)}
+func newHandlerSet() *handlerSet {
+	return &handlerSet{set: make(map[string]*list.List)}
 }
 
-func (hs *hSet) add(ev string, h Handler) Remover {
+func (hs *handlerSet) add(event string, handler Handler) (*list.Element, Remover) {
 	hs.Lock()
 	defer hs.Unlock()
-	ev = strings.ToLower(ev)
-	l, ok := hs.set[ev]
+	event = strings.ToLower(event)
+	l, ok := hs.set[event]
 	if !ok {
-		l = &hList{}
+		l = list.New()
+		hs.set[event] = l
 	}
-	hn := &hNode{
-		set:     hs,
-		event:   ev,
-		handler: h,
-	}
-	if !ok {
-		l.start = hn
-	} else {
-		hn.prev = l.end
-		l.end.next = hn
-	}
-	l.end = hn
-	hs.set[ev] = l
-	return hn
+	element := l.PushBack(&handlerElement{event, handler})
+	return element, RemoverFunc(func() {
+		hs.remove(element)
+	})
 }
 
-func (hs *hSet) remove(hn *hNode) {
+func (hs *handlerSet) remove(element *list.Element) {
 	hs.Lock()
 	defer hs.Unlock()
-	l, ok := hs.set[hn.event]
+	h := element.Value.(*handlerElement)
+	l, ok := hs.set[h.event]
 	if !ok {
-		logging.Error("Removing node for unknown event '%s'", hn.event)
+		logging.Error("Removing node for unknown event '%s'", h.event)
 		return
 	}
-	if hn.next == nil {
-		l.end = hn.prev
-	} else {
-		hn.next.prev = hn.prev
-	}
-	if hn.prev == nil {
-		l.start = hn.next
-	} else {
-		hn.prev.next = hn.next
-	}
-	hn.next = nil
-	hn.prev = nil
-	hn.set = nil
-	if l.start == nil || l.end == nil {
-		delete(hs.set, hn.event)
+	l.Remove(element)
+	if l.Len() == 0 {
+		delete(hs.set, h.event)
 	}
 }
 
-func (hs *hSet) dispatch(conn *Conn, line *Line) {
+func (hs *handlerSet) dispatch(conn *Conn, line *Line) {
 	hs.RLock()
 	defer hs.RUnlock()
-	ev := strings.ToLower(line.Cmd)
-	list, ok := hs.set[ev]
+	event := strings.ToLower(line.Cmd)
+	l, ok := hs.set[event]
 	if !ok {
 		return
 	}
-	for hn := list.start; hn != nil; hn = hn.next {
-		go hn.Handle(conn, line)
+
+	for e := l.Front(); e != nil; e = e.Next() {
+		h := e.Value.(*handlerElement)
+		go h.handler.Handle(conn, line)
 	}
 }
 
-// An IRC command looks like this:
-type Command interface {
-	Execute(*Conn, *Line)
-	Help() string
+type commandElement struct {
+	regex    string
+	handler  Handler
+	priority int
 }
 
-type command struct {
-	fn   HandlerFunc
-	help string
-}
-
-func (c *command) Execute(conn *Conn, line *Line) {
-	c.fn(conn, line)
-}
-
-func (c *command) Help() string {
-	return c.help
-}
-
-type cNode struct {
-	cmd    Command
-	set    *cSet
-	prefix string
-}
-
-func (cn *cNode) Execute(conn *Conn, line *Line) {
-	cn.cmd.Execute(conn, line)
-}
-
-func (cn *cNode) Help() string {
-	return cn.cmd.Help()
-}
-
-func (cn *cNode) Remove() {
-	cn.set.remove(cn)
-}
-
-type cSet struct {
-	set map[string]*cNode
+type commandList struct {
+	list *list.List
 	sync.RWMutex
 }
 
-func commandSet() *cSet {
-	return &cSet{set: make(map[string]*cNode)}
+func newCommandList() *commandList {
+	return &commandList{list: list.New()}
 }
 
-func (cs *cSet) add(pf string, c Command) Remover {
-	cs.Lock()
-	defer cs.Unlock()
-	pf = strings.ToLower(pf)
-	if _, ok := cs.set[pf]; ok {
-		logging.Error("Command prefix '%s' already registered.", pf)
-		return nil
+func (cl *commandList) add(regex string, handler Handler, priority int) (element *list.Element, remover Remover) {
+	cl.Lock()
+	defer cl.Unlock()
+	c := &commandElement{
+		regex:    regex,
+		handler:  handler,
+		priority: priority,
 	}
-	cn := &cNode{
-		cmd:    c,
-		set:    cs,
-		prefix: pf,
-	}
-	cs.set[pf] = cn
-	return cn
-}
-
-func (cs *cSet) remove(cn *cNode) {
-	cs.Lock()
-	defer cs.Unlock()
-	delete(cs.set, cn.prefix)
-	cn.set = nil
-}
-
-func (cs *cSet) match(txt string) (final Command, prefixlen int) {
-	cs.RLock()
-	defer cs.RUnlock()
-	txt = strings.ToLower(txt)
-	for prefix, cmd := range cs.set {
-		if !strings.HasPrefix(txt, prefix) {
-			continue
+	// Check for exact regex matches. This will filter out any repeated SimpleCommands.
+	for e := cl.list.Front(); e != nil; e = e.Next() {
+		c := e.Value.(*commandElement)
+		if c.regex == regex {
+			logging.Error("Command prefix '%s' already registered.", regex)
+			return
 		}
-		if final == nil || len(prefix) > prefixlen {
-			prefixlen = len(prefix)
-			final = cmd
+	}
+	element = cl.list.PushBack(c)
+	remover = RemoverFunc(func() {
+		cl.remove(element)
+	})
+	return
+}
+
+func (cl *commandList) remove(element *list.Element) {
+	cl.Lock()
+	defer cl.Unlock()
+	cl.list.Remove(element)
+}
+
+// Matches the command with the highest priority.
+func (cl *commandList) match(text string) (handler Handler) {
+	cl.RLock()
+	defer cl.RUnlock()
+	maxPriority := math.MinInt32
+	text = strings.ToLower(text)
+	for e := cl.list.Front(); e != nil; e = e.Next() {
+		c := e.Value.(*commandElement)
+		if c.priority > maxPriority {
+			if regex, error := regexp.Compile(c.regex); error == nil {
+				if regex.MatchString(text) {
+					maxPriority = c.priority
+					handler = c.handler
+				}
+			}
 		}
 	}
 	return
@@ -205,26 +161,75 @@ func (cs *cSet) match(txt string) (final Command, prefixlen int) {
 // "PRIVMSG", "JOIN", etc. but all the numeric replies are left as ascii
 // strings of digits like "332" (mainly because I really didn't feel like
 // putting massive constant tables in).
-func (conn *Conn) Handle(name string, h Handler) Remover {
-	return conn.handlers.add(name, h)
+func (conn *Conn) Handle(name string, handler Handler) Remover {
+	_, remover := conn.handlers.add(name, handler)
+	return remover
 }
 
-func (conn *Conn) HandleFunc(name string, hf HandlerFunc) Remover {
-	return conn.Handle(name, hf)
+func (conn *Conn) HandleFunc(name string, handlerFunc HandlerFunc) Remover {
+	return conn.Handle(name, handlerFunc)
 }
 
-func (conn *Conn) Command(prefix string, c Command) Remover {
-	return conn.commands.add(prefix, c)
+func (conn *Conn) Command(regex string, handler Handler, priority int) Remover {
+	_, remover := conn.commands.add(regex, handler, priority)
+	return remover
 }
 
-func (conn *Conn) CommandFunc(prefix string, hf HandlerFunc, help string) Remover {
-	return conn.Command(prefix, &command{hf, help})
+func (conn *Conn) CommandFunc(regex string, handlerFunc HandlerFunc, priority int) Remover {
+	return conn.Command(regex, handlerFunc, priority)
+}
+
+var SimpleCommandRegex string = `^!%v(\s|$)`
+
+// Simple commands are commands that are triggered from a simple prefix
+// SimpleCommand("roll" handler)
+// !roll
+// Because simple commands are simple, they get the highest priority.
+func (conn *Conn) SimpleCommand(prefix string, handler Handler) Remover {
+	stripHandler := func(conn *Conn, line *Line) {
+		text := line.Message()
+		if conn.cfg.SimpleCommandStripPrefix {
+			text = strings.TrimSpace(text[len(prefix):])
+		}
+		if text != line.Message() {
+			line = line.Copy()
+			line.Args[1] = text
+		}
+		handler.Handle(conn, line)
+	}
+	return conn.CommandFunc(fmt.Sprintf(SimpleCommandRegex, strings.ToLower(prefix)), stripHandler, math.MaxInt32)
+}
+
+func (conn *Conn) SimpleCommandFunc(prefix string, handlerFunc HandlerFunc) Remover {
+	return conn.SimpleCommand(prefix, handlerFunc)
+}
+
+// This will also register a help command to go along with the simple command itself.
+// eg. SimpleCommandHelp("bark", "Bot will bark", handler) will make the following commands:
+// !bark
+// !help bark
+func (conn *Conn) SimpleCommandHelp(prefix string, help string, handler Handler) Remover {
+	commandCommand := conn.SimpleCommand(prefix, handler)
+	helpCommand := conn.SimpleCommandFunc(fmt.Sprintf("help %v", prefix), HandlerFunc(func(conn *Conn, line *Line) {
+		conn.Privmsg(line.Target(), help)
+	}))
+	return RemoverFunc(func() {
+		commandCommand.Remove()
+		helpCommand.Remove()
+	})
+}
+
+func (conn *Conn) SimpleCommandHelpFunc(prefix string, help string, handlerFunc HandlerFunc) Remover {
+	return conn.SimpleCommandHelp(prefix, help, handlerFunc)
 }
 
 func (conn *Conn) dispatch(line *Line) {
 	conn.handlers.dispatch(conn, line)
 }
 
-func (conn *Conn) cmdMatch(txt string) (Command, int) {
-	return conn.commands.match(txt)
+func (conn *Conn) command(line *Line) {
+	command := conn.commands.match(line.Message())
+	if command != nil {
+		go command.Handle(conn, line)
+	}
 }

@@ -32,6 +32,7 @@ func setUp(t *testing.T, start ...bool) (*Conn, *testState) {
 		// Hack to allow tests of send, recv, write etc.
 		// NOTE: the value of the boolean doesn't matter.
 		c.postConnect()
+
 		// Sleep 1ms to allow background routines to start.
 		<-time.After(1e6)
 	}
@@ -56,7 +57,7 @@ func TestEOF(t *testing.T) {
 
 	// Set up a handler to detect whether disconnected handlers are called
 	dcon := false
-	c.HandleFunc("disconnected", func(conn *Conn, line *Line) {
+	c.HandleFunc(DISCONNECTED, func(conn *Conn, line *Line) {
 		dcon = true
 	})
 

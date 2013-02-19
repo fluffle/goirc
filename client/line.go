@@ -62,7 +62,7 @@ func parseLine(s string) *Line {
 	// So, I think CTCP and (in particular) CTCP ACTION are better handled as
 	// separate events as opposed to forcing people to have gargantuan
 	// handlers to cope with the possibilities.
-	if (line.Cmd == "PRIVMSG" || line.Cmd == "NOTICE") &&
+	if (line.Cmd == PRIVMSG || line.Cmd == NOTICE) &&
 		len(line.Args[1]) > 2 &&
 		strings.HasPrefix(line.Args[1], "\001") &&
 		strings.HasSuffix(line.Args[1], "\001") {
@@ -72,19 +72,42 @@ func parseLine(s string) *Line {
 			// Replace the line with the unwrapped CTCP
 			line.Args[1] = t[1]
 		}
-		if c := strings.ToUpper(t[0]); c == "ACTION" && line.Cmd == "PRIVMSG" {
+		if c := strings.ToUpper(t[0]); c == ACTION && line.Cmd == PRIVMSG {
 			// make a CTCP ACTION it's own event a-la PRIVMSG
 			line.Cmd = c
 		} else {
 			// otherwise, dispatch a generic CTCP/CTCPREPLY event that
 			// contains the type of CTCP in line.Args[0]
-			if line.Cmd == "PRIVMSG" {
-				line.Cmd = "CTCP"
+			if line.Cmd == PRIVMSG {
+				line.Cmd = CTCP
 			} else {
-				line.Cmd = "CTCPREPLY"
+				line.Cmd = CTCPREPLY
 			}
 			line.Args = append([]string{c}, line.Args...)
 		}
 	}
 	return line
+}
+
+// Return the contents of the message portion of a line.
+// This only really makes sense for messages with a :message portion, but there
+// are a lot of them.
+func (line *Line) Message() string {
+	if len(line.Args) > 0 {
+		return line.Args[len(line.Args)-1]
+	}
+	return ""
+}
+
+// Return the target of the line. This only really makes sense for PRIVMSG.
+// If the line was broadcast from a channel, the target will be that channel.
+// If the line was broadcast by a user, the target will be that user.
+func (line *Line) Target() string {
+	if line.Cmd == PRIVMSG {
+		if !strings.HasPrefix(line.Args[0], "#") {
+			return line.Nick
+		}
+		return line.Args[0]
+	}
+	return ""
 }

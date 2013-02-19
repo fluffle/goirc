@@ -7,20 +7,15 @@ import (
 	"strings"
 )
 
-const (
-	REGISTER = "REGISTER"
-	CONNECTED = "CONNECTED"
-	DISCONNECTED = "DISCONNECTED"
-)
-
 // sets up the internal event handlers to do essential IRC protocol things
 var intHandlers = map[string]HandlerFunc{
 	REGISTER: (*Conn).h_REGISTER,
-	"001":  (*Conn).h_001,
-	"433":  (*Conn).h_433,
-	"CTCP": (*Conn).h_CTCP,
-	"NICK": (*Conn).h_NICK,
-	"PING": (*Conn).h_PING,
+	"001":    (*Conn).h_001,
+	"433":    (*Conn).h_433,
+	CTCP:     (*Conn).h_CTCP,
+	NICK:     (*Conn).h_NICK,
+	PING:     (*Conn).h_PING,
+	PRIVMSG:  (*Conn).h_PRIVMSG,
 }
 
 func (conn *Conn) addIntHandlers() {
@@ -33,7 +28,7 @@ func (conn *Conn) addIntHandlers() {
 
 // Basic ping/pong handler
 func (conn *Conn) h_PING(line *Line) {
-	conn.Raw("PONG :" + line.Args[0])
+	conn.Pong(line.Args[0])
 }
 
 // Handler for initial registration with server once tcp connection is made.
@@ -86,10 +81,10 @@ func (conn *Conn) h_433(line *Line) {
 
 // Handle VERSION requests and CTCP PING
 func (conn *Conn) h_CTCP(line *Line) {
-	if line.Args[0] == "VERSION" {
-		conn.CtcpReply(line.Nick, "VERSION", "powered by goirc...")
-	} else if line.Args[0] == "PING" {
-		conn.CtcpReply(line.Nick, "PING", line.Args[2])
+	if line.Args[0] == VERSION {
+		conn.CtcpReply(line.Nick, VERSION, "powered by goirc...")
+	} else if line.Args[0] == PING {
+		conn.CtcpReply(line.Nick, PING, line.Args[2])
 	}
 }
 
@@ -102,34 +97,19 @@ func (conn *Conn) h_NICK(line *Line) {
 
 // Handle PRIVMSGs that trigger Commands
 func (conn *Conn) h_PRIVMSG(line *Line) {
-	txt := line.Args[1]
-	if conn.cfg.CommandStripNick && strings.HasPrefix(txt, conn.cfg.Me.Nick) {
+	text := line.Message()
+	if conn.cfg.CommandStripNick && strings.HasPrefix(text, conn.cfg.Me.Nick) {
 		// Look for '^${nick}[:;>,-]? '
 		l := len(conn.cfg.Me.Nick)
-		switch txt[l] {
+		switch text[l] {
 		case ':', ';', '>', ',', '-':
 			l++
 		}
-		if txt[l] == ' ' {
-			txt = strings.TrimSpace(txt[l:])
+		if text[l] == ' ' {
+			text = strings.TrimSpace(text[l:])
 		}
-	}
-	cmd, l := conn.cmdMatch(txt)
-	if cmd == nil {
-		return
-	}
-	if conn.cfg.CommandStripPrefix {
-		txt = strings.TrimSpace(txt[l:])
-	}
-	if txt != line.Args[1] {
 		line = line.Copy()
-		line.Args[1] = txt
+		line.Args[1] = text
 	}
-	cmd.Execute(conn, line)
-}
-
-func (conn *Conn) c_HELP(line *Line) {
-	if cmd, _ := conn.cmdMatch(line.Args[1]); cmd != nil {
-		conn.Privmsg(line.Args[0], cmd.Help())
-	}
+	conn.command(line)
 }

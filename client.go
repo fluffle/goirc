@@ -5,7 +5,9 @@ import (
 	"flag"
 	"fmt"
 	irc "github.com/fluffle/goirc/client"
+	"math/rand"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -18,13 +20,39 @@ func main() {
 	// create new IRC connection
 	c := irc.SimpleClient("GoTest", "gotest")
 	c.EnableStateTracking()
-	c.HandleFunc("connected",
+	c.HandleFunc(irc.CONNECTED,
 		func(conn *irc.Conn, line *irc.Line) { conn.Join(*channel) })
 
 	// Set up a handler to notify of disconnect events.
 	quit := make(chan bool)
-	c.HandleFunc("disconnected",
+	c.HandleFunc(irc.DISCONNECTED,
 		func(conn *irc.Conn, line *irc.Line) { quit <- true })
+
+	// Set up some simple commands, !bark and !roll.
+	// The !roll command will also get the  "!help roll" command also.
+	c.SimpleCommandFunc("bark", func(conn *irc.Conn, line *irc.Line) { conn.Privmsg(line.Target(), "Woof Woof") })
+	c.SimpleCommandHelpFunc("roll", `Rolls a d6, "roll <n>" to roll n dice at once.`, func(conn *irc.Conn, line *irc.Line) {
+		count := 1
+		fields := strings.Fields(line.Message())
+		if len(fields) > 1 {
+			var err error
+			if count, err = strconv.Atoi(fields[len(fields)-1]); err != nil {
+				count = 1
+			}
+		}
+		total := 0
+		for i := 0; i < count; i++ {
+			total += rand.Intn(6) + 1
+		}
+		conn.Privmsg(line.Target(), fmt.Sprintf("%d", total))
+	})
+
+	// Set up some commands that are triggered by a regex in a message.
+	// It is important to see that UrlRegex could actually respond to some
+	// of the Url's that YouTubeRegex listens to, because of this we put the
+	// YouTube command at a higher priority, this way it will take precedence.
+	c.CommandFunc(irc.YouTubeRegex, irc.YouTubeFunc, 10)
+	c.CommandFunc(irc.UrlRegex, irc.UrlFunc, 0)
 
 	// set up a goroutine to read commands from stdin
 	in := make(chan string, 4)
@@ -36,6 +64,8 @@ func main() {
 			if err != nil {
 				// wha?, maybe ctrl-D...
 				close(in)
+				reallyquit = true
+				c.Quit("")
 				break
 			}
 			// no point in sending empty lines down the channel
@@ -85,7 +115,6 @@ func main() {
 			fmt.Printf("Connection error: %s\n", err)
 			return
 		}
-
 		// wait on quit channel
 		<-quit
 	}

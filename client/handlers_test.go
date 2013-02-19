@@ -47,7 +47,7 @@ func Test001(t *testing.T) {
 	l := parseLine(":irc.server.org 001 test :Welcome to IRC test!ident@somehost.com")
 	// Set up a handler to detect whether connected handler is called from 001
 	hcon := false
-	c.HandleFunc("connected", func(conn *Conn, line *Line) {
+	c.HandleFunc(CONNECTED, func(conn *Conn, line *Line) {
 		hcon = true
 	})
 
@@ -166,7 +166,9 @@ func TestPRIVMSG(t *testing.T) {
 	f := func(conn *Conn, line *Line) {
 		conn.Privmsg(line.Args[0], line.Args[1])
 	}
-	c.CommandFunc("prefix", f, "")
+	// Test legacy simpleCommands, with out the !.
+	SimpleCommandRegex = `^%v(\s|$)`
+	c.SimpleCommandFunc("prefix", f)
 
 	// CommandStripNick and CommandStripPrefix are both false to begin
 	c.h_PRIVMSG(parseLine(":blah!moo@cows.com PRIVMSG #foo :prefix bar"))
@@ -183,7 +185,7 @@ func TestPRIVMSG(t *testing.T) {
 	c.h_PRIVMSG(parseLine(":blah!moo@cows.com PRIVMSG #foo :test: prefix bar"))
 	s.nc.Expect("PRIVMSG #foo :prefix bar")
 
-	c.cfg.CommandStripPrefix = true
+	c.cfg.SimpleCommandStripPrefix = true
 	c.h_PRIVMSG(parseLine(":blah!moo@cows.com PRIVMSG #foo :prefix bar"))
 	s.nc.Expect("PRIVMSG #foo :bar")
 	c.h_PRIVMSG(parseLine(":blah!moo@cows.com PRIVMSG #foo :test: prefix bar"))
