@@ -129,7 +129,7 @@ func (conn *Conn) h_TOPIC(line *Line) {
 
 // Handle 311 whois reply
 func (conn *Conn) h_311(line *Line) {
-	if nk := conn.ST.GetNick(line.Args[1]); nk != nil {
+	if nk := conn.ST.GetNick(line.Args[1]); nk != nil && nk != conn.Me() {
 		nk.Ident = line.Args[2]
 		nk.Host = line.Args[3]
 		nk.Name = line.Args[5]
@@ -161,7 +161,7 @@ func (conn *Conn) h_332(line *Line) {
 
 // Handle 352 who reply
 func (conn *Conn) h_352(line *Line) {
-	if nk := conn.ST.GetNick(line.Args[5]); nk != nil {
+	if nk := conn.ST.GetNick(line.Args[5]); nk != nil && nk != conn.Me() {
 		nk.Ident = line.Args[2]
 		nk.Host = line.Args[3]
 		// XXX: do we care about the actual server the nick is on?
