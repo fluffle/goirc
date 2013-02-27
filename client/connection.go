@@ -20,9 +20,8 @@ type Conn struct {
 	// Contains parameters that people can tweak to change client behaviour.
 	cfg *Config
 
-	// Handlers and Commands
+	// Handlers
 	handlers *hSet
-	commands *cSet
 
 	// State tracker for nicks and channels
 	st         state.Tracker
@@ -60,9 +59,6 @@ type Config struct {
 
 	// Client->server ping frequency, in seconds. Defaults to 3m.
 	PingFreq time.Duration
-
-	// Controls what is stripped from line.Args[1] for Commands
-	CommandStripNick, CommandStripPrefix bool
 
 	// Set this to true to disable flood protection and false to re-enable
 	Flood bool
@@ -113,7 +109,6 @@ func Client(cfg *Config) (*Conn, error) {
 		cLoop:      make(chan bool),
 		cPing:      make(chan bool),
 		handlers:   handlerSet(),
-		commands:   commandSet(),
 		stRemovers: make([]Remover, 0, len(stHandlers)),
 		lastsent:   time.Now(),
 	}

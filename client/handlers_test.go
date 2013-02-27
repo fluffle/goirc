@@ -2,7 +2,6 @@ package client
 
 import (
 	"code.google.com/p/gomock/gomock"
-	"fmt"
 	"github.com/fluffle/goirc/state"
 	"testing"
 	"time"
@@ -157,57 +156,6 @@ func TestCTCP(t *testing.T) {
 
 	// Call handler with CTCP UNKNOWN
 	c.h_CTCP(parseLine(":blah!moo@cows.com PRIVMSG test :\001UNKNOWN ctcp\001"))
-}
-
-func TestPRIVMSG(t *testing.T) {
-	c, s := setUp(t)
-	defer s.tearDown()
-
-	f := func(conn *Conn, line *Line) {
-		conn.Privmsg(line.Args[0], line.Args[1])
-	}
-	c.CommandFunc("prefix", f, "")
-
-	// CommandStripNick and CommandStripPrefix are both false to begin
-	c.h_PRIVMSG(parseLine(":blah!moo@cows.com PRIVMSG #foo :prefix bar"))
-	s.nc.Expect("PRIVMSG #foo :prefix bar")
-	// If we're not stripping off the nick, the prefix won't match.
-	// This might be considered a bug, but then the library currently has a
-	// poor understanding of the concept of "being addressed".
-	c.h_PRIVMSG(parseLine(":blah!moo@cows.com PRIVMSG #foo :test: prefix bar"))
-	s.nc.ExpectNothing()
-
-	c.cfg.CommandStripNick = true
-	c.h_PRIVMSG(parseLine(":blah!moo@cows.com PRIVMSG #foo :prefix bar"))
-	s.nc.Expect("PRIVMSG #foo :prefix bar")
-	c.h_PRIVMSG(parseLine(":blah!moo@cows.com PRIVMSG #foo :test: prefix bar"))
-	s.nc.Expect("PRIVMSG #foo :prefix bar")
-
-	c.cfg.CommandStripPrefix = true
-	c.h_PRIVMSG(parseLine(":blah!moo@cows.com PRIVMSG #foo :prefix bar"))
-	s.nc.Expect("PRIVMSG #foo :bar")
-	c.h_PRIVMSG(parseLine(":blah!moo@cows.com PRIVMSG #foo :test: prefix bar"))
-	s.nc.Expect("PRIVMSG #foo :bar")
-
-	c.cfg.CommandStripNick = false
-	c.h_PRIVMSG(parseLine(":blah!moo@cows.com PRIVMSG #foo :prefix bar"))
-	s.nc.Expect("PRIVMSG #foo :bar")
-	c.h_PRIVMSG(parseLine(":blah!moo@cows.com PRIVMSG #foo :test: prefix bar"))
-	s.nc.ExpectNothing()
-
-	// Check the various nick addressing notations that are supported.
-	c.cfg.CommandStripNick = true
-	for _, addr := range []string{":", ";", ",", ">", "-", ""} {
-		c.h_PRIVMSG(parseLine(fmt.Sprintf(
-			":blah!moo@cows.com PRIVMSG #foo :test%s prefix bar", addr)))
-		s.nc.Expect("PRIVMSG #foo :bar")
-		c.h_PRIVMSG(parseLine(fmt.Sprintf(
-			":blah!moo@cows.com PRIVMSG #foo :test%sprefix bar", addr)))
-		s.nc.ExpectNothing()
-	}
-	c.h_PRIVMSG(parseLine(":blah!moo@cows.com PRIVMSG #foo :test! prefix bar"))
-	s.nc.ExpectNothing()
-
 }
 
 // Test the handler for JOIN messages

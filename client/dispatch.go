@@ -113,92 +113,6 @@ func (hs *hSet) dispatch(conn *Conn, line *Line) {
 	}
 }
 
-// An IRC command looks like this:
-type Command interface {
-	Execute(*Conn, *Line)
-	Help() string
-}
-
-type command struct {
-	fn   HandlerFunc
-	help string
-}
-
-func (c *command) Execute(conn *Conn, line *Line) {
-	c.fn(conn, line)
-}
-
-func (c *command) Help() string {
-	return c.help
-}
-
-type cNode struct {
-	cmd    Command
-	set    *cSet
-	prefix string
-}
-
-func (cn *cNode) Execute(conn *Conn, line *Line) {
-	cn.cmd.Execute(conn, line)
-}
-
-func (cn *cNode) Help() string {
-	return cn.cmd.Help()
-}
-
-func (cn *cNode) Remove() {
-	cn.set.remove(cn)
-}
-
-type cSet struct {
-	set map[string]*cNode
-	sync.RWMutex
-}
-
-func commandSet() *cSet {
-	return &cSet{set: make(map[string]*cNode)}
-}
-
-func (cs *cSet) add(pf string, c Command) Remover {
-	cs.Lock()
-	defer cs.Unlock()
-	pf = strings.ToLower(pf)
-	if _, ok := cs.set[pf]; ok {
-		logging.Error("Command prefix '%s' already registered.", pf)
-		return nil
-	}
-	cn := &cNode{
-		cmd:    c,
-		set:    cs,
-		prefix: pf,
-	}
-	cs.set[pf] = cn
-	return cn
-}
-
-func (cs *cSet) remove(cn *cNode) {
-	cs.Lock()
-	defer cs.Unlock()
-	delete(cs.set, cn.prefix)
-	cn.set = nil
-}
-
-func (cs *cSet) match(txt string) (final Command, prefixlen int) {
-	cs.RLock()
-	defer cs.RUnlock()
-	txt = strings.ToLower(txt)
-	for prefix, cmd := range cs.set {
-		if !strings.HasPrefix(txt, prefix) {
-			continue
-		}
-		if final == nil || len(prefix) > prefixlen {
-			prefixlen = len(prefix)
-			final = cmd
-		}
-	}
-	return
-}
-
 // Handlers are triggered on incoming Lines from the server, with the handler
 // "name" being equivalent to Line.Cmd. Read the RFCs for details on what
 // replies could come from the server. They'll generally be things like
@@ -213,18 +127,6 @@ func (conn *Conn) HandleFunc(name string, hf HandlerFunc) Remover {
 	return conn.Handle(name, hf)
 }
 
-func (conn *Conn) Command(prefix string, c Command) Remover {
-	return conn.commands.add(prefix, c)
-}
-
-func (conn *Conn) CommandFunc(prefix string, hf HandlerFunc, help string) Remover {
-	return conn.Command(prefix, &command{hf, help})
-}
-
 func (conn *Conn) dispatch(line *Line) {
 	conn.handlers.dispatch(conn, line)
-}
-
-func (conn *Conn) cmdMatch(txt string) (Command, int) {
-	return conn.commands.match(txt)
 }
