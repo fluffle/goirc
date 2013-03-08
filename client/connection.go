@@ -272,7 +272,7 @@ func (conn *Conn) ping() {
 	for {
 		select {
 		case <-tick.C:
-			conn.Ping(time.Now().UnixNano())
+			conn.Ping(fmt.Sprintf("%d", time.Now().UnixNano()))
 		case <-conn.cPing:
 			tick.Stop()
 			return
