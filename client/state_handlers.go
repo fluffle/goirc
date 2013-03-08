@@ -158,23 +158,27 @@ func (conn *Conn) h_332(line *Line) {
 
 // Handle 352 who reply
 func (conn *Conn) h_352(line *Line) {
-	if nk := conn.st.GetNick(line.Args[5]); nk != nil && nk != conn.Me() {
-		nk.Ident = line.Args[2]
-		nk.Host = line.Args[3]
-		// XXX: do we care about the actual server the nick is on?
-		//      or the hop count to this server?
-		// last arg contains "<hop count> <real name>"
-		a := strings.SplitN(line.Args[len(line.Args)-1], " ", 2)
-		nk.Name = a[1]
-		if idx := strings.Index(line.Args[6], "*"); idx != -1 {
-			nk.Modes.Oper = true
-		}
-		if idx := strings.Index(line.Args[6], "H"); idx != -1 {
-			nk.Modes.Invisible = true
-		}
-	} else {
+	nk := conn.st.GetNick(line.Args[5])
+	if nk == nil {
 		logging.Warn("irc.352(): received WHO reply for unknown nick %s",
 			line.Args[5])
+		return
+	}
+	if nk == conn.Me() {
+		return
+	}
+	nk.Ident = line.Args[2]
+	nk.Host = line.Args[3]
+	// XXX: do we care about the actual server the nick is on?
+	//      or the hop count to this server?
+	// last arg contains "<hop count> <real name>"
+	a := strings.SplitN(line.Args[len(line.Args)-1], " ", 2)
+	nk.Name = a[1]
+	if idx := strings.Index(line.Args[6], "*"); idx != -1 {
+		nk.Modes.Oper = true
+	}
+	if idx := strings.Index(line.Args[6], "H"); idx != -1 {
+		nk.Modes.Invisible = true
 	}
 }
 
