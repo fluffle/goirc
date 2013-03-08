@@ -7,20 +7,14 @@ import (
 	"strings"
 )
 
-const (
-	REGISTER     = "REGISTER"
-	CONNECTED    = "CONNECTED"
-	DISCONNECTED = "DISCONNECTED"
-)
-
 // sets up the internal event handlers to do essential IRC protocol things
 var intHandlers = map[string]HandlerFunc{
 	REGISTER: (*Conn).h_REGISTER,
 	"001":    (*Conn).h_001,
 	"433":    (*Conn).h_433,
-	"CTCP":   (*Conn).h_CTCP,
-	"NICK":   (*Conn).h_NICK,
-	"PING":   (*Conn).h_PING,
+	CTCP:     (*Conn).h_CTCP,
+	NICK:     (*Conn).h_NICK,
+	PING:     (*Conn).h_PING,
 }
 
 func (conn *Conn) addIntHandlers() {
@@ -33,7 +27,7 @@ func (conn *Conn) addIntHandlers() {
 
 // Basic ping/pong handler
 func (conn *Conn) h_PING(line *Line) {
-	conn.Raw("PONG :" + line.Args[0])
+	conn.Pong(line.Args[0])
 }
 
 // Handler for initial registration with server once tcp connection is made.
@@ -86,10 +80,10 @@ func (conn *Conn) h_433(line *Line) {
 
 // Handle VERSION requests and CTCP PING
 func (conn *Conn) h_CTCP(line *Line) {
-	if line.Args[0] == "VERSION" {
-		conn.CtcpReply(line.Nick, "VERSION", conn.cfg.Version)
-	} else if line.Args[0] == "PING" {
-		conn.CtcpReply(line.Nick, "PING", line.Args[2])
+	if line.Args[0] == VERSION {
+		conn.CtcpReply(line.Nick, VERSION, conn.cfg.Version)
+	} else if line.Args[0] == PING {
+		conn.CtcpReply(line.Nick, PING, line.Args[2])
 	}
 }
 
