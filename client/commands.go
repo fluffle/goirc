@@ -37,23 +37,32 @@ const (
 // the symbol table and add methods/functions on the fly
 // [ CMD, FMT, FMTARGS ] etc.
 
+func cutNewLines(s string) string {
+	r := strings.SplitN(s, "\\r", 2)
+	r = strings.SplitN(r[0], "\\n", 2)
+	return r[0]
+}
+
 // Raw() sends a raw line to the server, should really only be used for
 // debugging purposes but may well come in handy.
-func (conn *Conn) Raw(rawline string) { conn.out <- rawline }
+func (conn *Conn) Raw(rawline string) {
+	// Avoid command injection by enforcing one command per line.
+	conn.out <- cutNewLines(rawline)
+}
 
 // Pass() sends a PASS command to the server
-func (conn *Conn) Pass(password string) { conn.out <- PASS + " " + password }
+func (conn *Conn) Pass(password string) { conn.Raw(PASS + " " + password) }
 
 // Nick() sends a NICK command to the server
-func (conn *Conn) Nick(nick string) { conn.out <- NICK + " " + nick }
+func (conn *Conn) Nick(nick string) { conn.Raw(NICK + " " + nick) }
 
 // User() sends a USER command to the server
 func (conn *Conn) User(ident, name string) {
-	conn.out <- USER + " " + ident + " 12 * :" + name
+	conn.Raw(USER + " " + ident + " 12 * :" + name)
 }
 
 // Join() sends a JOIN command to the server
-func (conn *Conn) Join(channel string) { conn.out <- JOIN + " " + channel }
+func (conn *Conn) Join(channel string) { conn.Raw(JOIN + " " + channel) }
 
 // Part() sends a PART command to the server with an optional part message
 func (conn *Conn) Part(channel string, message ...string) {
@@ -61,7 +70,7 @@ func (conn *Conn) Part(channel string, message ...string) {
 	if msg != "" {
 		msg = " :" + msg
 	}
-	conn.out <- PART + " " + channel + msg
+	conn.Raw(PART + " " + channel + msg)
 }
 
 // Kick() sends a KICK command to remove a nick from a channel
@@ -70,7 +79,7 @@ func (conn *Conn) Kick(channel, nick string, message ...string) {
 	if msg != "" {
 		msg = " :" + msg
 	}
-	conn.out <- KICK + " " + channel + " " + nick + msg
+	conn.Raw(KICK + " " + channel + " " + nick + msg)
 }
 
 // Quit() sends a QUIT command to the server with an optional quit message
@@ -79,20 +88,20 @@ func (conn *Conn) Quit(message ...string) {
 	if msg == "" {
 		msg = conn.cfg.QuitMessage
 	}
-	conn.out <- QUIT + " :" + msg
+	conn.Raw(QUIT + " :" + msg)
 }
 
 // Whois() sends a WHOIS command to the server
-func (conn *Conn) Whois(nick string) { conn.out <- WHOIS + " " + nick }
+func (conn *Conn) Whois(nick string) { conn.Raw(WHOIS + " " + nick) }
 
 //Who() sends a WHO command to the server
-func (conn *Conn) Who(nick string) { conn.out <- WHO + " " + nick }
+func (conn *Conn) Who(nick string) { conn.Raw(WHO + " " + nick) }
 
 // Privmsg() sends a PRIVMSG to the target t
-func (conn *Conn) Privmsg(t, msg string) { conn.out <- PRIVMSG + " " + t + " :" + msg }
+func (conn *Conn) Privmsg(t, msg string) { conn.Raw(PRIVMSG + " " + t + " :" + msg) }
 
 // Notice() sends a NOTICE to the target t
-func (conn *Conn) Notice(t, msg string) { conn.out <- NOTICE + " " + t + " :" + msg }
+func (conn *Conn) Notice(t, msg string) { conn.Raw(NOTICE + " " + t + " :" + msg) }
 
 // Ctcp() sends a (generic) CTCP message to the target t
 // with an optional argument
@@ -128,7 +137,7 @@ func (conn *Conn) Topic(channel string, topic ...string) {
 	if t != "" {
 		t = " :" + t
 	}
-	conn.out <- TOPIC + " " + channel + t
+	conn.Raw(TOPIC + " " + channel + t)
 }
 
 // Mode() sends a MODE command to the server. This one can get complicated if
@@ -143,7 +152,7 @@ func (conn *Conn) Mode(t string, modestring ...string) {
 	if mode != "" {
 		mode = " " + mode
 	}
-	conn.out <- MODE + " " + t + mode
+	conn.Raw(MODE + " " + t + mode)
 }
 
 // Away() sends an AWAY command to the server
@@ -154,18 +163,20 @@ func (conn *Conn) Away(message ...string) {
 	if msg != "" {
 		msg = " :" + msg
 	}
-	conn.out <- AWAY + msg
+	conn.Raw(AWAY + msg)
 }
 
 // Invite() sends an INVITE command to the server
-func (conn *Conn) Invite(nick, channel string) { conn.out <- INVITE + " " + nick + " " + channel }
+func (conn *Conn) Invite(nick, channel string) {
+	conn.Raw(INVITE + " " + nick + " " + channel)
+}
 
 // Oper() sends an OPER command to the server
-func (conn *Conn) Oper(user, pass string) { conn.out <- OPER + " " + user + " " + pass }
+func (conn *Conn) Oper(user, pass string) { conn.Raw(OPER + " " + user + " " + pass) }
 
 // Ping() sends a PING command to the server
 // A PONG response is to be expected afterwards
-func (conn *Conn) Ping(message string) { conn.out <- PING + " :" + message }
+func (conn *Conn) Ping(message string) { conn.Raw(PING + " :" + message) }
 
 // Pong() sends a PONG command to the server
-func (conn *Conn) Pong(message string) { conn.out <- PONG + " :" + message }
+func (conn *Conn) Pong(message string) { conn.Raw(PONG + " :" + message) }
