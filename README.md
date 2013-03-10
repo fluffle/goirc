@@ -9,6 +9,10 @@ Pretty simple, really:
 
 There is some example code that demonstrates usage of the library in `client.go`. This will connect to freenode and join `#go-nuts` by default, so be careful ;-)
 
+Please note: this branch has been feature-frozen for a while. Check out master
+for some interesting (but not backwards-compatible) changes that will become
+the new go1 branch when they're stable.
+
 ### Using the framework
 
 Synopsis:
