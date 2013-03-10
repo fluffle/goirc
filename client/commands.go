@@ -30,16 +30,10 @@ const (
 	WHOIS        = "WHOIS"
 )
 
-// this file contains the various commands you can
-// send to the server using an Conn connection
-
-// This could be a lot less ugly with the ability to manipulate
-// the symbol table and add methods/functions on the fly
-// [ CMD, FMT, FMTARGS ] etc.
-
+// cutNewLines() pares down a string to the part before the first "\r" or "\n"
 func cutNewLines(s string) string {
-	r := strings.SplitN(s, "\\r", 2)
-	r = strings.SplitN(r[0], "\\n", 2)
+	r := strings.SplitN(s, "\r", 2)
+	r = strings.SplitN(r[0], "\n", 2)
 	return r[0]
 }
 

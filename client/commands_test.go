@@ -2,6 +2,25 @@ package client
 
 import "testing"
 
+func TestCutNewLines(t *testing.T) {
+	tests := []struct{ in, out string }{
+		{"", ""},
+		{"foo bar", "foo bar"},
+		{"foo bar\rbaz", "foo bar"},
+		{"foo bar\nbaz", "foo bar"},
+		{"blorp\r\n\r\nbloop", "blorp"},
+		{"\n\rblaap", ""},
+		{"\r\n", ""},
+		{"boo\\r\\n\\n\r", "boo\\r\\n\\n"},
+	}
+	for i, test := range tests {
+		out := cutNewLines(test.in)
+		if test.out != out {
+			t.Errorf("test %d: expected '%s', got '%s'", i, test.out, out)
+		}
+	}
+}
+
 func TestClientCommands(t *testing.T) {
 	c, s := setUp(t)
 	defer s.tearDown()
