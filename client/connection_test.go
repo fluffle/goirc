@@ -17,6 +17,7 @@ type testState struct {
 	c    *Conn
 }
 
+// NOTE: including a second argument at all prevents calling c.postConnect()
 func setUp(t *testing.T, start ...bool) (*Conn, *testState) {
 	ctrl := gomock.NewController(t)
 	st := state.NewMockTracker(ctrl)
@@ -56,7 +57,7 @@ func TestEOF(t *testing.T) {
 
 	// Set up a handler to detect whether disconnected handlers are called
 	dcon := false
-	c.HandleFunc("disconnected", func(conn *Conn, line *Line) {
+	c.HandleFunc(DISCONNECTED, func(conn *Conn, line *Line) {
 		dcon = true
 	})
 

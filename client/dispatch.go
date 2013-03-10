@@ -6,7 +6,7 @@ import (
 	"sync"
 )
 
-// An IRC handler looks like this:
+// An IRC Handler looks like this:
 type Handler interface {
 	Handle(*Conn, *Line)
 }
@@ -16,16 +16,28 @@ type Remover interface {
 	Remove()
 }
 
+// A HandlerFunc implements Handler.
 type HandlerFunc func(*Conn, *Line)
 
 func (hf HandlerFunc) Handle(conn *Conn, line *Line) {
 	hf(conn, line)
 }
 
+// Handlers are organised using a map of linked-lists, with each map
+// key representing an IRC verb or numeric, and the linked list values
+// being handlers that are executed in parallel when a Line from the
+// server with that verb or numeric arrives.
+type hSet struct {
+	set map[string]*hList
+	sync.RWMutex
+}
+
 type hList struct {
 	start, end *hNode
 }
 
+// Storing the forward and backward links in the node allows O(1) removal.
+// This probably isn't strictly necessary but I think it's kinda nice.
 type hNode struct {
 	next, prev *hNode
 	set        *hSet
@@ -33,23 +45,22 @@ type hNode struct {
 	handler    Handler
 }
 
+// A hNode implements both Handler...
 func (hn *hNode) Handle(conn *Conn, line *Line) {
 	hn.handler.Handle(conn, line)
 }
 
+// ... and Remover.
 func (hn *hNode) Remove() {
 	hn.set.remove(hn)
-}
-
-type hSet struct {
-	set map[string]*hList
-	sync.RWMutex
 }
 
 func handlerSet() *hSet {
 	return &hSet{set: make(map[string]*hList)}
 }
 
+// When a new Handler is added for an event, it is wrapped in a hNode and
+// returned as a Remover so the caller can remove it at a later time.
 func (hs *hSet) add(ev string, h Handler) Remover {
 	hs.Lock()
 	defer hs.Unlock()

@@ -12,7 +12,7 @@ func TestHandlerSet(t *testing.T) {
 	}
 
 	callcount := 0
-	f := func(c *Conn, l *Line) {
+	f := func(_ *Conn, _ *Line) {
 		callcount++
 	}
 
