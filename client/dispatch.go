@@ -148,5 +148,5 @@ func (conn *Conn) LogPanic(line *Line) {
 	if err := recover(); err != nil {
 		_, f, l, _ := runtime.Caller(2)
 		logging.Error("%s:%d: panic: %v", f, l, err)
-    }
+	}
 }

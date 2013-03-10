@@ -78,7 +78,7 @@ func NewConfig(nick string, args ...string) *Config {
 		Me:       state.NewNick(nick),
 		PingFreq: 3 * time.Minute,
 		NewNick:  func(s string) string { return s + "_" },
-		Recover:  (*Conn).LogPanic,  // in dispatch.go
+		Recover:  (*Conn).LogPanic, // in dispatch.go
 	}
 	cfg.Me.Ident = "goirc"
 	if len(args) > 0 && args[0] != "" {
