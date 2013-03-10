@@ -42,3 +42,43 @@ func TestLineCopy(t *testing.T) {
 		t.Errorf("l1: %#v\nl2: %#v", l1, l2)
 	}
 }
+
+func TestLineText(t *testing.T) {
+	tests := []struct{in *Line; out string}{
+		{&Line{}, ""},
+		{&Line{Args: []string{"one thing"}}, "one thing"},
+		{&Line{Args: []string{"one", "two"}}, "two"},
+	}
+
+	for i, test := range tests {
+		out := test.in.Text()
+		if out != test.out {
+			t.Errorf("test %d: expected: '%s', got '%s'", i, test.out, out)
+		}
+	}
+}
+
+func TestLineTarget(t *testing.T) {
+	tests := []struct{in *Line; out string}{
+		{&Line{}, ""},
+		{&Line{Cmd: JOIN, Args: []string{"#foo"}}, "#foo"},
+		{&Line{Cmd: PART, Args: []string{"#foo", "bye"}}, "#foo"},
+		{&Line{Cmd: PRIVMSG, Args: []string{"Me", "la"}, Nick: "Them"}, "Them"},
+		{&Line{Cmd: NOTICE, Args: []string{"Me", "la"}, Nick: "Them"}, "Them"},
+		{&Line{Cmd: ACTION, Args: []string{"Me", "la"}, Nick: "Them"}, "Them"},
+		{&Line{Cmd: CTCP, Args: []string{"PING", "Me", "1"}, Nick: "Them"}, "Them"},
+		{&Line{Cmd: CTCPREPLY, Args: []string{"PONG", "Me", "2"}, Nick: "Them"}, "Them"},
+		{&Line{Cmd: PRIVMSG, Args: []string{"#foo", "la"}, Nick: "Them"}, "#foo"},
+		{&Line{Cmd: NOTICE, Args: []string{"#foo", "la"}, Nick: "Them"}, "#foo"},
+		{&Line{Cmd: ACTION, Args: []string{"#foo", "la"}, Nick: "Them"}, "#foo"},
+		{&Line{Cmd: CTCP, Args: []string{"PING", "#foo", "1"}, Nick: "Them"}, "#foo"},
+		{&Line{Cmd: CTCPREPLY, Args: []string{"PONG", "#foo", "2"}, Nick: "Them"}, "#foo"},
+	}
+
+	for i, test := range tests {
+		out := test.in.Target()
+		if out != test.out {
+			t.Errorf("test %d: expected: '%s', got '%s'", i, test.out, out)
+		}
+	}
+}
