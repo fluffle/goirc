@@ -489,15 +489,15 @@ func TestRateLimit(t *testing.T) {
 	// So, time at the nanosecond resolution is a bit of a bitch. Choosing 60
 	// characters as the line length means we should be increasing badness by
 	// 2.5 seconds minus the delta between the two ratelimit calls. This should
-	// be minimal but it's guaranteed that it won't be zero. Use 10us as a fuzz.
+	// be minimal but it's guaranteed that it won't be zero. Use 20us as a fuzz.
 	if l := c.rateLimit(60); l != 0 ||
-		abs(c.badness-2500*time.Millisecond) > 10*time.Microsecond {
+		abs(c.badness-2500*time.Millisecond) > 20*time.Microsecond {
 		t.Errorf("Rate limit calculating badness incorrectly.")
 	}
 	// At this point, we can tip over the badness scale, with a bit of help.
 	// 720 chars => +8 seconds of badness => 10.5 seconds => ratelimit
 	if l := c.rateLimit(720); l != 8*time.Second ||
-		abs(c.badness-10500*time.Millisecond) > 10*time.Microsecond {
+		abs(c.badness-10500*time.Millisecond) > 20*time.Microsecond {
 		t.Errorf("Rate limit failed to return correct limiting values.")
 		t.Errorf("l=%d, badness=%d", l, c.badness)
 	}
