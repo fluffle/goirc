@@ -68,6 +68,9 @@ type Config struct {
 
 	// Sent as the QUIT message.
 	QuitMessage string
+
+	// Configurable panic recovery for all handlers.
+	Recover func(*Conn, *Line)
 }
 
 func NewConfig(nick string, args ...string) *Config {
@@ -75,6 +78,7 @@ func NewConfig(nick string, args ...string) *Config {
 		Me:       state.NewNick(nick),
 		PingFreq: 3 * time.Minute,
 		NewNick:  func(s string) string { return s + "_" },
+		Recover:  (*Conn).LogPanic,  // in dispatch.go
 	}
 	cfg.Me.Ident = "goirc"
 	if len(args) > 0 && args[0] != "" {

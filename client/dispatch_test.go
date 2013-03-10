@@ -6,6 +6,11 @@ import (
 )
 
 func TestHandlerSet(t *testing.T) {
+	// A Conn is needed here because the previous behaviour of passing nil to
+	// hset.dispatch causes a nil pointer dereference with panic recovery.
+	c, s := setUp(t)
+	defer s.tearDown()
+
 	hs := handlerSet()
 	if len(hs.set) != 0 {
 		t.Errorf("New set contains things!")
@@ -83,7 +88,7 @@ func TestHandlerSet(t *testing.T) {
 	if callcount != 0 {
 		t.Errorf("Something incremented call count before we were expecting it.")
 	}
-	hs.dispatch(nil, &Line{Cmd: "One"})
+	hs.dispatch(c, &Line{Cmd: "One"})
 	<-time.After(time.Millisecond)
 	if callcount != 4 {
 		t.Errorf("Our handler wasn't called four times :-(")
@@ -107,7 +112,7 @@ func TestHandlerSet(t *testing.T) {
 	}
 
 	// Dispatch should result in 3 additions.
-	hs.dispatch(nil, &Line{Cmd: "One"})
+	hs.dispatch(c, &Line{Cmd: "One"})
 	<-time.After(time.Millisecond)
 	if callcount != 7 {
 		t.Errorf("Our handler wasn't called three times :-(")
@@ -129,7 +134,7 @@ func TestHandlerSet(t *testing.T) {
 	}
 
 	// Dispatch should result in 2 additions.
-	hs.dispatch(nil, &Line{Cmd: "One"})
+	hs.dispatch(c, &Line{Cmd: "One"})
 	<-time.After(time.Millisecond)
 	if callcount != 9 {
 		t.Errorf("Our handler wasn't called two times :-(")
@@ -151,7 +156,7 @@ func TestHandlerSet(t *testing.T) {
 	}
 
 	// Dispatch should result in 1 addition.
-	hs.dispatch(nil, &Line{Cmd: "One"})
+	hs.dispatch(c, &Line{Cmd: "One"})
 	<-time.After(time.Millisecond)
 	if callcount != 10 {
 		t.Errorf("Our handler wasn't called once :-(")
@@ -170,9 +175,29 @@ func TestHandlerSet(t *testing.T) {
 	}
 
 	// Dispatch should result in NO additions.
-	hs.dispatch(nil, &Line{Cmd: "One"})
+	hs.dispatch(c, &Line{Cmd: "One"})
 	<-time.After(time.Millisecond)
 	if callcount != 10 {
 		t.Errorf("Our handler was called?")
+	}
+}
+
+func TestPanicRecovery(t *testing.T) {
+	c, s := setUp(t)
+	defer s.tearDown()
+
+	recovered := false
+	c.cfg.Recover = func(conn *Conn, line *Line) {
+		if err, ok := recover().(string); ok && err == "panic!" {
+			recovered = true
+		}
+	}
+	c.HandleFunc(PRIVMSG, func(conn *Conn, line *Line) {
+		panic("panic!")
+	})
+	c.in <- parseLine(":nick!user@host.com PRIVMSG #channel :OH NO PIGEONS")
+	<-time.After(time.Millisecond)
+	if recovered != true {
+		t.Errorf("Failed to recover panic!")
 	}
 }

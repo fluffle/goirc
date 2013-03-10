@@ -2,6 +2,7 @@ package client
 
 import (
 	"github.com/fluffle/golog/logging"
+	"runtime"
 	"strings"
 	"sync"
 )
@@ -45,8 +46,9 @@ type hNode struct {
 	handler    Handler
 }
 
-// A hNode implements both Handler...
+// A hNode implements both Handler (with configurable panic recovery)...
 func (hn *hNode) Handle(conn *Conn, line *Line) {
+	defer conn.cfg.Recover(conn, line)
 	hn.handler.Handle(conn, line)
 }
 
@@ -140,4 +142,11 @@ func (conn *Conn) HandleFunc(name string, hf HandlerFunc) Remover {
 
 func (conn *Conn) dispatch(line *Line) {
 	conn.handlers.dispatch(conn, line)
+}
+
+func (conn *Conn) LogPanic(line *Line) {
+	if err := recover(); err != nil {
+		_, f, l, _ := runtime.Caller(2)
+		logging.Error("%s:%d: panic: %v", f, l, err)
+    }
 }
