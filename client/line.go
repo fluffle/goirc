@@ -17,7 +17,7 @@ type Line struct {
 	Time                   time.Time
 }
 
-// NOTE: this doesn't copy l.Time (this should be read-only anyway)
+// Copy() returns a deep copy of the Line.
 func (l *Line) Copy() *Line {
 	nl := *l
 	nl.Args = make([]string, len(l.Args))
@@ -25,6 +25,7 @@ func (l *Line) Copy() *Line {
 	return &nl
 }
 
+// parseLine() creates a Line from an incoming message from the IRC server.
 func parseLine(s string) *Line {
 	line := &Line{Raw: s}
 	if s[0] == ':' {
@@ -62,7 +63,7 @@ func parseLine(s string) *Line {
 	// So, I think CTCP and (in particular) CTCP ACTION are better handled as
 	// separate events as opposed to forcing people to have gargantuan
 	// handlers to cope with the possibilities.
-	if (line.Cmd == "PRIVMSG" || line.Cmd == "NOTICE") &&
+	if (line.Cmd == PRIVMSG || line.Cmd == NOTICE) &&
 		len(line.Args[1]) > 2 &&
 		strings.HasPrefix(line.Args[1], "\001") &&
 		strings.HasSuffix(line.Args[1], "\001") {
@@ -72,16 +73,16 @@ func parseLine(s string) *Line {
 			// Replace the line with the unwrapped CTCP
 			line.Args[1] = t[1]
 		}
-		if c := strings.ToUpper(t[0]); c == "ACTION" && line.Cmd == "PRIVMSG" {
+		if c := strings.ToUpper(t[0]); c == ACTION && line.Cmd == PRIVMSG {
 			// make a CTCP ACTION it's own event a-la PRIVMSG
 			line.Cmd = c
 		} else {
 			// otherwise, dispatch a generic CTCP/CTCPREPLY event that
 			// contains the type of CTCP in line.Args[0]
-			if line.Cmd == "PRIVMSG" {
-				line.Cmd = "CTCP"
+			if line.Cmd == PRIVMSG {
+				line.Cmd = CTCP
 			} else {
-				line.Cmd = "CTCPREPLY"
+				line.Cmd = CTCPREPLY
 			}
 			line.Args = append([]string{c}, line.Args...)
 		}
