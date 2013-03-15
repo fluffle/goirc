@@ -96,14 +96,14 @@ func NewConfig(nick string, args ...string) *Config {
 // Creates a new IRC connection object, but doesn't connect to anything so
 // that you can add event handlers to it. See AddHandler() for details
 func SimpleClient(nick string, args ...string) *Conn {
-	conn, _ := Client(NewConfig(nick, args...))
+	conn := Client(NewConfig(nick, args...))
 	return conn
 }
 
-func Client(cfg *Config) (*Conn, error) {
+func Client(cfg *Config) *Conn {
 	logging.InitFromFlags()
-	if cfg.Me == nil || cfg.Me.Nick == "" || cfg.Me.Ident == "" {
-		return nil, fmt.Errorf("irc.Client(): Both cfg.Nick and cfg.Ident must be non-empty.")
+	if cfg == nil || cfg.Me == nil || cfg.Me.Nick == "" || cfg.Me.Ident == "" {
+		logging.Fatal("irc.Client(): Both cfg.Nick and cfg.Ident must be non-empty.")
 	}
 	conn := &Conn{
 		cfg:        cfg,
@@ -118,7 +118,7 @@ func Client(cfg *Config) (*Conn, error) {
 	}
 	conn.addIntHandlers()
 	conn.initialise()
-	return conn, nil
+	return conn
 }
 
 func (conn *Conn) Connected() bool {
