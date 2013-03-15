@@ -94,4 +94,7 @@ func TestClientCommands(t *testing.T) {
 
 	c.Oper("user", "pass")
 	s.nc.Expect("OPER user pass")
+
+	c.VHost("user", "pass")
+	s.nc.Expect("VHOST user pass")
 }

@@ -26,6 +26,7 @@ const (
 	TOPIC        = "TOPIC"
 	USER         = "USER"
 	VERSION      = "VERSION"
+	VHOST        = "VHOST"
 	WHO          = "WHO"
 	WHOIS        = "WHOIS"
 )
@@ -167,6 +168,9 @@ func (conn *Conn) Invite(nick, channel string) {
 
 // Oper() sends an OPER command to the server
 func (conn *Conn) Oper(user, pass string) { conn.Raw(OPER + " " + user + " " + pass) }
+
+// VHost() sends a VHOST command to the server
+func (conn *Conn) VHost(user, pass string) { conn.Raw(VHOST + " " + user + " " + pass) }
 
 // Ping() sends a PING command to the server
 // A PONG response is to be expected afterwards
