@@ -37,22 +37,15 @@ func (line *Line) Text() string {
 // Return the target of the line, usually the first Arg for the IRC verb.
 // If the line was broadcast from a channel, the target will be that channel.
 // If the line was broadcast by a user, the target will be that user.
-// NOTE: Makes the assumption that all channels start with #.
 // TODO(fluffle): Add 005 CHANTYPES parsing for this?
 func (line *Line) Target() string {
 	switch line.Cmd {
 	case PRIVMSG, NOTICE, ACTION:
-		if !strings.HasPrefix(line.Args[0], "#") {
+		if !line.Public() {
 			return line.Nick
 		}
 	case CTCP, CTCPREPLY:
-		// CTCP prepends the CTCP verb to line.Args, thus for the message
-		//   :nick!user@host PRIVMSG #foo :\001BAR baz\001
-		// line.Args contains: []string{"BAR", "#foo", "baz"}
-		// TODO(fluffle): Arguably this is broken, and we should have
-		// line.Args containing: []string{"#foo", "BAR", "baz"}
-		// ... OR change conn.Ctcp()'s argument order to be consistent.
-		if !strings.HasPrefix(line.Args[1], "#") {
+		if !line.Public() {
 			return line.Nick
 		}
 		return line.Args[1]
@@ -62,6 +55,28 @@ func (line *Line) Target() string {
 	}
 	return ""
 }
+
+// NOTE: Makes the assumption that all channels start with #.
+func (line *Line) Public() bool {
+	switch line.Cmd {
+	case PRIVMSG, NOTICE, ACTION:
+		if strings.HasPrefix(line.Args[0], "#") {
+			return true
+		}
+	case CTCP, CTCPREPLY:
+		// CTCP prepends the CTCP verb to line.Args, thus for the message
+		//   :nick!user@host PRIVMSG #foo :\001BAR baz\001
+		// line.Args contains: []string{"BAR", "#foo", "baz"}
+		// TODO(fluffle): Arguably this is broken, and we should have
+		// line.Args containing: []string{"#foo", "BAR", "baz"}
+		// ... OR change conn.Ctcp()'s argument order to be consistent.
+		if strings.HasPrefix(line.Args[1], "#") {
+			return true
+		}
+	}
+	return false
+}
+
 
 // parseLine() creates a Line from an incoming message from the IRC server.
 func parseLine(s string) *Line {
