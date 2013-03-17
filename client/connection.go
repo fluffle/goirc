@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/fluffle/goirc/state"
 	"github.com/fluffle/golog/logging"
+	"io"
 	"net"
 	"strings"
 	"sync"
@@ -259,7 +260,9 @@ func (conn *Conn) recv() {
 	for {
 		s, err := conn.io.ReadString('\n')
 		if err != nil {
-			logging.Error("irc.recv(): %s", err.Error())
+			if err != io.EOF {
+				logging.Error("irc.recv(): %s", err.Error())
+			}
 			conn.shutdown()
 			return
 		}
