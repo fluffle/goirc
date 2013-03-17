@@ -71,6 +71,10 @@ type Config struct {
 
 	// Configurable panic recovery for all handlers.
 	Recover func(*Conn, *Line)
+
+	// Split PRIVMSGs, NOTICEs and CTCPs longer than
+	// SplitLen characters over multiple lines.
+	SplitLen int
 }
 
 func NewConfig(nick string, args ...string) *Config {
@@ -79,6 +83,7 @@ func NewConfig(nick string, args ...string) *Config {
 		PingFreq: 3 * time.Minute,
 		NewNick:  func(s string) string { return s + "_" },
 		Recover:  (*Conn).LogPanic, // in dispatch.go
+		SplitLen: 450,
 	}
 	cfg.Me.Ident = "goirc"
 	if len(args) > 0 && args[0] != "" {

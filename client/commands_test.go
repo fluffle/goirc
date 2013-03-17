@@ -1,6 +1,9 @@
 package client
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
 func TestCutNewLines(t *testing.T) {
 	tests := []struct{ in, out string }{
@@ -16,7 +19,58 @@ func TestCutNewLines(t *testing.T) {
 	for i, test := range tests {
 		out := cutNewLines(test.in)
 		if test.out != out {
-			t.Errorf("test %d: expected '%s', got '%s'", i, test.out, out)
+			t.Errorf("test %d: expected %q, got %q", i, test.out, out)
+		}
+	}
+}
+
+func TestIndexFragment(t *testing.T) {
+	tests := []struct {
+		in  string
+		out int
+	}{
+		{"", -1},
+		{"foobarbaz", -1},
+		{"foo bar baz", 8},
+		{"foo. bar baz", 5},
+		{"foo: bar baz", 5},
+		{"foo; bar baz", 5},
+		{"foo, bar baz", 5},
+		{"foo! bar baz", 5},
+		{"foo? bar baz", 5},
+		{"foo\" bar baz", 5},
+		{"foo' bar baz", 5},
+		{"foo. bar. baz beep", 10},
+		{"foo. bar, baz beep", 10},
+	}
+	for i, test := range tests {
+		out := indexFragment(test.in)
+		if test.out != out {
+			t.Errorf("test %d: expected %d, got %d", i, test.out, out)
+		}
+	}
+}
+
+func TestSplitMessage(t *testing.T) {
+	tests := []struct {
+		in  string
+		sp  int
+		out []string
+	}{
+		{"", 0, []string{""}},
+		{"foo", 0, []string{"foo"}},
+		{"foo bar baz beep", 0, []string{"foo bar ...", "baz beep"}},
+		{"foo bar baz beep", 13, []string{"foo bar baz ...", "beep"}},
+		{"foo. bar baz beep", 0, []string{"foo. ...", "bar baz ...", "beep"}},
+		{"foo bar, baz beep", 13, []string{"foo bar, ...", "baz beep"}},
+		{"0123456789012345", 0, []string{"0123456789...", "012345"}},
+		{"0123456789012345", 13, []string{"0123456789012...", "345"}},
+		{"0123456789012345", 20, []string{"0123456789012345"}},
+	}
+	for i, test := range tests {
+		out := splitMessage(test.in, test.sp)
+		if !reflect.DeepEqual(test.out, out) {
+			t.Errorf("test %d: expected %q, got %q", i, test.out, out)
 		}
 	}
 }
@@ -24,6 +78,10 @@ func TestCutNewLines(t *testing.T) {
 func TestClientCommands(t *testing.T) {
 	c, s := setUp(t)
 	defer s.tearDown()
+
+	// Avoid having to type ridiculously long lines to test that
+	// messages longer than SplitLen are correctly sent to the server.
+	c.cfg.SplitLen = 20
 
 	c.Pass("password")
 	s.nc.Expect("PASS password")
@@ -59,11 +117,29 @@ func TestClientCommands(t *testing.T) {
 	c.Privmsg("#foo", "bar")
 	s.nc.Expect("PRIVMSG #foo :bar")
 
+	//                 0123456789012345678901234567890123
+	c.Privmsg("#foo", "foo bar baz blorp. woo woobly woo.")
+	s.nc.Expect("PRIVMSG #foo :foo bar baz blorp. ...")
+	s.nc.Expect("PRIVMSG #foo :woo woobly woo.")
+
 	c.Notice("somebody", "something")
 	s.nc.Expect("NOTICE somebody :something")
 
+	//                    01234567890123456789012345678901234567
+	c.Notice("somebody", "something much much longer that splits")
+	s.nc.Expect("NOTICE somebody :something much much ...")
+	s.nc.Expect("NOTICE somebody :longer that splits")
+
 	c.Ctcp("somebody", "ping", "123456789")
 	s.nc.Expect("PRIVMSG somebody :\001PING 123456789\001")
+
+	c.Ctcp("somebody", "ping", "123456789012345678901234567890")
+	s.nc.Expect("PRIVMSG somebody :\001PING 12345678901234567890...\001")
+	s.nc.Expect("PRIVMSG somebody :\001PING 1234567890\001")
+
+	c.CtcpReply("somebody", "pong", "123456789012345678901234567890")
+	s.nc.Expect("NOTICE somebody :\001PONG 12345678901234567890...\001")
+	s.nc.Expect("NOTICE somebody :\001PONG 1234567890\001")
 
 	c.CtcpReply("somebody", "pong", "123456789")
 	s.nc.Expect("NOTICE somebody :\001PONG 123456789\001")
