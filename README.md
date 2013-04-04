@@ -11,7 +11,8 @@ There is some example code that demonstrates usage of the library in `client.go`
 
 Please note: this branch has been feature-frozen for a while. Check out master
 for some interesting (but not backwards-compatible) changes that will become
-the new go1 branch when they're stable.
+the new go1 branch when they're stable. See `fix/goirc.go` and the README there
+for a quick way to migrate.
 
 ### Using the framework
 
