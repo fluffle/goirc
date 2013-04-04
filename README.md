@@ -9,6 +9,9 @@ Pretty simple, really:
 
 There is some example code that demonstrates usage of the library in `client.go`. This will connect to freenode and join `#go-nuts` by default, so be careful ;-)
 
+See `fix/goirc.go` and the README there for a quick way to migrate from the
+old `go1` API.
+
 ### Using the framework
 
 Synopsis:
