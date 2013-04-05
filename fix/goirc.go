@@ -23,6 +23,11 @@ var goircFix = fix{
 	`Update code that uses goirc/client to new API.`,
 }
 
+const (
+	clientPath = "github.com/fluffle/goirc/client"
+	statePath  = "github.com/fluffle/goirc/state"
+)
+
 var goircConstants = map[string]string{
 	`"REGISTER"`: "REGISTER",
 	`"CONNECTED"`: "CONNECTED",
@@ -89,7 +94,7 @@ func goircNewApi(f *ast.File) bool {
 }
 
 func stateApi(f *ast.File) bool {
-	spec := importSpec(f, "github.com/fluffle/goirc/state")
+	spec := importSpec(f, statePath)
 	if spec == nil {
 		return false
 	}
@@ -106,7 +111,7 @@ func stateApi(f *ast.File) bool {
 }
 
 func clientApi(f *ast.File) bool {
-	spec := importSpec(f, "github.com/fluffle/goirc/client")
+	spec := importSpec(f, clientPath)
 	if spec == nil {
 		return false
 	}
@@ -165,6 +170,15 @@ func clientApi(f *ast.File) bool {
 }
 
 func isClientConn(t ast.Expr, pkg string) bool {
+	// TODO(fluffle): when Conn is a struct member and we're looking for e.g.
+	//   struct.Conn.AddHandler()
+	// we will pass in the *ast.SelectorExpr{X: struct, Sel: Conn} to this.
+	// Unfortunately the *ast.Ident{Conn} in this case often has no *ast.Object
+	// associated with it, so to divine it's type we need to recurse down until
+	// X is an *ast.Ident instead of another *ast.SelectorExpr, then look for
+	// the struct member types all the way back up until we get to "Conn".
+	// This is a massive pain-in-the-arse; I can see why type checking of this
+	// sort is often not done, s/AddHandler/HandleFunc/g is much simpler.
 	id, ok := t.(*ast.Ident)
 	if !ok || id.Obj == nil { return false }
 	switch dec := id.Obj.Decl.(type) {
@@ -185,7 +199,7 @@ func isClientConn(t ast.Expr, pkg string) bool {
 			return ok && isPkgDot(lit.Type, pkg, "Conn")
 		case *ast.CompositeLit:
 			// X := client.Conn{}
-			return isPkgDot(lit.Type, pkg, "Conn")
+			return isPkgDot(rhs.Type, pkg, "Conn")
 		default:
 			fmt.Printf("rhs: %#v\n", rhs)
 		}
