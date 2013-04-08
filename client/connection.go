@@ -35,8 +35,8 @@ type Conn struct {
 	out       chan string
 	connected bool
 
-	// Control channels to goroutines
-	cSend, cLoop, cPing chan bool
+	// Control channel to goroutines
+	die chan struct{}
 
 	// Internal counters for flood protection
 	badness  time.Duration
@@ -115,9 +115,6 @@ func Client(cfg *Config) *Conn {
 		cfg:        cfg,
 		in:         make(chan *Line, 32),
 		out:        make(chan string, 32),
-		cSend:      make(chan bool),
-		cLoop:      make(chan bool),
-		cPing:      make(chan bool),
 		handlers:   handlerSet(),
 		stRemovers: make([]Remover, 0, len(stHandlers)),
 		lastsent:   time.Now(),
@@ -166,6 +163,7 @@ func (conn *Conn) DisableStateTracking() {
 func (conn *Conn) initialise() {
 	conn.io = nil
 	conn.sock = nil
+	conn.die = make(chan struct{})
 	if conn.st != nil {
 		conn.st.Wipe()
 	}
@@ -216,25 +214,24 @@ func (conn *Conn) Connect() error {
 		}
 	}
 	conn.connected = true
-	conn.postConnect()
+	conn.postConnect(true)
 	conn.dispatch(&Line{Cmd: REGISTER})
 	return nil
 }
 
 // Post-connection setup (for ease of testing)
-func (conn *Conn) postConnect() {
+func (conn *Conn) postConnect(start bool) {
 	conn.io = bufio.NewReadWriter(
 		bufio.NewReader(conn.sock),
 		bufio.NewWriter(conn.sock))
-	go conn.send()
-	go conn.recv()
-	if conn.cfg.PingFreq > 0 {
-		go conn.ping()
-	} else {
-		// Otherwise the send in shutdown will hang :-/
-		go func() { <-conn.cPing }()
+	if start {
+		go conn.send()
+		go conn.recv()
+		go conn.runLoop()
+		if conn.cfg.PingFreq > 0 {
+			go conn.ping()
+		}
 	}
-	go conn.runLoop()
 }
 
 // copied from http.client for great justice
@@ -248,8 +245,8 @@ func (conn *Conn) send() {
 		select {
 		case line := <-conn.out:
 			conn.write(line)
-		case <-conn.cSend:
-			// strobe on control channel, bail out
+		case <-conn.die:
+			// control channel closed, bail out
 			return
 		}
 	}
@@ -285,7 +282,8 @@ func (conn *Conn) ping() {
 		select {
 		case <-tick.C:
 			conn.Ping(fmt.Sprintf("%d", time.Now().UnixNano()))
-		case <-conn.cPing:
+		case <-conn.die:
+			// control channel closed, bail out
 			tick.Stop()
 			return
 		}
@@ -298,8 +296,8 @@ func (conn *Conn) runLoop() {
 		select {
 		case line := <-conn.in:
 			conn.dispatch(line)
-		case <-conn.cLoop:
-			// strobe on control channel, bail out
+		case <-conn.die:
+			// control channel closed, bail out
 			return
 		}
 	}
@@ -361,9 +359,7 @@ func (conn *Conn) shutdown() {
 	conn.dispatch(&Line{Cmd: DISCONNECTED})
 	conn.connected = false
 	conn.sock.Close()
-	conn.cSend <- true
-	conn.cLoop <- true
-	conn.cPing <- true
+	close(conn.die)
 	// reinit datastructures ready for next connection
 	// do this here rather than after runLoop()'s for due to race
 	conn.initialise()

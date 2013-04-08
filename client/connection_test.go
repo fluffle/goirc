@@ -1,7 +1,6 @@
 package client
 
 import (
-	"bufio"
 	"code.google.com/p/gomock/gomock"
 	"github.com/fluffle/goirc/state"
 	"github.com/fluffle/golog/logging"
@@ -29,13 +28,11 @@ func setUp(t *testing.T, start ...bool) (*Conn, *testState) {
 	c.sock = nc
 	c.cfg.Flood = true // Tests can take a while otherwise
 	c.connected = true
-	if len(start) == 0 {
-		// Hack to allow tests of send, recv, write etc.
-		// NOTE: the value of the boolean doesn't matter.
-		c.postConnect()
-		// Sleep 1ms to allow background routines to start.
-		<-time.After(1e6)
-	}
+	// If a second argument is passed to setUp, we tell postConnect not to
+	// start the various goroutines that shuttle data around.
+	c.postConnect(len(start) == 0)
+	// Sleep 1ms to allow background routines to start.
+	<-time.After(1e6)
 
 	return c, &testState{ctrl, st, nc, c}
 }
@@ -141,16 +138,9 @@ func TestClientAndStateTracking(t *testing.T) {
 }
 
 func TestSend(t *testing.T) {
-	// Passing a second value to setUp inhibits postConnect()
+	// Passing a second value to setUp stops goroutines from starting
 	c, s := setUp(t, false)
-	// We can't use tearDown here, as it will cause a deadlock in shutdown()
-	// trying to send kill messages down channels to nonexistent goroutines.
-	defer s.ctrl.Finish()
-
-	// ... so we have to do some of it's work here.
-	c.io = bufio.NewReadWriter(
-		bufio.NewReader(c.sock),
-		bufio.NewWriter(c.sock))
+	defer s.tearDown()
 
 	// Assert that before send is running, nothing should be sent to the socket
 	// but writes to the buffered channel "out" should not block.
@@ -177,7 +167,11 @@ func TestSend(t *testing.T) {
 	if exited {
 		t.Errorf("Exited before signal sent.")
 	}
-	c.cSend <- true
+	// This sneakily uses the fact that the other two goroutines that would
+	// normally be waiting for die to close are not running, so we only send
+	// to the goroutine started above. Normally shutdown() closes c.die and
+	// signals to all three goroutines (send, ping, runLoop) to exit.
+	c.die <- struct{}{}
 	// Allow propagation time...
 	<-time.After(1e6)
 	if !exited {
@@ -191,16 +185,11 @@ func TestSend(t *testing.T) {
 }
 
 func TestRecv(t *testing.T) {
-	// Passing a second value to setUp inhibits postConnect()
+	// Passing a second value to setUp stops goroutines from starting
 	c, s := setUp(t, false)
-	// We can't tearDown here as we need to explicitly test recv exiting.
-	// The same shutdown() caveat in TestSend above also applies.
+	// We can't use tearDown here because we're testing shutdown conditions
+	// (and so need to EXPECT() a call to st.Wipe() in the right place)
 	defer s.ctrl.Finish()
-
-	// ... so we have to do some of it's work here.
-	c.io = bufio.NewReadWriter(
-		bufio.NewReader(c.sock),
-		bufio.NewWriter(c.sock))
 
 	// Send a line before recv is started up, to verify nothing appears on c.in
 	s.nc.Send(":irc.server.org 001 test :First test line.")
@@ -254,11 +243,6 @@ func TestRecv(t *testing.T) {
 	s.st.EXPECT().Wipe()
 	s.nc.Close()
 
-	// Since send and runloop aren't actually running, we need to empty their
-	// channels manually for recv() to be able to call shutdown correctly.
-	<-c.cSend
-	<-c.cLoop
-	<-c.cPing
 	// Give things time to shake themselves out...
 	<-time.After(time.Millisecond)
 	if !exited {
@@ -272,11 +256,9 @@ func TestRecv(t *testing.T) {
 }
 
 func TestPing(t *testing.T) {
-	// Passing a second value to setUp inhibits postConnect()
+	// Passing a second value to setUp stops goroutines from starting
 	c, s := setUp(t, false)
-	// We can't use tearDown here, as it will cause a deadlock in shutdown()
-	// trying to send kill messages down channels to nonexistent goroutines.
-	defer s.ctrl.Finish()
+	defer s.tearDown()
 
 	// Set a low ping frequency for testing.
 	c.cfg.PingFreq = 50 * time.Millisecond
@@ -329,8 +311,11 @@ func TestPing(t *testing.T) {
 	if exited {
 		t.Errorf("Exited before signal sent.")
 	}
-
-	c.cPing <- true
+	// This sneakily uses the fact that the other two goroutines that would
+	// normally be waiting for die to close are not running, so we only send
+	// to the goroutine started above. Normally shutdown() closes c.die and
+	// signals to all three goroutines (send, ping, runLoop) to exit.
+	c.die <- struct{}{}
 	// Make sure we're no longer pinging by waiting ~2x PingFreq
 	<-time.After(105 * time.Millisecond)
 	if s := reader(); s != "" {
@@ -343,16 +328,9 @@ func TestPing(t *testing.T) {
 }
 
 func TestRunLoop(t *testing.T) {
-	// Passing a second value to setUp inhibits postConnect()
+	// Passing a second value to setUp stops goroutines from starting
 	c, s := setUp(t, false)
-	// We can't use tearDown here, as it will cause a deadlock in shutdown()
-	// trying to send kill messages down channels to nonexistent goroutines.
-	defer s.ctrl.Finish()
-
-	// ... so we have to do some of it's work here.
-	c.io = bufio.NewReadWriter(
-		bufio.NewReader(c.sock),
-		bufio.NewWriter(c.sock))
+	defer s.tearDown()
 
 	// Set up a handler to detect whether 001 handler is called
 	h001 := false
@@ -399,7 +377,11 @@ func TestRunLoop(t *testing.T) {
 	if exited {
 		t.Errorf("Exited before signal sent.")
 	}
-	c.cLoop <- true
+	// This sneakily uses the fact that the other two goroutines that would
+	// normally be waiting for die to close are not running, so we only send
+	// to the goroutine started above. Normally shutdown() closes c.die and
+	// signals to all three goroutines (send, ping, runLoop) to exit.
+	c.die <- struct{}{}
 	// Allow propagation time...
 	<-time.After(time.Millisecond)
 	if !exited {
@@ -415,16 +397,11 @@ func TestRunLoop(t *testing.T) {
 }
 
 func TestWrite(t *testing.T) {
-	// Passing a second value to setUp inhibits postConnect()
+	// Passing a second value to setUp stops goroutines from starting
 	c, s := setUp(t, false)
-	// We can't use tearDown here, as it will cause a deadlock in shutdown()
-	// trying to send kill messages down channels to nonexistent goroutines.
+	// We can't use tearDown here because we're testing shutdown conditions
+	// (and so need to EXPECT() a call to st.Wipe() in the right place)
 	defer s.ctrl.Finish()
-
-	// ... so we have to do some of it's work here.
-	c.io = bufio.NewReadWriter(
-		bufio.NewReader(c.sock),
-		bufio.NewWriter(c.sock))
 
 	// Write should just write a line to the socket.
 	c.write("yo momma")
@@ -446,17 +423,8 @@ func TestWrite(t *testing.T) {
 	}
 
 	// Finally, test the error state by closing the socket then writing.
-	// This little function makes sure that all the blocking channels that are
-	// written to during the course of s.nc.Close() and c.write() are read from
-	// again, to prevent deadlocks when these are both called synchronously.
-	// XXX: This may well be a horrible hack.
-	go func() {
-		<-c.cSend
-		<-c.cLoop
-		<-c.cPing
-	}()
-	s.nc.Close()
 	s.st.EXPECT().Wipe()
+	s.nc.Close()
 	c.write("she can't pass unit tests")
 }
 
