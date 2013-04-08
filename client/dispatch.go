@@ -122,7 +122,7 @@ func (hs *hSet) dispatch(conn *Conn, line *Line) {
 		return
 	}
 	for hn := list.start; hn != nil; hn = hn.next {
-		go hn.Handle(conn, line)
+		go hn.Handle(conn, line.Copy())
 	}
 }
 
