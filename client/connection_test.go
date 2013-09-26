@@ -3,7 +3,6 @@ package client
 import (
 	"code.google.com/p/gomock/gomock"
 	"github.com/fluffle/goirc/state"
-	"github.com/fluffle/golog/logging"
 	"strings"
 	"testing"
 	"time"
@@ -22,7 +21,6 @@ func setUp(t *testing.T, start ...bool) (*Conn, *testState) {
 	st := state.NewMockTracker(ctrl)
 	nc := MockNetConn(t)
 	c := SimpleClient("test", "test", "Testing IRC")
-	logging.SetLogLevel(logging.LogFatal)
 
 	c.st = st
 	c.sock = nc

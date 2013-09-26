@@ -1,7 +1,6 @@
 package state
 
 import (
-	"github.com/fluffle/golog/logging"
 	"reflect"
 )
 
@@ -69,8 +68,6 @@ func (nk *Nick) addChannel(ch *Channel, cp *ChanPrivs) {
 	if _, ok := nk.chans[ch]; !ok {
 		nk.chans[ch] = cp
 		nk.lookup[ch.Name] = ch
-	} else {
-		logging.Warn("Nick.addChannel(): %s already on %s.", nk.Nick, ch.Name)
 	}
 }
 
@@ -79,8 +76,6 @@ func (nk *Nick) delChannel(ch *Channel) {
 	if _, ok := nk.chans[ch]; ok {
 		delete(nk.chans, ch)
 		delete(nk.lookup, ch.Name)
-	} else {
-		logging.Warn("Nick.delChannel(): %s not on %s.", nk.Nick, ch.Name)
 	}
 }
 
@@ -105,8 +100,6 @@ func (nk *Nick) ParseModes(modes string) {
 			nk.Modes.HiddenHost = modeop
 		case 'z':
 			nk.Modes.SSL = modeop
-		default:
-			logging.Info("Nick.ParseModes(): unknown mode char %c", m)
 		}
 	}
 }

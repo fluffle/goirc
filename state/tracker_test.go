@@ -1,15 +1,8 @@
 package state
 
 import (
-	"github.com/fluffle/golog/logging"
 	"testing"
 )
-
-func init() {
-	// This is probably a dirty hack...
-	logging.InitFromFlags()
-	logging.SetLogLevel(logging.LogFatal)
-}
 
 func TestSTNewTracker(t *testing.T) {
 	st := NewTracker("mynick")
