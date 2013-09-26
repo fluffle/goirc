@@ -5,8 +5,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/fluffle/goirc/state"
-	"github.com/fluffle/golog/logging"
-	"io"
 	"net"
 	"strings"
 	"sync"
@@ -107,9 +105,8 @@ func SimpleClient(nick string, args ...string) *Conn {
 }
 
 func Client(cfg *Config) *Conn {
-	logging.InitFromFlags()
 	if cfg == nil || cfg.Me == nil || cfg.Me.Nick == "" || cfg.Me.Ident == "" {
-		logging.Fatal("irc.Client(): Both cfg.Nick and cfg.Ident must be non-empty.")
+		panic("irc.Client(): Both cfg.Nick and cfg.Ident must be non-empty.")
 	}
 	conn := &Conn{
 		cfg:        cfg,
@@ -196,7 +193,6 @@ func (conn *Conn) Connect() error {
 		if !hasPort(conn.cfg.Server) {
 			conn.cfg.Server += ":6697"
 		}
-		logging.Info("irc.Connect(): Connecting to %s with SSL.", conn.cfg.Server)
 		if s, err := tls.Dial("tcp", conn.cfg.Server, conn.cfg.SSLConfig); err == nil {
 			conn.sock = s
 		} else {
@@ -206,7 +202,6 @@ func (conn *Conn) Connect() error {
 		if !hasPort(conn.cfg.Server) {
 			conn.cfg.Server += ":6667"
 		}
-		logging.Info("irc.Connect(): Connecting to %s without SSL.", conn.cfg.Server)
 		if s, err := net.Dial("tcp", conn.cfg.Server); err == nil {
 			conn.sock = s
 		} else {
@@ -257,20 +252,14 @@ func (conn *Conn) recv() {
 	for {
 		s, err := conn.io.ReadString('\n')
 		if err != nil {
-			if err != io.EOF {
-				logging.Error("irc.recv(): %s", err.Error())
-			}
 			conn.shutdown()
 			return
 		}
 		s = strings.Trim(s, "\r\n")
-		logging.Debug("<- %s", s)
 
 		if line := parseLine(s); line != nil {
 			line.Time = time.Now()
 			conn.in <- line
-		} else {
-			logging.Warn("irc.recv(): problems parsing line:\n  %s", s)
 		}
 	}
 }
@@ -309,23 +298,18 @@ func (conn *Conn) write(line string) {
 	if !conn.cfg.Flood {
 		if t := conn.rateLimit(len(line)); t != 0 {
 			// sleep for the current line's time value before sending it
-			logging.Debug("irc.rateLimit(): Flood! Sleeping for %.2f secs.",
-				t.Seconds())
 			<-time.After(t)
 		}
 	}
 
 	if _, err := conn.io.WriteString(line + "\r\n"); err != nil {
-		logging.Error("irc.send(): %s", err.Error())
 		conn.shutdown()
 		return
 	}
 	if err := conn.io.Flush(); err != nil {
-		logging.Error("irc.send(): %s", err.Error())
 		conn.shutdown()
 		return
 	}
-	logging.Debug("-> %s", line)
 }
 
 // Implement Hybrid's flood control algorithm to rate-limit outgoing lines.
@@ -355,7 +339,6 @@ func (conn *Conn) shutdown() {
 	if !conn.connected {
 		return
 	}
-	logging.Info("irc.shutdown(): Disconnected from server.")
 	conn.dispatch(&Line{Cmd: DISCONNECTED})
 	conn.connected = false
 	conn.sock.Close()

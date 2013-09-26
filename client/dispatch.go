@@ -1,7 +1,7 @@
 package client
 
 import (
-	"github.com/fluffle/golog/logging"
+	"log"
 	"runtime"
 	"strings"
 	"sync"
@@ -92,7 +92,6 @@ func (hs *hSet) remove(hn *hNode) {
 	defer hs.Unlock()
 	l, ok := hs.set[hn.event]
 	if !ok {
-		logging.Error("Removing node for unknown event '%s'", hn.event)
 		return
 	}
 	if hn.next == nil {
@@ -147,6 +146,6 @@ func (conn *Conn) dispatch(line *Line) {
 func (conn *Conn) LogPanic(line *Line) {
 	if err := recover(); err != nil {
 		_, f, l, _ := runtime.Caller(2)
-		logging.Error("%s:%d: panic: %v", f, l, err)
+		log.Printf("%s:%d: panic: %v", f, l, err)
 	}
 }

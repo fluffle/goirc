@@ -2,7 +2,6 @@ package state
 
 import (
 	"fmt"
-	"github.com/fluffle/golog/logging"
 	"reflect"
 	"strconv"
 )
@@ -121,8 +120,6 @@ func (ch *Channel) addNick(nk *Nick, cp *ChanPrivs) {
 	if _, ok := ch.nicks[nk]; !ok {
 		ch.nicks[nk] = cp
 		ch.lookup[nk.Nick] = nk
-	} else {
-		logging.Warn("Channel.addNick(): %s already on %s.", nk.Nick, ch.Name)
 	}
 }
 
@@ -131,23 +128,18 @@ func (ch *Channel) delNick(nk *Nick) {
 	if _, ok := ch.nicks[nk]; ok {
 		delete(ch.nicks, nk)
 		delete(ch.lookup, nk.Nick)
-	} else {
-		logging.Warn("Channel.delNick(): %s not on %s.", nk.Nick, ch.Name)
 	}
 }
 
 // Parses mode strings for a channel.
 func (ch *Channel) ParseModes(modes string, modeargs ...string) {
 	var modeop bool // true => add mode, false => remove mode
-	var modestr string
 	for i := 0; i < len(modes); i++ {
 		switch m := modes[i]; m {
 		case '+':
 			modeop = true
-			modestr = string(m)
 		case '-':
 			modeop = false
-			modestr = string(m)
 		case 'i':
 			ch.Modes.InviteOnly = modeop
 		case 'm':
@@ -173,9 +165,6 @@ func (ch *Channel) ParseModes(modes string, modeargs ...string) {
 				ch.Modes.Key, modeargs = modeargs[0], modeargs[1:]
 			} else if !modeop {
 				ch.Modes.Key = ""
-			} else {
-				logging.Warn("Channel.ParseModes(): not enough arguments to "+
-					"process MODE %s %s%c", ch.Name, modestr, m)
 			}
 		case 'l':
 			if modeop && len(modeargs) != 0 {
@@ -183,9 +172,6 @@ func (ch *Channel) ParseModes(modes string, modeargs ...string) {
 				modeargs = modeargs[1:]
 			} else if !modeop {
 				ch.Modes.Limit = 0
-			} else {
-				logging.Warn("Channel.ParseModes(): not enough arguments to "+
-					"process MODE %s %s%c", ch.Name, modestr, m)
 			}
 		case 'q', 'a', 'o', 'h', 'v':
 			if len(modeargs) != 0 {
@@ -204,16 +190,8 @@ func (ch *Channel) ParseModes(modes string, modeargs ...string) {
 						cp.Voice = modeop
 					}
 					modeargs = modeargs[1:]
-				} else {
-					logging.Warn("Channel.ParseModes(): untracked nick %s "+
-						"received MODE on channel %s", modeargs[0], ch.Name)
 				}
-			} else {
-				logging.Warn("Channel.ParseModes(): not enough arguments to "+
-					"process MODE %s %s%c", ch.Name, modestr, m)
 			}
-		default:
-			logging.Info("Channel.ParseModes(): unknown mode char %c", m)
 		}
 	}
 }
