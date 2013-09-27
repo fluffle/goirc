@@ -2,7 +2,7 @@ package state
 
 import (
 	"fmt"
-	"github.com/fluffle/golog/logging"
+	"github.com/fluffle/goirc/logging"
 	"reflect"
 	"strconv"
 )

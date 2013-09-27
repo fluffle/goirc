@@ -1,7 +1,7 @@
 package state
 
 import (
-	"github.com/fluffle/golog/logging"
+	"github.com/fluffle/goirc/logging"
 )
 
 // The state manager interface

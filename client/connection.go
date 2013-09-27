@@ -4,8 +4,8 @@ import (
 	"bufio"
 	"crypto/tls"
 	"fmt"
+	"github.com/fluffle/goirc/logging"
 	"github.com/fluffle/goirc/state"
-	"github.com/fluffle/golog/logging"
 	"io"
 	"net"
 	"strings"
@@ -107,9 +107,13 @@ func SimpleClient(nick string, args ...string) *Conn {
 }
 
 func Client(cfg *Config) *Conn {
-	logging.InitFromFlags()
-	if cfg == nil || cfg.Me == nil || cfg.Me.Nick == "" || cfg.Me.Ident == "" {
-		logging.Fatal("irc.Client(): Both cfg.Nick and cfg.Ident must be non-empty.")
+	if cfg == nil {
+		cfg = NewConfig("__idiot__")
+	}
+	if cfg.Me == nil || cfg.Me.Nick == "" || cfg.Me.Ident == "" {
+		cfg.Me = state.NewNick("__idiot__")
+		cfg.Me.Ident = "goirc"
+		cfg.Me.Name = "Powered by GoIRC"
 	}
 	conn := &Conn{
 		cfg:        cfg,
@@ -309,7 +313,7 @@ func (conn *Conn) write(line string) {
 	if !conn.cfg.Flood {
 		if t := conn.rateLimit(len(line)); t != 0 {
 			// sleep for the current line's time value before sending it
-			logging.Debug("irc.rateLimit(): Flood! Sleeping for %.2f secs.",
+			logging.Info("irc.rateLimit(): Flood! Sleeping for %.2f secs.",
 				t.Seconds())
 			<-time.After(t)
 		}
