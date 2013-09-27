@@ -26,7 +26,7 @@ var stHandlers = map[string]HandlerFunc{
 
 func (conn *Conn) addSTHandlers() {
 	for n, h := range stHandlers {
-		conn.stRemovers = append(conn.stRemovers, conn.Handle(n, h))
+		conn.stRemovers = append(conn.stRemovers, conn.handle(n, h))
 	}
 }
 

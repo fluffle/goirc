@@ -87,7 +87,7 @@ func TestClientAndStateTracking(t *testing.T) {
 	}
 	// Check that the internal handlers are correctly set up
 	for k, _ := range intHandlers {
-		if _, ok := c.handlers.set[strings.ToLower(k)]; !ok {
+		if _, ok := c.intHandlers.set[strings.ToLower(k)]; !ok {
 			t.Errorf("Missing internal handler for '%s'.", k)
 		}
 	}
@@ -95,7 +95,7 @@ func TestClientAndStateTracking(t *testing.T) {
 	// Now enable the state tracking code and check its handlers
 	c.EnableStateTracking()
 	for k, _ := range stHandlers {
-		if _, ok := c.handlers.set[strings.ToLower(k)]; !ok {
+		if _, ok := c.intHandlers.set[strings.ToLower(k)]; !ok {
 			t.Errorf("Missing state handler for '%s'.", k)
 		}
 	}
@@ -124,7 +124,7 @@ func TestClientAndStateTracking(t *testing.T) {
 
 	// Finally, check state tracking handlers were all removed correctly
 	for k, _ := range stHandlers {
-		if _, ok := c.handlers.set[strings.ToLower(k)]; ok && k != "NICK" {
+		if _, ok := c.intHandlers.set[strings.ToLower(k)]; ok && k != "NICK" {
 			// A bit leaky, because intHandlers adds a NICK handler.
 			t.Errorf("State handler for '%s' not removed correctly.", k)
 		}

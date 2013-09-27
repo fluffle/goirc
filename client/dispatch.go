@@ -121,9 +121,15 @@ func (hs *hSet) dispatch(conn *Conn, line *Line) {
 	if !ok {
 		return
 	}
+	wg := &sync.WaitGroup{}
 	for hn := list.start; hn != nil; hn = hn.next {
-		go hn.Handle(conn, line.Copy())
+		wg.Add(1)
+		go func(hn *hNode) {
+			hn.Handle(conn, line.Copy())
+			wg.Done()
+		}(hn)
 	}
+	wg.Wait()
 }
 
 // Handlers are triggered on incoming Lines from the server, with the handler
@@ -133,7 +139,15 @@ func (hs *hSet) dispatch(conn *Conn, line *Line) {
 // strings of digits like "332" (mainly because I really didn't feel like
 // putting massive constant tables in).
 func (conn *Conn) Handle(name string, h Handler) Remover {
-	return conn.handlers.add(name, h)
+	return conn.fgHandlers.add(name, h)
+}
+
+func (conn *Conn) HandleBG(name string, h Handler) Remover {
+	return conn.bgHandlers.add(name, h)
+}
+
+func (conn *Conn) handle(name string, h Handler) Remover {
+	return conn.intHandlers.add(name, h)
 }
 
 func (conn *Conn) HandleFunc(name string, hf HandlerFunc) Remover {
@@ -141,7 +155,18 @@ func (conn *Conn) HandleFunc(name string, hf HandlerFunc) Remover {
 }
 
 func (conn *Conn) dispatch(line *Line) {
-	conn.handlers.dispatch(conn, line)
+	// We run the internal handlers first, including all state tracking ones.
+	// This ensures that user-supplied handlers that use the tracker have a
+	// consistent view of the connection state in handlers that mutate it.
+	conn.intHandlers.dispatch(conn, line)
+	// Background handlers are run in parallel and do not block the event loop.
+	// This is useful for things that may need to do significant work.
+	go conn.bgHandlers.dispatch(conn, line)
+	// Foreground handlers have a guarantee of protocol consistency: all the
+	// handlers for one event will have finished before the handlers for the
+	// next start processing. They are run in parallel but block the event
+	// loop, so care should be taken to ensure these handlers are quick :-)
+	conn.fgHandlers.dispatch(conn, line)
 }
 
 func (conn *Conn) LogPanic(line *Line) {

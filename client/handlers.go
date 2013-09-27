@@ -21,7 +21,7 @@ func (conn *Conn) addIntHandlers() {
 	for n, h := range intHandlers {
 		// internal handlers are essential for the IRC client
 		// to function, so we don't save their Removers here
-		conn.Handle(n, h)
+		conn.handle(n, h)
 	}
 }
 

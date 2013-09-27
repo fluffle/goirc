@@ -22,7 +22,9 @@ type Conn struct {
 	cfg *Config
 
 	// Handlers
-	handlers *hSet
+	intHandlers *hSet
+	fgHandlers *hSet
+	bgHandlers *hSet
 
 	// State tracker for nicks and channels
 	st         state.Tracker
@@ -116,12 +118,14 @@ func Client(cfg *Config) *Conn {
 		cfg.Me.Name = "Powered by GoIRC"
 	}
 	conn := &Conn{
-		cfg:        cfg,
-		in:         make(chan *Line, 32),
-		out:        make(chan string, 32),
-		handlers:   handlerSet(),
-		stRemovers: make([]Remover, 0, len(stHandlers)),
-		lastsent:   time.Now(),
+		cfg:         cfg,
+		in:          make(chan *Line, 32),
+		out:         make(chan string, 32),
+		intHandlers: handlerSet(),
+		fgHandlers:  handlerSet(),
+		bgHandlers:  handlerSet(),
+		stRemovers:  make([]Remover, 0, len(stHandlers)),
+		lastsent:    time.Now(),
 	}
 	conn.addIntHandlers()
 	conn.initialise()
