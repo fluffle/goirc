@@ -37,8 +37,9 @@ type Conn struct {
 	out       chan string
 	connected bool
 
-	// Control channel to goroutines
+	// Control channel and WaitGroup for goroutines
 	die chan struct{}
+	wg  sync.WaitGroup
 
 	// Internal counters for flood protection
 	badness  time.Duration
@@ -249,6 +250,8 @@ func hasPort(s string) bool {
 
 // goroutine to pass data from output channel to write()
 func (conn *Conn) send() {
+	conn.wg.Add(1)
+	defer conn.wg.Done()
 	for {
 		select {
 		case line := <-conn.out:
@@ -262,12 +265,15 @@ func (conn *Conn) send() {
 
 // receive one \r\n terminated line from peer, parse and dispatch it
 func (conn *Conn) recv() {
+	conn.wg.Add(1)
 	for {
 		s, err := conn.io.ReadString('\n')
 		if err != nil {
 			if err != io.EOF {
 				logging.Error("irc.recv(): %s", err.Error())
 			}
+			// We can't defer this, because shutdown() waits for it.
+			conn.wg.Done()
 			conn.shutdown()
 			return
 		}
@@ -285,6 +291,8 @@ func (conn *Conn) recv() {
 
 // Repeatedly pings the server every PingFreq seconds (no matter what)
 func (conn *Conn) ping() {
+	conn.wg.Add(1)
+	defer conn.wg.Done()
 	tick := time.NewTicker(conn.cfg.PingFreq)
 	for {
 		select {
@@ -300,6 +308,8 @@ func (conn *Conn) ping() {
 
 // goroutine to dispatch events for lines received on input channel
 func (conn *Conn) runLoop() {
+	conn.wg.Add(1)
+	defer conn.wg.Done()
 	for {
 		select {
 		case line := <-conn.in:
@@ -368,8 +378,8 @@ func (conn *Conn) shutdown() {
 	conn.connected = false
 	conn.sock.Close()
 	close(conn.die)
+	conn.wg.Wait()
 	// reinit datastructures ready for next connection
-	// do this here rather than after runLoop()'s for due to race
 	conn.initialise()
 }
 
