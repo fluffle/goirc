@@ -65,7 +65,7 @@ func TestEOF(t *testing.T) {
 	<-time.After(time.Millisecond)
 
 	// Verify that the connection no longer thinks it's connected
-	if c.connected {
+	if c.Connected() {
 		t.Errorf("Conn still thinks it's connected to the server.")
 	}
 

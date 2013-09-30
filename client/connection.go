@@ -16,7 +16,7 @@ import (
 // An IRC connection is represented by this struct.
 type Conn struct {
 	// For preventing races on (dis)connect.
-	mu sync.Mutex
+	mu sync.RWMutex
 
 	// Contains parameters that people can tweak to change client behaviour.
 	cfg *Config
@@ -134,6 +134,8 @@ func Client(cfg *Config) *Conn {
 }
 
 func (conn *Conn) Connected() bool {
+	conn.mu.RLock()
+	defer conn.mu.RUnlock()
 	return conn.connected
 }
 
