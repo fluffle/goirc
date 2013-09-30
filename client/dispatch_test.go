@@ -1,6 +1,7 @@
 package client
 
 import (
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -16,9 +17,9 @@ func TestHandlerSet(t *testing.T) {
 		t.Errorf("New set contains things!")
 	}
 
-	callcount := 0
+	callcount := new(int32)
 	f := func(_ *Conn, _ *Line) {
-		callcount++
+		atomic.AddInt32(callcount, 1)
 	}
 
 	// Add one
@@ -85,12 +86,12 @@ func TestHandlerSet(t *testing.T) {
 	}
 
 	// Dispatch should result in 4 additions.
-	if callcount != 0 {
+	if atomic.LoadInt32(callcount) != 0 {
 		t.Errorf("Something incremented call count before we were expecting it.")
 	}
 	hs.dispatch(c, &Line{Cmd: "One"})
 	<-time.After(time.Millisecond)
-	if callcount != 4 {
+	if atomic.LoadInt32(callcount) != 4 {
 		t.Errorf("Our handler wasn't called four times :-(")
 	}
 
@@ -114,7 +115,7 @@ func TestHandlerSet(t *testing.T) {
 	// Dispatch should result in 3 additions.
 	hs.dispatch(c, &Line{Cmd: "One"})
 	<-time.After(time.Millisecond)
-	if callcount != 7 {
+	if atomic.LoadInt32(callcount) != 7 {
 		t.Errorf("Our handler wasn't called three times :-(")
 	}
 
@@ -136,7 +137,7 @@ func TestHandlerSet(t *testing.T) {
 	// Dispatch should result in 2 additions.
 	hs.dispatch(c, &Line{Cmd: "One"})
 	<-time.After(time.Millisecond)
-	if callcount != 9 {
+	if atomic.LoadInt32(callcount) != 9 {
 		t.Errorf("Our handler wasn't called two times :-(")
 	}
 
@@ -158,7 +159,7 @@ func TestHandlerSet(t *testing.T) {
 	// Dispatch should result in 1 addition.
 	hs.dispatch(c, &Line{Cmd: "One"})
 	<-time.After(time.Millisecond)
-	if callcount != 10 {
+	if atomic.LoadInt32(callcount) != 10 {
 		t.Errorf("Our handler wasn't called once :-(")
 	}
 
@@ -177,7 +178,7 @@ func TestHandlerSet(t *testing.T) {
 	// Dispatch should result in NO additions.
 	hs.dispatch(c, &Line{Cmd: "One"})
 	<-time.After(time.Millisecond)
-	if callcount != 10 {
+	if atomic.LoadInt32(callcount) != 10 {
 		t.Errorf("Our handler was called?")
 	}
 }
