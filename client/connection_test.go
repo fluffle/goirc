@@ -8,6 +8,36 @@ import (
 	"time"
 )
 
+type checker struct {
+	t *testing.T
+	c chan struct{}
+}
+
+func callCheck(t *testing.T) checker {
+	return checker{t: t, c: make(chan struct{})}
+}
+
+func (c checker) call() {
+	c.c <- struct{}{}
+}
+
+func (c checker) assertNotCalled(fmt string, args ...interface{}) {
+	select {
+	case <-c.c:
+		c.t.Errorf(fmt, args...)
+	default:
+	}
+}
+
+func (c checker) assertWasCalled(fmt string, args ...interface{}) {
+	select {
+	case <-c.c:
+	case <-time.After(time.Millisecond):
+		// Usually need to wait for goroutines to settle :-/
+		c.t.Errorf(fmt, args...)
+	}
+}
+
 type testState struct {
 	ctrl *gomock.Controller
 	st   *state.MockTracker
@@ -30,7 +60,7 @@ func setUp(t *testing.T, start ...bool) (*Conn, *testState) {
 	// start the various goroutines that shuttle data around.
 	c.postConnect(len(start) == 0)
 	// Sleep 1ms to allow background routines to start.
-	<-time.After(1e6)
+	<-time.After(time.Millisecond)
 
 	return c, &testState{ctrl, st, nc, c}
 }
@@ -39,7 +69,6 @@ func (s *testState) tearDown() {
 	s.st.EXPECT().Wipe()
 	s.nc.ExpectNothing()
 	s.c.shutdown()
-	<-time.After(time.Millisecond)
 	s.ctrl.Finish()
 }
 
@@ -51,27 +80,21 @@ func TestEOF(t *testing.T) {
 	defer s.ctrl.Finish()
 
 	// Set up a handler to detect whether disconnected handlers are called
-	dcon := false
+	dcon := callCheck(t)
 	c.HandleFunc(DISCONNECTED, func(conn *Conn, line *Line) {
-		dcon = true
+		dcon.call()
 	})
 
 	// Simulate EOF from server
 	s.st.EXPECT().Wipe()
 	s.nc.Close()
 
-	// Since things happen in different internal goroutines, we need to wait
-	// 1 ms should be enough :-)
-	<-time.After(time.Millisecond)
+	// Verify that disconnected handler was called
+	dcon.assertWasCalled("Conn did not call disconnected handlers.")
 
 	// Verify that the connection no longer thinks it's connected
 	if c.Connected() {
 		t.Errorf("Conn still thinks it's connected to the server.")
-	}
-
-	// Verify that disconnected handler was called
-	if !dcon {
-		t.Errorf("Conn did not call disconnected handlers.")
 	}
 }
 
@@ -146,10 +169,10 @@ func TestSend(t *testing.T) {
 	s.nc.ExpectNothing()
 
 	// We want to test that the a goroutine calling send will exit correctly.
-	exited := false
+	exited := callCheck(t)
 	go func() {
 		c.send()
-		exited = true
+		exited.call()
 	}()
 
 	// send is now running in the background as if started by postConnect.
@@ -162,19 +185,13 @@ func TestSend(t *testing.T) {
 	s.nc.Expect("SENT AFTER START")
 
 	// Now, use the control channel to exit send and kill the goroutine.
-	if exited {
-		t.Errorf("Exited before signal sent.")
-	}
 	// This sneakily uses the fact that the other two goroutines that would
 	// normally be waiting for die to close are not running, so we only send
 	// to the goroutine started above. Normally shutdown() closes c.die and
 	// signals to all three goroutines (send, ping, runLoop) to exit.
+	exited.assertNotCalled("Exited before signal sent.")
 	c.die <- struct{}{}
-	// Allow propagation time...
-	<-time.After(1e6)
-	if !exited {
-		t.Errorf("Didn't exit after signal.")
-	}
+	exited.assertWasCalled("Didn't exit after signal.")
 	s.nc.ExpectNothing()
 
 	// Sending more on c.out shouldn't reach the network.
@@ -206,15 +223,11 @@ func TestRecv(t *testing.T) {
 	}
 
 	// We want to test that the a goroutine calling recv will exit correctly.
-	exited := false
+	exited := callCheck(t)
 	go func() {
 		c.recv()
-		exited = true
+		exited.call()
 	}()
-
-	// Strangely, recv() needs some time to start up, but *only* when this test
-	// is run standalone with: client/_test/_testmain --test.run TestRecv
-	<-time.After(time.Millisecond)
 
 	// Now, this should mean that we'll receive our parsed line on c.in
 	if l := reader(); l == nil || l.Cmd != "001" {
@@ -235,17 +248,10 @@ func TestRecv(t *testing.T) {
 	}
 
 	// The only way recv() exits is when the socket closes.
-	if exited {
-		t.Errorf("Exited before socket close.")
-	}
+	exited.assertNotCalled("Exited before socket close.")
 	s.st.EXPECT().Wipe()
 	s.nc.Close()
-
-	// Give things time to shake themselves out...
-	<-time.After(time.Millisecond)
-	if !exited {
-		t.Errorf("Didn't exit on socket close.")
-	}
+	exited.assertWasCalled("Didn't exit on socket close.")
 
 	// Since s.nc is closed we can't attempt another send on it...
 	if l := reader(); l != nil {
@@ -275,10 +281,10 @@ func TestPing(t *testing.T) {
 	}
 
 	// Start ping loop.
-	exited := false
+	exited := callCheck(t)
 	go func() {
 		c.ping()
-		exited = true
+		exited.call()
 	}()
 
 	// The first ping should be after 50ms,
@@ -306,22 +312,17 @@ func TestPing(t *testing.T) {
 	}
 
 	// Now kill the ping loop.
-	if exited {
-		t.Errorf("Exited before signal sent.")
-	}
 	// This sneakily uses the fact that the other two goroutines that would
 	// normally be waiting for die to close are not running, so we only send
 	// to the goroutine started above. Normally shutdown() closes c.die and
 	// signals to all three goroutines (send, ping, runLoop) to exit.
+	exited.assertNotCalled("Exited before signal sent.")
 	c.die <- struct{}{}
+	exited.assertWasCalled("Didn't exit after signal.")
 	// Make sure we're no longer pinging by waiting ~2x PingFreq
 	<-time.After(105 * time.Millisecond)
 	if s := reader(); s != "" {
 		t.Errorf("Line output after ping stopped.")
-	}
-
-	if !exited {
-		t.Errorf("Didn't exit after signal.")
 	}
 }
 
@@ -331,67 +332,47 @@ func TestRunLoop(t *testing.T) {
 	defer s.tearDown()
 
 	// Set up a handler to detect whether 001 handler is called
-	h001 := false
+	h001 := callCheck(t)
 	c.HandleFunc("001", func(conn *Conn, line *Line) {
-		h001 = true
+		h001.call()
 	})
+	h002 := callCheck(t)
 	// Set up a handler to detect whether 002 handler is called
-	h002 := false
 	c.HandleFunc("002", func(conn *Conn, line *Line) {
-		h002 = true
+		h002.call()
 	})
 
 	l1 := parseLine(":irc.server.org 001 test :First test line.")
 	c.in <- l1
-	if h001 {
-		t.Errorf("001 handler called before runLoop started.")
-	}
+	h001.assertNotCalled("001 handler called before runLoop started.")
 
 	// We want to test that the a goroutine calling runLoop will exit correctly.
 	// Now, we can expect the call to Dispatch to take place as runLoop starts.
-	exited := false
+	exited := callCheck(t)
 	go func() {
 		c.runLoop()
-		exited = true
+		exited.call()
 	}()
-	// Here, the opposite seemed to take place, with TestRunLoop failing when
-	// run as part of the suite but passing when run on it's own.
-	<-time.After(time.Millisecond)
-	if !h001 {
-		t.Errorf("001 handler not called after runLoop started.")
-	}
+	h001.assertWasCalled("001 handler not called after runLoop started.")
 
 	// Send another line, just to be sure :-)
+	h002.assertNotCalled("002 handler called before expected.")
 	l2 := parseLine(":irc.server.org 002 test :Second test line.")
 	c.in <- l2
-	// It appears some sleeping is needed after all of these to ensure channel
-	// sends occur before the close signal is sent below...
-	<-time.After(time.Millisecond)
-	if !h002 {
-		t.Errorf("002 handler not called while runLoop started.")
-	}
+	h002.assertWasCalled("002 handler not called while runLoop started.")
 
 	// Now, use the control channel to exit send and kill the goroutine.
-	if exited {
-		t.Errorf("Exited before signal sent.")
-	}
 	// This sneakily uses the fact that the other two goroutines that would
 	// normally be waiting for die to close are not running, so we only send
 	// to the goroutine started above. Normally shutdown() closes c.die and
 	// signals to all three goroutines (send, ping, runLoop) to exit.
+	exited.assertNotCalled("Exited before signal sent.")
 	c.die <- struct{}{}
-	// Allow propagation time...
-	<-time.After(time.Millisecond)
-	if !exited {
-		t.Errorf("Didn't exit after signal.")
-	}
+	exited.assertWasCalled("Didn't exit after signal.")
 
 	// Sending more on c.in shouldn't dispatch any further events
-	h001 = false
 	c.in <- l1
-	if h001 {
-		t.Errorf("001 handler called after runLoop ended.")
-	}
+	h001.assertNotCalled("001 handler called after runLoop ended.")
 }
 
 func TestWrite(t *testing.T) {

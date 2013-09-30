@@ -186,18 +186,15 @@ func TestPanicRecovery(t *testing.T) {
 	c, s := setUp(t)
 	defer s.tearDown()
 
-	recovered := false
+	recovered := callCheck(t)
 	c.cfg.Recover = func(conn *Conn, line *Line) {
 		if err, ok := recover().(string); ok && err == "panic!" {
-			recovered = true
+			recovered.call()
 		}
 	}
 	c.HandleFunc(PRIVMSG, func(conn *Conn, line *Line) {
 		panic("panic!")
 	})
 	c.in <- parseLine(":nick!user@host.com PRIVMSG #channel :OH NO PIGEONS")
-	<-time.After(time.Millisecond)
-	if recovered != true {
-		t.Errorf("Failed to recover panic!")
-	}
+	recovered.assertWasCalled("Failed to recover panic!")
 }
