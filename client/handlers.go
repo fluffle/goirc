@@ -103,10 +103,10 @@ func (conn *Conn) h_433(line *Line) {
 	// arm a timer to try get back our nick.
 	go func(old string) {
 		retry := 1 * time.Minute
-		for time.Sleep(retry); conn.cfg.Me.Nick != old; time.Sleep(retry) {
+		for time.Sleep(retry); conn.Me.Nick != old; time.Sleep(retry) {
 			conn.Nick(old)
 		}
-	}(conn.cfg.Me.Nick)
+	}(conn.Me.Nick)
 	// if this is happening before we're properly connected (i.e. the nick
 	// we sent in the initial NICK command is in use) we will not receive
 	// a NICK message to confirm our change of nick, so ReNick here...
