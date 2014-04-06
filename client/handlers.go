@@ -106,7 +106,7 @@ func (conn *Conn) h_433(line *Line) {
 		for time.Sleep(retry); conn.Me.Nick != old; time.Sleep(retry) {
 			conn.Nick(old)
 		}
-	}(conn.Me.Nick)
+	}(line.Args[1])
 	// if this is happening before we're properly connected (i.e. the nick
 	// we sent in the initial NICK command is in use) we will not receive
 	// a NICK message to confirm our change of nick, so ReNick here...
