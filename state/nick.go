@@ -2,7 +2,9 @@ package state
 
 import (
 	"github.com/fluffle/goirc/logging"
+
 	"reflect"
+	"sort"
 )
 
 // A struct representing an IRC nick
@@ -111,22 +113,29 @@ func (nk *Nick) ParseModes(modes string) {
 	}
 }
 
-// Channels returns a list of *Channel the nick is on.
+type byName []*Channel
+
+func (b byName) Len() int           { return len(b) }
+func (b byName) Less(i, j int) bool { return b[i].Name < b[j].Name }
+func (b byName) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
+
+// Channels returns a list of *Channel the nick is on, sorted by name.
 func (nk *Nick) Channels() []*Channel {
 	channels := make([]*Channel, 0, len(nk.lookup))
 	for _, channel := range nk.lookup {
 		channels = append(channels, channel)
 	}
+	sort.Sort(byName(channels))
 	return channels
 }
 
-// ChannelsStr returns a list of channel strings the nick is on.
+// ChannelsStr returns a list of channel strings the nick is on, sorted by name.
 func (nk *Nick) ChannelsStr() []string {
-	channels := make([]string, 0, len(nk.lookup))
-	for _, channel := range nk.lookup {
-		channels = append(channels, channel.Name)
+	var names []string
+	for _, channel := range nk.Channels() {
+		names = append(names, channel.Name)
 	}
-	return channels
+	return names
 }
 
 // Returns a string representing the nick. Looks like:
