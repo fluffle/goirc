@@ -1,15 +1,6 @@
 package state
 
-import (
-	"github.com/fluffle/goirc/logging"
-	"testing"
-)
-
-func init() {
-	// This is probably a dirty hack...
-	logging.InitFromFlags()
-	logging.SetLogLevel(logging.LogFatal)
-}
+import "testing"
 
 func TestSTNewTracker(t *testing.T) {
 	st := NewTracker("mynick")
