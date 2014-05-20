@@ -1,9 +1,11 @@
 package state
 
 import (
-	"fmt"
 	"github.com/fluffle/goirc/logging"
+
+	"fmt"
 	"reflect"
+	"sort"
 	"strconv"
 )
 
@@ -218,19 +220,26 @@ func (ch *Channel) ParseModes(modes string, modeargs ...string) {
 	}
 }
 
-// Nicks returns a list of *Nick that are on the channel.
+type byNick []*Nick
+
+func (b byNick) Len() int           { return len(b) }
+func (b byNick) Less(i, j int) bool { return b[i].Nick < b[j].Nick }
+func (b byNick) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
+
+// Nicks returns a list of *Nick that are on the channel, sorted by nick.
 func (ch *Channel) Nicks() []*Nick {
 	nicks := make([]*Nick, 0, len(ch.lookup))
 	for _, nick := range ch.lookup {
 		nicks = append(nicks, nick)
 	}
+	sort.Sort(byNick(nicks))
 	return nicks
 }
 
-// NicksStr returns a list of nick strings that are on the channel.
+// NicksStr returns a list of nick strings that are on the channel, sorted by nick.
 func (ch *Channel) NicksStr() []string {
-	nicks := make([]string, 0, len(ch.lookup))
-	for _, nick := range ch.lookup {
+	var nicks []string
+	for _, nick := range ch.Nicks() {
 		nicks = append(nicks, nick.Nick)
 	}
 	return nicks
