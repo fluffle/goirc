@@ -376,13 +376,13 @@ func (conn *Conn) shutdown() {
 		return
 	}
 	logging.Info("irc.shutdown(): Disconnected from server.")
-	conn.dispatch(&Line{Cmd: DISCONNECTED})
 	conn.connected = false
 	conn.sock.Close()
 	close(conn.die)
 	conn.wg.Wait()
 	// reinit datastructures ready for next connection
 	conn.initialise()
+	conn.dispatch(&Line{Cmd: DISCONNECTED})
 }
 
 // Dumps a load of information about the current state of the connection to a
