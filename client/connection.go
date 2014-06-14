@@ -390,12 +390,12 @@ func (conn *Conn) shutdown() {
 func (conn *Conn) String() string {
 	str := "GoIRC Connection\n"
 	str += "----------------\n\n"
-	if conn.connected {
+	if conn.Connected() {
 		str += "Connected to " + conn.cfg.Server + "\n\n"
 	} else {
 		str += "Not currently connected!\n\n"
 	}
-	str += conn.cfg.Me.String() + "\n"
+	str += conn.Me().String() + "\n"
 	if conn.st != nil {
 		str += conn.st.String() + "\n"
 	}
