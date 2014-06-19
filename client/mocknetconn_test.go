@@ -130,11 +130,11 @@ func (m *mockNetConn) Closed() bool {
 }
 
 func (m *mockNetConn) LocalAddr() net.Addr {
-	return &net.IPAddr{net.IPv4(127, 0, 0, 1), ""}
+	return &net.IPAddr{IP: net.IPv4(127, 0, 0, 1)}
 }
 
 func (m *mockNetConn) RemoteAddr() net.Addr {
-	return &net.IPAddr{net.IPv4(127, 0, 0, 1), ""}
+	return &net.IPAddr{IP: net.IPv4(127, 0, 0, 1)}
 }
 
 func (m *mockNetConn) SetDeadline(t time.Time) error {
