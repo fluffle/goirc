@@ -78,8 +78,8 @@ func (line *Line) Public() bool {
 }
 
 
-// parseLine() creates a Line from an incoming message from the IRC server.
-func parseLine(s string) *Line {
+// ParseLine() creates a Line from an incoming message from the IRC server.
+func ParseLine(s string) *Line {
 	line := &Line{Raw: s}
 	if s[0] == ':' {
 		// remove a source and parse it
