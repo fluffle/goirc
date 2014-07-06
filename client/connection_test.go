@@ -241,7 +241,7 @@ func TestRecv(t *testing.T) {
 	}
 
 	// Test that recv does something useful with a line it can't parse
-	// (not that there are many, parseLine is forgiving).
+	// (not that there are many, ParseLine is forgiving).
 	s.nc.Send(":textwithnospaces")
 	if l := reader(); l != nil {
 		t.Errorf("Bad line still caused receive on input channel.")
@@ -342,7 +342,7 @@ func TestRunLoop(t *testing.T) {
 		h002.call()
 	})
 
-	l1 := parseLine(":irc.server.org 001 test :First test line.")
+	l1 := ParseLine(":irc.server.org 001 test :First test line.")
 	c.in <- l1
 	h001.assertNotCalled("001 handler called before runLoop started.")
 
@@ -357,7 +357,7 @@ func TestRunLoop(t *testing.T) {
 
 	// Send another line, just to be sure :-)
 	h002.assertNotCalled("002 handler called before expected.")
-	l2 := parseLine(":irc.server.org 002 test :Second test line.")
+	l2 := ParseLine(":irc.server.org 002 test :Second test line.")
 	c.in <- l2
 	h002.assertWasCalled("002 handler not called while runLoop started.")
 

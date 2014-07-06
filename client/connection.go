@@ -282,7 +282,7 @@ func (conn *Conn) recv() {
 		s = strings.Trim(s, "\r\n")
 		logging.Debug("<- %s", s)
 
-		if line := parseLine(s); line != nil {
+		if line := ParseLine(s); line != nil {
 			line.Time = time.Now()
 			conn.in <- line
 		} else {

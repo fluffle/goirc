@@ -196,6 +196,6 @@ func TestPanicRecovery(t *testing.T) {
 	c.HandleFunc(PRIVMSG, func(conn *Conn, line *Line) {
 		panic("panic!")
 	})
-	c.in <- parseLine(":nick!user@host.com PRIVMSG #channel :OH NO PIGEONS")
+	c.in <- ParseLine(":nick!user@host.com PRIVMSG #channel :OH NO PIGEONS")
 	recovered.assertWasCalled("Failed to recover panic!")
 }
