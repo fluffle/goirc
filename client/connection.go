@@ -236,10 +236,12 @@ func (conn *Conn) postConnect(start bool) {
 		bufio.NewReader(conn.sock),
 		bufio.NewWriter(conn.sock))
 	if start {
+		conn.wg.Add(3)
 		go conn.send()
 		go conn.recv()
 		go conn.runLoop()
 		if conn.cfg.PingFreq > 0 {
+			conn.wg.Add(1)
 			go conn.ping()
 		}
 	}
@@ -252,7 +254,6 @@ func hasPort(s string) bool {
 
 // goroutine to pass data from output channel to write()
 func (conn *Conn) send() {
-	conn.wg.Add(1)
 	defer conn.wg.Done()
 	for {
 		select {
@@ -267,7 +268,6 @@ func (conn *Conn) send() {
 
 // receive one \r\n terminated line from peer, parse and dispatch it
 func (conn *Conn) recv() {
-	conn.wg.Add(1)
 	for {
 		s, err := conn.io.ReadString('\n')
 		if err != nil {
@@ -293,7 +293,6 @@ func (conn *Conn) recv() {
 
 // Repeatedly pings the server every PingFreq seconds (no matter what)
 func (conn *Conn) ping() {
-	conn.wg.Add(1)
 	defer conn.wg.Done()
 	tick := time.NewTicker(conn.cfg.PingFreq)
 	for {
@@ -310,7 +309,6 @@ func (conn *Conn) ping() {
 
 // goroutine to dispatch events for lines received on input channel
 func (conn *Conn) runLoop() {
-	conn.wg.Add(1)
 	defer conn.wg.Done()
 	for {
 		select {

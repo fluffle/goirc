@@ -170,6 +170,8 @@ func TestSend(t *testing.T) {
 
 	// We want to test that the a goroutine calling send will exit correctly.
 	exited := callCheck(t)
+	// send() will decrement the WaitGroup, so we must increment it.
+	c.wg.Add(1)
 	go func() {
 		c.send()
 		exited.call()
@@ -224,6 +226,8 @@ func TestRecv(t *testing.T) {
 
 	// We want to test that the a goroutine calling recv will exit correctly.
 	exited := callCheck(t)
+	// recv() will decrement the WaitGroup, so we must increment it.
+	c.wg.Add(1)
 	go func() {
 		c.recv()
 		exited.call()
@@ -282,6 +286,8 @@ func TestPing(t *testing.T) {
 
 	// Start ping loop.
 	exited := callCheck(t)
+	// ping() will decrement the WaitGroup, so we must increment it.
+	c.wg.Add(1)
 	go func() {
 		c.ping()
 		exited.call()
@@ -349,6 +355,8 @@ func TestRunLoop(t *testing.T) {
 	// We want to test that the a goroutine calling runLoop will exit correctly.
 	// Now, we can expect the call to Dispatch to take place as runLoop starts.
 	exited := callCheck(t)
+	// runLoop() will decrement the WaitGroup, so we must increment it.
+	c.wg.Add(1)
 	go func() {
 		c.runLoop()
 		exited.call()
