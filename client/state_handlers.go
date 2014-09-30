@@ -4,8 +4,9 @@ package client
 // to manage tracking state for an IRC connection
 
 import (
-	"github.com/fluffle/goirc/logging"
 	"strings"
+
+	"github.com/fluffle/goirc/logging"
 )
 
 var stHandlers = map[string]HandlerFunc{
@@ -176,6 +177,9 @@ func (conn *Conn) h_352(line *Line) {
 	nk.Name = a[1]
 	if idx := strings.Index(line.Args[6], "*"); idx != -1 {
 		nk.Modes.Oper = true
+	}
+	if idx := strings.Index(line.Args[6], "B"); idx != -1 {
+		nk.Modes.Bot = true
 	}
 	if idx := strings.Index(line.Args[6], "H"); idx != -1 {
 		nk.Modes.Invisible = true
