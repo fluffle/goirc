@@ -31,6 +31,7 @@ type Conn struct {
 	stRemovers []Remover
 
 	// I/O stuff to server
+	dialer    *net.Dialer
 	sock      net.Conn
 	io        *bufio.ReadWriter
 	in        chan *Line
@@ -57,6 +58,9 @@ type Config struct {
 	// Are we connecting via SSL? Do we care about certificate validity?
 	SSL       bool
 	SSLConfig *tls.Config
+
+	// Local address to connect to the server.
+	LocalAddr string
 
 	// Replaceable function to customise the 433 handler's new nick
 	NewNick func(string) string
@@ -118,8 +122,24 @@ func Client(cfg *Config) *Conn {
 		cfg.Me.Ident = "goirc"
 		cfg.Me.Name = "Powered by GoIRC"
 	}
+
+	dialer := new(net.Dialer)
+	if cfg.LocalAddr != "" {
+		if !hasPort(cfg.LocalAddr) {
+			cfg.LocalAddr += ":0"
+		}
+
+		local, err := net.ResolveTCPAddr("tcp", cfg.LocalAddr)
+		if err == nil {
+			dialer.LocalAddr = local
+		} else {
+			logging.Error("irc.Client(): Cannot resolve local address %s: %s", cfg.LocalAddr, err)
+		}
+	}
+
 	conn := &Conn{
 		cfg:         cfg,
+		dialer:      dialer,
 		in:          make(chan *Line, 32),
 		out:         make(chan string, 32),
 		intHandlers: handlerSet(),
@@ -208,7 +228,7 @@ func (conn *Conn) Connect() error {
 			conn.cfg.Server += ":6697"
 		}
 		logging.Info("irc.Connect(): Connecting to %s with SSL.", conn.cfg.Server)
-		if s, err := tls.Dial("tcp", conn.cfg.Server, conn.cfg.SSLConfig); err == nil {
+		if s, err := tls.DialWithDialer(conn.dialer, "tcp", conn.cfg.Server, conn.cfg.SSLConfig); err == nil {
 			conn.sock = s
 		} else {
 			return err
@@ -218,7 +238,7 @@ func (conn *Conn) Connect() error {
 			conn.cfg.Server += ":6667"
 		}
 		logging.Info("irc.Connect(): Connecting to %s without SSL.", conn.cfg.Server)
-		if s, err := net.Dial("tcp", conn.cfg.Server); err == nil {
+		if s, err := conn.dialer.Dial("tcp", conn.cfg.Server); err == nil {
 			conn.sock = s
 		} else {
 			return err
