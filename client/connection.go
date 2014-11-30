@@ -246,7 +246,7 @@ func (conn *Conn) Connect() error {
 	}
 	conn.connected = true
 	conn.postConnect(true)
-	conn.dispatch(&Line{Cmd: REGISTER})
+	conn.dispatch(&Line{Cmd: REGISTER, Time: time.Now()})
 	return nil
 }
 
@@ -400,7 +400,7 @@ func (conn *Conn) shutdown() {
 	conn.wg.Wait()
 	// reinit datastructures ready for next connection
 	conn.initialise()
-	conn.dispatch(&Line{Cmd: DISCONNECTED})
+	conn.dispatch(&Line{Cmd: DISCONNECTED, Time: time.Now()})
 }
 
 // Dumps a load of information about the current state of the connection to a
