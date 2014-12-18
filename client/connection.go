@@ -225,7 +225,7 @@ func (conn *Conn) Connect() error {
 	}
 	if conn.cfg.SSL {
 		if !hasPort(conn.cfg.Server) {
-			conn.cfg.Server += ":6697"
+			conn.cfg.Server = net.JoinHostPort(conn.cfg.Server, "6697")
 		}
 		logging.Info("irc.Connect(): Connecting to %s with SSL.", conn.cfg.Server)
 		if s, err := tls.DialWithDialer(conn.dialer, "tcp", conn.cfg.Server, conn.cfg.SSLConfig); err == nil {
@@ -235,7 +235,7 @@ func (conn *Conn) Connect() error {
 		}
 	} else {
 		if !hasPort(conn.cfg.Server) {
-			conn.cfg.Server += ":6667"
+			conn.cfg.Server = net.JoinHostPort(conn.cfg.Server, "6667")
 		}
 		logging.Info("irc.Connect(): Connecting to %s without SSL.", conn.cfg.Server)
 		if s, err := conn.dialer.Dial("tcp", conn.cfg.Server); err == nil {
