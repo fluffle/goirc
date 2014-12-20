@@ -79,6 +79,9 @@ type Config struct {
 	// Split PRIVMSGs, NOTICEs and CTCPs longer than
 	// SplitLen characters over multiple lines.
 	SplitLen int
+
+	// Timeout, The amount of time in seconds until a timeout is triggered.
+	Timeout time.Duration
 }
 
 func NewConfig(nick string, args ...string) *Config {
@@ -88,6 +91,7 @@ func NewConfig(nick string, args ...string) *Config {
 		NewNick:  func(s string) string { return s + "_" },
 		Recover:  (*Conn).LogPanic, // in dispatch.go
 		SplitLen: 450,
+		Timeout: 60,
 	}
 	cfg.Me.Ident = "goirc"
 	if len(args) > 0 && args[0] != "" {
@@ -207,8 +211,14 @@ func (conn *Conn) Connect() error {
 		if !hasPort(conn.cfg.Server) {
 			conn.cfg.Server += ":6697"
 		}
+		if &conn.cfg.Timeout != nil{
+			conn.cfg.Timeout = (60 * time.Second)
+		}
 		logging.Info("irc.Connect(): Connecting to %s with SSL.", conn.cfg.Server)
-		if s, err := tls.Dial("tcp", conn.cfg.Server, conn.cfg.SSLConfig); err == nil {
+		dialer := &net.Dialer{
+                Timeout : conn.cfg.Timeout,
+         }
+		if s, err := tls.DialWithDialer(dialer, "tcp", conn.cfg.Server, conn.cfg.SSLConfig); err == nil {
 			conn.sock = s
 		} else {
 			return err
@@ -217,8 +227,11 @@ func (conn *Conn) Connect() error {
 		if !hasPort(conn.cfg.Server) {
 			conn.cfg.Server += ":6667"
 		}
+		if &conn.cfg.Timeout != nil{
+			conn.cfg.Timeout = (60 * time.Second)
+		}
 		logging.Info("irc.Connect(): Connecting to %s without SSL.", conn.cfg.Server)
-		if s, err := net.Dial("tcp", conn.cfg.Server); err == nil {
+		if s, err := net.DialTimeout("tcp", conn.cfg.Server, conn.cfg.Timeout); err == nil {
 			conn.sock = s
 		} else {
 			return err
