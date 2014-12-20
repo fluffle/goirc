@@ -128,6 +128,7 @@ func Client(cfg *Config) *Conn {
 	}
 
 	dialer := new(net.Dialer)
+	dialer.Timeout = cfg.Timeout
 	if cfg.LocalAddr != "" {
 		if !hasPort(cfg.LocalAddr) {
 			cfg.LocalAddr += ":0"
@@ -227,7 +228,6 @@ func (conn *Conn) Connect() error {
 	if conn.connected {
 		return fmt.Errorf("irc.Connect(): Cannot connect to %s, already connected.", conn.cfg.Server)
 	}
-	conn.dialer.Timeout = conn.cfg.Timeout
 	if conn.cfg.SSL {
 		if !hasPort(conn.cfg.Server) {
 			conn.cfg.Server = net.JoinHostPort(conn.cfg.Server, "6697")
