@@ -227,15 +227,12 @@ func (conn *Conn) Connect() error {
 	if conn.connected {
 		return fmt.Errorf("irc.Connect(): Cannot connect to %s, already connected.", conn.cfg.Server)
 	}
+	conn.dialer.Timeout = conn.cfg.Timeout
 	if conn.cfg.SSL {
 		if !hasPort(conn.cfg.Server) {
 			conn.cfg.Server = net.JoinHostPort(conn.cfg.Server, "6697")
 		}
-		if &conn.cfg.Timeout != nil {
-			conn.cfg.Timeout = (60 * time.Second)
-		}
 		logging.Info("irc.Connect(): Connecting to %s with SSL.", conn.cfg.Server)
-		conn.dialer.Timeout = conn.cfg.Timeout
 		if s, err := tls.DialWithDialer(conn.dialer, "tcp", conn.cfg.Server, conn.cfg.SSLConfig); err == nil {
 			conn.sock = s
 		} else {
@@ -245,11 +242,8 @@ func (conn *Conn) Connect() error {
 		if !hasPort(conn.cfg.Server) {
 			conn.cfg.Server = net.JoinHostPort(conn.cfg.Server, "6667")
 		}
-		if &conn.cfg.Timeout != nil {
-			conn.cfg.Timeout = (60 * time.Second)
-		}
 		logging.Info("irc.Connect(): Connecting to %s without SSL.", conn.cfg.Server)
-		if s, err := conn.dialer.DialTimeout("tcp", conn.cfg.Server, conn.cfg.Timeout); err == nil {
+		if s, err := conn.dialer.Dial("tcp", conn.cfg.Server); err == nil {
 			conn.sock = s
 		} else {
 			return err
