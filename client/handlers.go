@@ -5,6 +5,7 @@ package client
 
 import (
 	"strings"
+	"time"
 )
 
 // sets up the internal event handlers to do essential IRC protocol things
@@ -42,7 +43,7 @@ func (conn *Conn) h_REGISTER(line *Line) {
 // Handler to trigger a CONNECTED event on receipt of numeric 001
 func (conn *Conn) h_001(line *Line) {
 	// we're connected!
-	conn.dispatch(&Line{Cmd: CONNECTED})
+	conn.dispatch(&Line{Cmd: CONNECTED, Time: time.Now()})
 	// and we're being given our hostname (from the server's perspective)
 	t := line.Args[len(line.Args)-1]
 	if idx := strings.LastIndex(t, " "); idx != -1 {

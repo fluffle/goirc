@@ -31,6 +31,7 @@ type Conn struct {
 	stRemovers []Remover
 
 	// I/O stuff to server
+	dialer    *net.Dialer
 	sock      net.Conn
 	io        *bufio.ReadWriter
 	in        chan *Line
@@ -57,6 +58,9 @@ type Config struct {
 	// Are we connecting via SSL? Do we care about certificate validity?
 	SSL       bool
 	SSLConfig *tls.Config
+
+	// Local address to connect to the server.
+	LocalAddr string
 
 	// Replaceable function to customise the 433 handler's new nick
 	NewNick func(string) string
@@ -91,7 +95,7 @@ func NewConfig(nick string, args ...string) *Config {
 		NewNick:  func(s string) string { return s + "_" },
 		Recover:  (*Conn).LogPanic, // in dispatch.go
 		SplitLen: 450,
-		Timeout:  60,
+		Timeout:  60 * time.Second,
 	}
 	cfg.Me.Ident = "goirc"
 	if len(args) > 0 && args[0] != "" {
@@ -122,8 +126,24 @@ func Client(cfg *Config) *Conn {
 		cfg.Me.Ident = "goirc"
 		cfg.Me.Name = "Powered by GoIRC"
 	}
+
+	dialer := new(net.Dialer)
+	if cfg.LocalAddr != "" {
+		if !hasPort(cfg.LocalAddr) {
+			cfg.LocalAddr += ":0"
+		}
+
+		local, err := net.ResolveTCPAddr("tcp", cfg.LocalAddr)
+		if err == nil {
+			dialer.LocalAddr = local
+		} else {
+			logging.Error("irc.Client(): Cannot resolve local address %s: %s", cfg.LocalAddr, err)
+		}
+	}
+
 	conn := &Conn{
 		cfg:         cfg,
+		dialer:      dialer,
 		in:          make(chan *Line, 32),
 		out:         make(chan string, 32),
 		intHandlers: handlerSet(),
@@ -209,29 +229,27 @@ func (conn *Conn) Connect() error {
 	}
 	if conn.cfg.SSL {
 		if !hasPort(conn.cfg.Server) {
-			conn.cfg.Server += ":6697"
+			conn.cfg.Server = net.JoinHostPort(conn.cfg.Server, "6697")
 		}
 		if &conn.cfg.Timeout != nil {
 			conn.cfg.Timeout = (60 * time.Second)
 		}
 		logging.Info("irc.Connect(): Connecting to %s with SSL.", conn.cfg.Server)
-		dialer := &net.Dialer{
-			Timeout: conn.cfg.Timeout,
-		}
-		if s, err := tls.DialWithDialer(dialer, "tcp", conn.cfg.Server, conn.cfg.SSLConfig); err == nil {
+		conn.dialer.Timeout = conn.cfg.Timeout
+		if s, err := tls.DialWithDialer(conn.dialer, "tcp", conn.cfg.Server, conn.cfg.SSLConfig); err == nil {
 			conn.sock = s
 		} else {
 			return err
 		}
 	} else {
 		if !hasPort(conn.cfg.Server) {
-			conn.cfg.Server += ":6667"
+			conn.cfg.Server = net.JoinHostPort(conn.cfg.Server, "6667")
 		}
 		if &conn.cfg.Timeout != nil {
 			conn.cfg.Timeout = (60 * time.Second)
 		}
 		logging.Info("irc.Connect(): Connecting to %s without SSL.", conn.cfg.Server)
-		if s, err := net.DialTimeout("tcp", conn.cfg.Server, conn.cfg.Timeout); err == nil {
+		if s, err := conn.dialer.DialTimeout("tcp", conn.cfg.Server, conn.cfg.Timeout); err == nil {
 			conn.sock = s
 		} else {
 			return err
@@ -239,7 +257,7 @@ func (conn *Conn) Connect() error {
 	}
 	conn.connected = true
 	conn.postConnect(true)
-	conn.dispatch(&Line{Cmd: REGISTER})
+	conn.dispatch(&Line{Cmd: REGISTER, Time: time.Now()})
 	return nil
 }
 
@@ -393,7 +411,7 @@ func (conn *Conn) shutdown() {
 	conn.wg.Wait()
 	// reinit datastructures ready for next connection
 	conn.initialise()
-	conn.dispatch(&Line{Cmd: DISCONNECTED})
+	conn.dispatch(&Line{Cmd: DISCONNECTED, Time: time.Now()})
 }
 
 // Dumps a load of information about the current state of the connection to a
