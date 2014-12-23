@@ -96,8 +96,14 @@ func (conn *Conn) User(ident, name string) {
 	conn.Raw(USER + " " + ident + " 12 * :" + name)
 }
 
-// Join() sends a JOIN command to the server
-func (conn *Conn) Join(channel string) { conn.Raw(JOIN + " " + channel) }
+// Join() sends a JOIN command to the server with an optional key
+func (conn *Conn) Join(channel string, key ...string) {
+	k := ""
+	if len(key) > 0 {
+		k = " " + key[0]
+	}
+	conn.Raw(JOIN + " " + channel + k)
+}
 
 // Part() sends a PART command to the server with an optional part message
 func (conn *Conn) Part(channel string, message ...string) {
