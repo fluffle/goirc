@@ -72,7 +72,7 @@ func splitMessage(msg string, splitLen int) (msgs []string) {
 		if idx < 0 {
 			idx = splitLen
 		}
-		msgs = append(msgs, msg[:idx] + "...")
+		msgs = append(msgs, msg[:idx]+"...")
 		msg = msg[idx:]
 	}
 	return append(msgs, msg)
@@ -104,6 +104,9 @@ func (conn *Conn) Join(channel string, key ...string) {
 	}
 	conn.Raw(JOIN + " " + channel + k)
 }
+
+// JoinKey() sends a JOIN command to the server with a key
+func (conn *Conn) JoinWithKey(channel string, key string) { conn.Raw(JOIN + " " + channel + " " + key) }
 
 // Part() sends a PART command to the server with an optional part message
 func (conn *Conn) Part(channel string, message ...string) {

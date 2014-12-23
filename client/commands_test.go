@@ -100,6 +100,9 @@ func TestClientCommands(t *testing.T) {
 	c.Join("#foo bar")
 	s.nc.Expect("JOIN #foo bar")
 
+	c.JoinWithKey("#foo", "bar")
+	s.nc.Expect("JOIN #foo bar")
+
 	c.Part("#foo")
 	s.nc.Expect("PART #foo")
 	c.Part("#foo", "Screw you guys...")
