@@ -100,7 +100,7 @@ func (conn *Conn) User(ident, name string) {
 func (conn *Conn) Join(channel string) { conn.Raw(JOIN + " " + channel) }
 
 // JoinKey() sends a JOIN command to the server with a key
-func (conn *Conn) JoinKey(channel string, key string) { conn.Raw(JOIN + " " + channel + " " + key) }
+func (conn *Conn) JoinWithKey(channel string, key string) { conn.Raw(JOIN + " " + channel + " " + key) }
 
 // Part() sends a PART command to the server with an optional part message
 func (conn *Conn) Part(channel string, message ...string) {
