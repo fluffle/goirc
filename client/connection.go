@@ -403,9 +403,11 @@ func (conn *Conn) shutdown() {
 	conn.sock.Close()
 	close(conn.die)
 	conn.wg.Wait()
+	// Dispatch after closing connection but before reinit
+	// so event handlers can still access state information.
+	conn.dispatch(&Line{Cmd: DISCONNECTED, Time: time.Now()})
 	// reinit datastructures ready for next connection
 	conn.initialise()
-	conn.dispatch(&Line{Cmd: DISCONNECTED, Time: time.Now()})
 }
 
 // Dumps a load of information about the current state of the connection to a
