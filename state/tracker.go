@@ -2,6 +2,8 @@ package state
 
 import (
 	"github.com/fluffle/goirc/logging"
+
+	"sync"
 )
 
 // The state manager interface
@@ -9,18 +11,22 @@ type Tracker interface {
 	// Nick methods
 	NewNick(nick string) *Nick
 	GetNick(nick string) *Nick
-	ReNick(old, neu string)
-	DelNick(nick string)
+	ReNick(old, neu string) *Nick
+	DelNick(nick string) *Nick
+	NickInfo(nick, ident, host, name string) *Nick
+	NickModes(nick, modestr string) *Nick
 	// Channel methods
 	NewChannel(channel string) *Channel
 	GetChannel(channel string) *Channel
-	DelChannel(channel string)
+	DelChannel(channel string) *Channel
+	Topic(channel, topic string) *Channel
+	ChannelModes(channel, modestr string, modeargs ...string) *Channel
 	// Information about ME!
 	Me() *Nick
 	// And the tracking operations
 	IsOn(channel, nick string) (*ChanPrivs, bool)
-	Associate(channel *Channel, nick *Nick) *ChanPrivs
-	Dissociate(channel *Channel, nick *Nick)
+	Associate(channel, nick string) *ChanPrivs
+	Dissociate(channel, nick string)
 	Wipe()
 	// The state tracker can output a debugging string
 	String() string
@@ -29,26 +35,34 @@ type Tracker interface {
 // ... and a struct to implement it ...
 type stateTracker struct {
 	// Map of channels we're on
-	chans map[string]*Channel
+	chans map[string]*channel
 	// Map of nicks we know about
-	nicks map[string]*Nick
+	nicks map[string]*nick
 
 	// We need to keep state on who we are :-)
-	me *Nick
+	me *nick
+
+	// And we need to protect against data races *cough*.
+	mu sync.Mutex
 }
+
+var _ Tracker = (*stateTracker)(nil)
 
 // ... and a constructor to make it ...
 func NewTracker(mynick string) *stateTracker {
 	st := &stateTracker{
-		chans: make(map[string]*Channel),
-		nicks: make(map[string]*Nick),
+		chans: make(map[string]*channel),
+		nicks: make(map[string]*nick),
 	}
-	st.me = st.NewNick(mynick)
+	st.me = newNick(mynick)
+	st.nicks[mynick] = st.me
 	return st
 }
 
 // ... and a method to wipe the state clean.
 func (st *stateTracker) Wipe() {
+	st.mu.Lock()
+	defer st.mu.Unlock()
 	// Deleting all the channels implicitly deletes every nick but me.
 	for _, ch := range st.chans {
 		st.delChannel(ch)
@@ -59,67 +73,84 @@ func (st *stateTracker) Wipe() {
  * tracker methods to create/look up nicks/channels
 \******************************************************************************/
 
-// Creates a new Nick, initialises it, and stores it so it
+// Creates a new nick, initialises it, and stores it so it
 // can be properly tracked for state management purposes.
 func (st *stateTracker) NewNick(n string) *Nick {
+	if n == "" {
+		logging.Warn("Tracker.NewNick(): Not tracking empty nick.")
+		return nil
+	}
+	st.mu.Lock()
+	defer st.mu.Unlock()
 	if _, ok := st.nicks[n]; ok {
 		logging.Warn("Tracker.NewNick(): %s already tracked.", n)
 		return nil
 	}
-	st.nicks[n] = NewNick(n)
-	return st.nicks[n]
+	st.nicks[n] = newNick(n)
+	return st.nicks[n].Nick()
 }
 
-// Returns a Nick for the nick n, if we're tracking it.
+// Returns a nick for the nick n, if we're tracking it.
 func (st *stateTracker) GetNick(n string) *Nick {
+	st.mu.Lock()
+	defer st.mu.Unlock()
 	if nk, ok := st.nicks[n]; ok {
-		return nk
+		return nk.Nick()
 	}
 	return nil
 }
 
-// Signals to the tracker that a Nick should be tracked
+// Signals to the tracker that a nick should be tracked
 // under a "neu" nick rather than the old one.
-func (st *stateTracker) ReNick(old, neu string) {
-	if nk, ok := st.nicks[old]; ok {
-		if _, ok := st.nicks[neu]; !ok {
-			nk.Nick = neu
-			delete(st.nicks, old)
-			st.nicks[neu] = nk
-			for ch, _ := range nk.chans {
-				// We also need to update the lookup maps of all the channels
-				// the nick is on, to keep things in sync.
-				delete(ch.lookup, old)
-				ch.lookup[neu] = nk
-			}
-		} else {
-			logging.Warn("Tracker.ReNick(): %s already exists.", neu)
-		}
-	} else {
+func (st *stateTracker) ReNick(old, neu string) *Nick {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	nk, ok := st.nicks[old]
+	if !ok {
 		logging.Warn("Tracker.ReNick(): %s not tracked.", old)
+		return nil
 	}
+	if _, ok := st.nicks[neu]; ok {
+		logging.Warn("Tracker.ReNick(): %s already exists.", neu)
+		return nil
+	}
+
+	nk.nick = neu
+	delete(st.nicks, old)
+	st.nicks[neu] = nk
+	for ch, _ := range nk.chans {
+		// We also need to update the lookup maps of all the channels
+		// the nick is on, to keep things in sync.
+		delete(ch.lookup, old)
+		ch.lookup[neu] = nk
+	}
+	return nk.Nick()
 }
 
-// Removes a Nick from being tracked.
-func (st *stateTracker) DelNick(n string) {
+// Removes a nick from being tracked.
+func (st *stateTracker) DelNick(n string) *Nick {
+	st.mu.Lock()
+	defer st.mu.Unlock()
 	if nk, ok := st.nicks[n]; ok {
-		if nk != st.me {
-			st.delNick(nk)
-		} else {
+		if nk == st.me {
 			logging.Warn("Tracker.DelNick(): won't delete myself.")
+			return nil
 		}
-	} else {
-		logging.Warn("Tracker.DelNick(): %s not tracked.", n)
+		st.delNick(nk)
+		return nk.Nick()
 	}
+	logging.Warn("Tracker.DelNick(): %s not tracked.", n)
+	return nil
 }
 
-func (st *stateTracker) delNick(nk *Nick) {
+func (st *stateTracker) delNick(nk *nick) {
+	// st.mu lock held by DelNick, DelChannel or Wipe
 	if nk == st.me {
 		// Shouldn't get here => internal state tracking code is fubar.
 		logging.Error("Tracker.DelNick(): TRYING TO DELETE ME :-(")
 		return
 	}
-	delete(st.nicks, nk.Nick)
+	delete(st.nicks, nk.nick)
 	for ch, _ := range nk.chans {
 		nk.delChannel(ch)
 		ch.delNick(nk)
@@ -127,41 +158,79 @@ func (st *stateTracker) delNick(nk *Nick) {
 			// Deleting a nick from tracking shouldn't empty any channels as
 			// *we* should be on the channel with them to be tracking them.
 			logging.Error("Tracker.delNick(): deleting nick %s emptied "+
-				"channel %s, this shouldn't happen!", nk.Nick, ch.Name)
+				"channel %s, this shouldn't happen!", nk.nick, ch.name)
 		}
 	}
+}
+
+// Sets ident, host and "real" name for the nick.
+func (st *stateTracker) NickInfo(n, ident, host, name string) *Nick {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	nk, ok := st.nicks[n]
+	if !ok {
+		return nil
+	}
+	nk.ident = ident
+	nk.host = host
+	nk.name = name
+	return nk.Nick()
+}
+
+// Sets user modes for the nick.
+func (st *stateTracker) NickModes(n, modes string) *Nick {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	nk, ok := st.nicks[n]
+	if !ok {
+		return nil
+	}
+	nk.parseModes(modes)
+	return nk.Nick()
 }
 
 // Creates a new Channel, initialises it, and stores it so it
 // can be properly tracked for state management purposes.
 func (st *stateTracker) NewChannel(c string) *Channel {
+	if c == "" {
+		logging.Warn("Tracker.NewChannel(): Not tracking empty channel.")
+		return nil
+	}
+	st.mu.Lock()
+	defer st.mu.Unlock()
 	if _, ok := st.chans[c]; ok {
 		logging.Warn("Tracker.NewChannel(): %s already tracked.", c)
 		return nil
 	}
-	st.chans[c] = NewChannel(c)
-	return st.chans[c]
+	st.chans[c] = newChannel(c)
+	return st.chans[c].Channel()
 }
 
 // Returns a Channel for the channel c, if we're tracking it.
 func (st *stateTracker) GetChannel(c string) *Channel {
+	st.mu.Lock()
+	defer st.mu.Unlock()
 	if ch, ok := st.chans[c]; ok {
-		return ch
+		return ch.Channel()
 	}
 	return nil
 }
 
 // Removes a Channel from being tracked.
-func (st *stateTracker) DelChannel(c string) {
+func (st *stateTracker) DelChannel(c string) *Channel {
+	st.mu.Lock()
+	defer st.mu.Unlock()
 	if ch, ok := st.chans[c]; ok {
 		st.delChannel(ch)
-	} else {
-		logging.Warn("Tracker.DelChannel(): %s not tracked.", c)
+		return ch.Channel()
 	}
+	logging.Warn("Tracker.DelChannel(): %s not tracked.", c)
+	return nil
 }
 
-func (st *stateTracker) delChannel(ch *Channel) {
-	delete(st.chans, ch.Name)
+func (st *stateTracker) delChannel(ch *channel) {
+	// st.mu lock held by DelChannel or Wipe
+	delete(st.chans, ch.name)
 	for nk, _ := range ch.nicks {
 		ch.delNick(nk)
 		nk.delChannel(ch)
@@ -172,67 +241,98 @@ func (st *stateTracker) delChannel(ch *Channel) {
 	}
 }
 
+// Sets the topic of a channel.
+func (st *stateTracker) Topic(c, topic string) *Channel {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	ch, ok := st.chans[c]
+	if !ok {
+		return nil
+	}
+	ch.topic = topic
+	return ch.Channel()
+}
+
+// Sets modes for a channel, including privileges like +o.
+func (st *stateTracker) ChannelModes(c, modes string, args ...string) *Channel {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	ch, ok := st.chans[c]
+	if !ok {
+		return nil
+	}
+	ch.parseModes(modes, args...)
+	return ch.Channel()
+}
+
 // Returns the Nick the state tracker thinks is Me.
 func (st *stateTracker) Me() *Nick {
-	return st.me
+	return st.me.Nick()
 }
 
 // Returns true if both the channel c and the nick n are tracked
 // and the nick is associated with the channel.
 func (st *stateTracker) IsOn(c, n string) (*ChanPrivs, bool) {
-	nk := st.GetNick(n)
-	ch := st.GetChannel(c)
-	if nk != nil && ch != nil {
-		return nk.IsOn(ch)
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	nk, nok := st.nicks[n]
+	ch, cok := st.chans[c]
+	if nok && cok {
+		return nk.isOn(ch)
 	}
 	return nil, false
 }
 
 // Associates an already known nick with an already known channel.
-func (st *stateTracker) Associate(ch *Channel, nk *Nick) *ChanPrivs {
-	if ch == nil || nk == nil {
-		logging.Error("Tracker.Associate(): passed nil values :-(")
-		return nil
-	} else if _ch, ok := st.chans[ch.Name]; !ok || ch != _ch {
+func (st *stateTracker) Associate(c, n string) *ChanPrivs {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	nk, nok := st.nicks[n]
+	ch, cok := st.chans[c]
+
+	if !cok {
 		// As we can implicitly delete both nicks and channels from being
 		// tracked by dissociating one from the other, we should verify that
 		// we're not being passed an old Nick or Channel.
 		logging.Error("Tracker.Associate(): channel %s not found in "+
-			"(or differs from) internal state.", ch.Name)
+			"internal state.", c)
 		return nil
-	} else if _nk, ok := st.nicks[nk.Nick]; !ok || nk != _nk {
+	} else if !nok {
 		logging.Error("Tracker.Associate(): nick %s not found in "+
-			"(or differs from) internal state.", nk.Nick)
+			"internal state.", n)
 		return nil
-	} else if _, ok := nk.IsOn(ch); ok {
+	} else if _, ok := nk.isOn(ch); ok {
 		logging.Warn("Tracker.Associate(): %s already on %s.",
-			nk.Nick, ch.Name)
+			nk, ch)
 		return nil
 	}
 	cp := new(ChanPrivs)
 	ch.addNick(nk, cp)
 	nk.addChannel(ch, cp)
-	return cp
+	return cp.Copy()
 }
 
 // Dissociates an already known nick from an already known channel.
 // Does some tidying up to stop tracking nicks we're no longer on
 // any common channels with, and channels we're no longer on.
-func (st *stateTracker) Dissociate(ch *Channel, nk *Nick) {
-	if ch == nil || nk == nil {
-		logging.Error("Tracker.Dissociate(): passed nil values :-(")
-	} else if _ch, ok := st.chans[ch.Name]; !ok || ch != _ch {
+func (st *stateTracker) Dissociate(c, n string) {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	nk, nok := st.nicks[n]
+	ch, cok := st.chans[c]
+
+	if !cok {
 		// As we can implicitly delete both nicks and channels from being
 		// tracked by dissociating one from the other, we should verify that
 		// we're not being passed an old Nick or Channel.
 		logging.Error("Tracker.Dissociate(): channel %s not found in "+
-			"(or differs from) internal state.", ch.Name)
-	} else if _nk, ok := st.nicks[nk.Nick]; !ok || nk != _nk {
+			"internal state.", c)
+	} else if !nok {
 		logging.Error("Tracker.Dissociate(): nick %s not found in "+
-			"(or differs from) internal state.", nk.Nick)
-	} else if _, ok := nk.IsOn(ch); !ok {
+			"internal state.", n)
+	} else if _, ok := nk.isOn(ch); !ok {
 		logging.Warn("Tracker.Dissociate(): %s not on %s.",
-			nk.Nick, ch.Name)
+			nk.nick, ch.name)
 	} else if nk == st.me {
 		// I'm leaving the channel for some reason, so it won't be tracked.
 		st.delChannel(ch)
@@ -248,6 +348,8 @@ func (st *stateTracker) Dissociate(ch *Channel, nk *Nick) {
 }
 
 func (st *stateTracker) String() string {
+	st.mu.Lock()
+	defer st.mu.Unlock()
 	str := "GoIRC Channels\n"
 	str += "--------------\n\n"
 	for _, ch := range st.chans {
