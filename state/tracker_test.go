@@ -573,13 +573,13 @@ func TestSTRaces(t *testing.T) {
 		go func(s string) {
 			st.NewNick("nick-" + s)
 			c := st.NewChannel("#chan-" + s)
-			st.Associate(c, st.me)
+			st.Associate(c.Name, "mynick")
 			wg.Done()
 		}(string(i))
 		go func(s string) {
 			n := st.GetNick("nick-" + s)
 			c := st.GetChannel("#chan-" + s)
-			st.Associate(c, n)
+			st.Associate(c.Name, n.Nick)
 			wg.Done()
 		}(string(i))
 	}
@@ -589,19 +589,19 @@ func TestSTRaces(t *testing.T) {
 	race := func(ns, cs string) {
 		wg.Add(5)
 		go func() {
-			st.Associate(st.GetChannel("#chan-"+cs), st.GetNick("nick-"+ns))
+			st.Associate("#chan-"+cs, "nick-"+ns)
 			wg.Done()
 		}()
 		go func() {
-			st.GetNick("nick-"+ns).Channels()
+			st.GetNick("nick-"+ns)
 			wg.Done()
 		}()
 		go func() {
-			st.GetChannel("#chan-"+cs).Nicks()
+			st.GetChannel("#chan-"+cs)
 			wg.Done()
 		}()
 		go func() {
-			st.Dissociate(st.GetChannel("#chan-"+cs), st.GetNick("nick-"+ns))
+			st.Dissociate("#chan-"+cs, "nick-"+ns)
 			wg.Done()
 		}()
 		go func() {
