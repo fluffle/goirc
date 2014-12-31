@@ -1,6 +1,9 @@
 package state
 
-import "testing"
+import (
+	"sync"
+	"testing"
+)
 
 func TestSTNewTracker(t *testing.T) {
 	st := NewTracker("mynick")
@@ -412,4 +415,57 @@ func TestSTWipe(t *testing.T) {
 	if len(nick1.chans) != 0 || len(nick2.chans) != 0 || len(nick3.chans) != 0 {
 		t.Errorf("Nick chan lists wrong length after wipe.")
 	}
+}
+
+func TestSTRaces(t *testing.T) {
+	st := NewTracker("mynick")
+	wg := sync.WaitGroup{}
+
+	for i := 'a'; i < 'g'; i++ {
+		wg.Add(2)
+		go func(s string) {
+			st.NewNick("nick-" + s)
+			c := st.NewChannel("#chan-" + s)
+			st.Associate(c, st.me)
+			wg.Done()
+		}(string(i))
+		go func(s string) {
+			n := st.GetNick("nick-" + s)
+			c := st.GetChannel("#chan-" + s)
+			st.Associate(c, n)
+			wg.Done()
+		}(string(i))
+	}
+	wg.Wait()
+
+	wg = sync.WaitGroup{}
+	race := func(ns, cs string) {
+		wg.Add(5)
+		go func() {
+			st.Associate(st.GetChannel("#chan-"+cs), st.GetNick("nick-"+ns))
+			wg.Done()
+		}()
+		go func() {
+			st.GetNick("nick-"+ns).Channels()
+			wg.Done()
+		}()
+		go func() {
+			st.GetChannel("#chan-"+cs).Nicks()
+			wg.Done()
+		}()
+		go func() {
+			st.Dissociate(st.GetChannel("#chan-"+cs), st.GetNick("nick-"+ns))
+			wg.Done()
+		}()
+		go func() {
+			st.ReNick("nick-"+ns, "nick2-"+ns)
+			wg.Done()
+		}()
+	}
+	for n := 'a'; n < 'g'; n++ {
+		for c := 'a'; c < 'g'; c++ {
+			race(string(n), string(c))
+		}
+	}
+	wg.Wait()
 }
