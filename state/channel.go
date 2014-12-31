@@ -3,18 +3,24 @@ package state
 import (
 	"github.com/fluffle/goirc/logging"
 
-	"fmt"
 	"reflect"
-	"sort"
 	"strconv"
 )
 
-// A struct representing an IRC channel
+// A Channel is returned from the state tracker and contains
+// a copy of the channel state at a particular time.
 type Channel struct {
 	Name, Topic string
 	Modes       *ChanMode
-	lookup      map[string]*Nick
-	nicks       map[*Nick]*ChanPrivs
+	Nicks       map[string]*ChanPrivs
+}
+
+// Internal bookkeeping struct for channels.
+type channel struct {
+	name, topic string
+	modes       *ChanMode
+	lookup      map[string]*nick
+	nicks       map[*nick]*ChanPrivs
 }
 
 // A struct representing the modes of an IRC Channel
@@ -98,48 +104,57 @@ func init() {
  * Channel methods for state management
 \******************************************************************************/
 
-func NewChannel(name string) *Channel {
-	return &Channel{
-		Name:   name,
-		Modes:  new(ChanMode),
-		nicks:  make(map[*Nick]*ChanPrivs),
-		lookup: make(map[string]*Nick),
+func newChannel(name string) *channel {
+	return &channel{
+		name:   name,
+		modes:  new(ChanMode),
+		nicks:  make(map[*nick]*ChanPrivs),
+		lookup: make(map[string]*nick),
 	}
 }
 
-// Returns true if the Nick is associated with the Channel
-func (ch *Channel) IsOn(nk *Nick) (*ChanPrivs, bool) {
-	cp, ok := ch.nicks[nk]
-	return cp, ok
+// Returns a copy of the internal tracker channel state at this time.
+// Relies on tracker-level locking for concurrent access.
+func (ch *channel) Channel() *Channel {
+	c := &Channel{
+		Name:  ch.name,
+		Topic: ch.topic,
+		Modes: ch.modes.Copy(),
+		Nicks: make(map[string]*ChanPrivs),
+	}
+	for n, cp := range ch.nicks {
+		c.Nicks[n.nick] = cp.Copy()
+	}
+	return c
 }
 
-func (ch *Channel) IsOnStr(n string) (*Nick, bool) {
-	nk, ok := ch.lookup[n]
-	return nk, ok
+func (ch *channel) isOn(nk *nick) (*ChanPrivs, bool) {
+	cp, ok := ch.nicks[nk]
+	return cp.Copy(), ok
 }
 
 // Associates a Nick with a Channel
-func (ch *Channel) addNick(nk *Nick, cp *ChanPrivs) {
+func (ch *channel) addNick(nk *nick, cp *ChanPrivs) {
 	if _, ok := ch.nicks[nk]; !ok {
 		ch.nicks[nk] = cp
-		ch.lookup[nk.Nick] = nk
+		ch.lookup[nk.nick] = nk
 	} else {
-		logging.Warn("Channel.addNick(): %s already on %s.", nk.Nick, ch.Name)
+		logging.Warn("Channel.addNick(): %s already on %s.", nk.nick, ch.name)
 	}
 }
 
 // Disassociates a Nick from a Channel.
-func (ch *Channel) delNick(nk *Nick) {
+func (ch *channel) delNick(nk *nick) {
 	if _, ok := ch.nicks[nk]; ok {
 		delete(ch.nicks, nk)
-		delete(ch.lookup, nk.Nick)
+		delete(ch.lookup, nk.nick)
 	} else {
-		logging.Warn("Channel.delNick(): %s not on %s.", nk.Nick, ch.Name)
+		logging.Warn("Channel.delNick(): %s not on %s.", nk.nick, ch.name)
 	}
 }
 
 // Parses mode strings for a channel.
-func (ch *Channel) ParseModes(modes string, modeargs ...string) {
+func (ch *channel) parseModes(modes string, modeargs ...string) {
 	var modeop bool // true => add mode, false => remove mode
 	var modestr string
 	for i := 0; i < len(modes); i++ {
@@ -151,43 +166,43 @@ func (ch *Channel) ParseModes(modes string, modeargs ...string) {
 			modeop = false
 			modestr = string(m)
 		case 'i':
-			ch.Modes.InviteOnly = modeop
+			ch.modes.InviteOnly = modeop
 		case 'm':
-			ch.Modes.Moderated = modeop
+			ch.modes.Moderated = modeop
 		case 'n':
-			ch.Modes.NoExternalMsg = modeop
+			ch.modes.NoExternalMsg = modeop
 		case 'p':
-			ch.Modes.Private = modeop
+			ch.modes.Private = modeop
 		case 'r':
-			ch.Modes.Registered = modeop
+			ch.modes.Registered = modeop
 		case 's':
-			ch.Modes.Secret = modeop
+			ch.modes.Secret = modeop
 		case 't':
-			ch.Modes.ProtectedTopic = modeop
+			ch.modes.ProtectedTopic = modeop
 		case 'z':
-			ch.Modes.SSLOnly = modeop
+			ch.modes.SSLOnly = modeop
 		case 'Z':
-			ch.Modes.AllSSL = modeop
+			ch.modes.AllSSL = modeop
 		case 'O':
-			ch.Modes.OperOnly = modeop
+			ch.modes.OperOnly = modeop
 		case 'k':
 			if modeop && len(modeargs) != 0 {
-				ch.Modes.Key, modeargs = modeargs[0], modeargs[1:]
+				ch.modes.Key, modeargs = modeargs[0], modeargs[1:]
 			} else if !modeop {
-				ch.Modes.Key = ""
+				ch.modes.Key = ""
 			} else {
 				logging.Warn("Channel.ParseModes(): not enough arguments to "+
-					"process MODE %s %s%c", ch.Name, modestr, m)
+					"process MODE %s %s%c", ch.name, modestr, m)
 			}
 		case 'l':
 			if modeop && len(modeargs) != 0 {
-				ch.Modes.Limit, _ = strconv.Atoi(modeargs[0])
+				ch.modes.Limit, _ = strconv.Atoi(modeargs[0])
 				modeargs = modeargs[1:]
 			} else if !modeop {
-				ch.Modes.Limit = 0
+				ch.modes.Limit = 0
 			} else {
 				logging.Warn("Channel.ParseModes(): not enough arguments to "+
-					"process MODE %s %s%c", ch.Name, modestr, m)
+					"process MODE %s %s%c", ch.name, modestr, m)
 			}
 		case 'q', 'a', 'o', 'h', 'v':
 			if len(modeargs) != 0 {
@@ -208,11 +223,11 @@ func (ch *Channel) ParseModes(modes string, modeargs ...string) {
 					modeargs = modeargs[1:]
 				} else {
 					logging.Warn("Channel.ParseModes(): untracked nick %s "+
-						"received MODE on channel %s", modeargs[0], ch.Name)
+						"received MODE on channel %s", modeargs[0], ch.name)
 				}
 			} else {
 				logging.Warn("Channel.ParseModes(): not enough arguments to "+
-					"process MODE %s %s%c", ch.Name, modestr, m)
+					"process MODE %s %s%c", ch.name, modestr, m)
 			}
 		default:
 			logging.Info("Channel.ParseModes(): unknown mode char %c", m)
@@ -220,29 +235,39 @@ func (ch *Channel) ParseModes(modes string, modeargs ...string) {
 	}
 }
 
-type byNick []*Nick
-
-func (b byNick) Len() int           { return len(b) }
-func (b byNick) Less(i, j int) bool { return b[i].Nick < b[j].Nick }
-func (b byNick) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
-
-// Nicks returns a list of *Nick that are on the channel, sorted by nick.
-func (ch *Channel) Nicks() []*Nick {
-	nicks := make([]*Nick, 0, len(ch.lookup))
-	for _, nick := range ch.lookup {
-		nicks = append(nicks, nick)
-	}
-	sort.Sort(byNick(nicks))
-	return nicks
+// Returns true if the Nick is associated with the Channel
+func (ch *Channel) IsOn(nk string) (*ChanPrivs, bool) {
+	cp, ok := ch.Nicks[nk]
+	return cp, ok
 }
 
-// NicksStr returns a list of nick strings that are on the channel, sorted by nick.
-func (ch *Channel) NicksStr() []string {
-	var nicks []string
-	for _, nick := range ch.Nicks() {
-		nicks = append(nicks, nick.Nick)
-	}
-	return nicks
+// Test Channel equality.
+func (ch *Channel) Equals(other *Channel) bool {
+	return reflect.DeepEqual(ch, other)
+}
+
+// Duplicates a ChanMode struct.
+func (cm *ChanMode) Copy() *ChanMode {
+	if cm == nil { return nil }
+	c := *cm
+	return &c
+}
+
+// Test ChanMode equality.
+func (cm *ChanMode) Equals(other *ChanMode) bool {
+	return reflect.DeepEqual(cm, other)
+}
+
+// Duplicates a ChanPrivs struct.
+func (cp *ChanPrivs) Copy() *ChanPrivs {
+	if cp == nil { return nil }
+	c := *cp
+	return &c
+}
+
+// Test ChanPrivs equality.
+func (cp *ChanPrivs) Equals(other *ChanPrivs) bool {
+	return reflect.DeepEqual(cp, other)
 }
 
 // Returns a string representing the channel. Looks like:
@@ -257,10 +282,14 @@ func (ch *Channel) String() string {
 	str += "Topic: " + ch.Topic + "\n\t"
 	str += "Modes: " + ch.Modes.String() + "\n\t"
 	str += "Nicks: \n"
-	for nk, cp := range ch.nicks {
-		str += "\t\t" + nk.Nick + ": " + cp.String() + "\n"
+	for nk, cp := range ch.Nicks {
+		str += "\t\t" + nk + ": " + cp.String() + "\n"
 	}
 	return str
+}
+
+func (ch *channel) String() string {
+	return ch.Channel().String()
 }
 
 // Returns a string representing the channel modes. Looks like:
@@ -284,7 +313,7 @@ func (cm *ChanMode) String() string {
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 			if f.Int() != 0 {
 				str += ChanModeToString[t.Field(i).Name]
-				a = append(a, fmt.Sprintf("%d", f.Int()))
+				a = append(a, strconv.FormatInt(f.Int(), 10))
 			}
 		}
 	}
