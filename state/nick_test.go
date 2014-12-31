@@ -1,23 +1,35 @@
 package state
 
-import (
-	"testing"
-)
+import "testing"
+
+func compareNick(t *testing.T, nk *nick) {
+	n := nk.Nick()
+	if n.Nick != nk.nick || n.Ident != nk.ident || n.Host != nk.host || n.Name != nk.name ||
+		!n.Modes.Equals(nk.modes) || len(n.Channels) != len(nk.chans) {
+		t.Errorf("Nick not duped correctly from internal state.")
+	}
+	for ch, cp := range nk.chans {
+		if other, ok := n.Channels[ch.name]; !ok || !cp.Equals(other) {
+			t.Errorf("Channel not duped correctly from internal state.")
+		}
+	}
+}
 
 func TestNewNick(t *testing.T) {
-	nk := NewNick("test1")
+	nk := newNick("test1")
 
-	if nk.Nick != "test1" {
+	if nk.nick != "test1" {
 		t.Errorf("Nick not created correctly by NewNick()")
 	}
 	if len(nk.chans) != 0 || len(nk.lookup) != 0 {
 		t.Errorf("Nick maps contain data after NewNick()")
 	}
+	compareNick(t, nk)
 }
 
 func TestAddChannel(t *testing.T) {
-	nk := NewNick("test1")
-	ch := NewChannel("#test1")
+	nk := newNick("test1")
+	ch := newChannel("#test1")
 	cp := new(ChanPrivs)
 
 	nk.addChannel(ch, cp)
@@ -31,11 +43,12 @@ func TestAddChannel(t *testing.T) {
 	if c, ok := nk.lookup["#test1"]; !ok || c != ch {
 		t.Errorf("Channel #test1 not properly stored in lookup map.")
 	}
+	compareNick(t, nk)
 }
 
 func TestDelChannel(t *testing.T) {
-	nk := NewNick("test1")
-	ch := NewChannel("#test1")
+	nk := newNick("test1")
+	ch := newChannel("#test1")
 	cp := new(ChanPrivs)
 
 	nk.addChannel(ch, cp)
@@ -49,11 +62,12 @@ func TestDelChannel(t *testing.T) {
 	if c, ok := nk.lookup["#test1"]; ok || c != nil {
 		t.Errorf("Channel #test1 not properly removed from lookup map.")
 	}
+	compareNick(t, nk)
 }
 
 func TestNickParseModes(t *testing.T) {
-	nk := NewNick("test1")
-	md := nk.Modes
+	nk := newNick("test1")
+	md := nk.modes
 
 	// Modes should all be false for a new nick
 	if md.Invisible || md.Oper || md.WallOps || md.HiddenHost || md.SSL {
@@ -65,8 +79,9 @@ func TestNickParseModes(t *testing.T) {
 	md.HiddenHost = true
 
 	// Parse a mode line that flips one true to false and two false to true
-	nk.ParseModes("+z-x+w")
+	nk.parseModes("+z-x+w")
 
+	compareNick(t, nk)
 	if !md.Invisible || md.Oper || !md.WallOps || md.HiddenHost || !md.SSL {
 		t.Errorf("Modes not flipped correctly by ParseModes.")
 	}
