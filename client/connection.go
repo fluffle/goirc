@@ -23,8 +23,8 @@ type Conn struct {
 
 	// Handlers
 	intHandlers *hSet
-	fgHandlers *hSet
-	bgHandlers *hSet
+	fgHandlers  *hSet
+	bgHandlers  *hSet
 
 	// State tracker for nicks and channels
 	st         state.Tracker
@@ -83,6 +83,9 @@ type Config struct {
 	// Split PRIVMSGs, NOTICEs and CTCPs longer than
 	// SplitLen characters over multiple lines.
 	SplitLen int
+
+	// Timeout, The amount of time in seconds until a timeout is triggered.
+	Timeout time.Duration
 }
 
 func NewConfig(nick string, args ...string) *Config {
@@ -92,6 +95,7 @@ func NewConfig(nick string, args ...string) *Config {
 		NewNick:  func(s string) string { return s + "_" },
 		Recover:  (*Conn).LogPanic, // in dispatch.go
 		SplitLen: 450,
+		Timeout:  60 * time.Second,
 	}
 	cfg.Me.Ident = "goirc"
 	if len(args) > 0 && args[0] != "" {
@@ -124,6 +128,7 @@ func Client(cfg *Config) *Conn {
 	}
 
 	dialer := new(net.Dialer)
+	dialer.Timeout = cfg.Timeout
 	if cfg.LocalAddr != "" {
 		if !hasPort(cfg.LocalAddr) {
 			cfg.LocalAddr += ":0"
