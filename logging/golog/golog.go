@@ -9,7 +9,7 @@ import (
 // Just import this package alongside goirc/client and call
 // golog.Init() in your main() to set things up.
 func Init() {
-	l := log.InitFromFlags()
+	l := log.NewFromFlags()
 	l.SetDepth(1)
 	logging.SetLogger(l)
 }
