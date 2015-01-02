@@ -90,7 +90,7 @@ type Config struct {
 
 func NewConfig(nick string, args ...string) *Config {
 	cfg := &Config{
-		Me:       state.NewNick(nick),
+		Me:       &state.Nick{Nick: nick},
 		PingFreq: 3 * time.Minute,
 		NewNick:  func(s string) string { return s + "_" },
 		Recover:  (*Conn).LogPanic, // in dispatch.go
@@ -122,7 +122,7 @@ func Client(cfg *Config) *Conn {
 		cfg = NewConfig("__idiot__")
 	}
 	if cfg.Me == nil || cfg.Me.Nick == "" || cfg.Me.Ident == "" {
-		cfg.Me = state.NewNick("__idiot__")
+		cfg.Me = &state.Nick{Nick: "__idiot__"}
 		cfg.Me.Ident = "goirc"
 		cfg.Me.Name = "Powered by GoIRC"
 	}
@@ -169,6 +169,11 @@ func (conn *Conn) Config() *Config {
 }
 
 func (conn *Conn) Me() *state.Nick {
+	conn.mu.RLock()
+	defer conn.mu.RUnlock()
+	if conn.st != nil {
+		conn.cfg.Me = conn.st.Me()
+	}
 	return conn.cfg.Me
 }
 
@@ -177,6 +182,8 @@ func (conn *Conn) StateTracker() state.Tracker {
 }
 
 func (conn *Conn) EnableStateTracking() {
+	conn.mu.Lock()
+	defer conn.mu.Unlock()
 	if conn.st == nil {
 		n := conn.cfg.Me
 		conn.st = state.NewTracker(n.Nick)
@@ -188,7 +195,10 @@ func (conn *Conn) EnableStateTracking() {
 }
 
 func (conn *Conn) DisableStateTracking() {
+	conn.mu.Lock()
+	defer conn.mu.Unlock()
 	if conn.st != nil {
+		conn.cfg.Me = conn.st.Me()
 		conn.delSTHandlers()
 		conn.st.Wipe()
 		conn.st = nil

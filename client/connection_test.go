@@ -128,20 +128,23 @@ func TestClientAndStateTracking(t *testing.T) {
 	}
 
 	// We're expecting the untracked me to be replaced by a tracked one
+	if c.st == nil {
+		t.Errorf("State tracker not enabled correctly.")
+	}
 	if me := c.cfg.Me; me.Nick != "test" || me.Ident != "test" ||
 		me.Name != "Testing IRC" || me.Host != "" {
 		t.Errorf("Enabling state tracking did not replace Me correctly.")
-	}
-	if c.st == nil || c.cfg.Me != c.st.Me() {
-		t.Errorf("State tracker not enabled correctly.")
 	}
 
 	// Now, shim in the mock state tracker and test disabling state tracking
 	me := c.cfg.Me
 	c.st = st
-	st.EXPECT().Wipe()
+	gomock.InOrder(
+		st.EXPECT().Me().Return(me),
+		st.EXPECT().Wipe(),
+	)
 	c.DisableStateTracking()
-	if c.st != nil || c.cfg.Me != me {
+	if c.st != nil || !c.cfg.Me.Equals(me) {
 		t.Errorf("State tracker not disabled correctly.")
 	}
 
