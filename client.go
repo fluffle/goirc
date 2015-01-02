@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	irc "github.com/fluffle/goirc/client"
+	"github.com/fluffle/goirc/logging/glog"
 	"os"
 	"strings"
 )
@@ -14,6 +15,7 @@ var channel *string = flag.String("channel", "#go-nuts", "IRC channel")
 
 func main() {
 	flag.Parse()
+	glog.Init()
 
 	// create new IRC connection
 	c := irc.SimpleClient("GoTest", "gotest")
