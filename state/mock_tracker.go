@@ -48,20 +48,44 @@ func (_mr *_MockTrackerRecorder) GetNick(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetNick", arg0)
 }
 
-func (_m *MockTracker) ReNick(old string, neu string) {
-	_m.ctrl.Call(_m, "ReNick", old, neu)
+func (_m *MockTracker) ReNick(old string, neu string) *Nick {
+	ret := _m.ctrl.Call(_m, "ReNick", old, neu)
+	ret0, _ := ret[0].(*Nick)
+	return ret0
 }
 
 func (_mr *_MockTrackerRecorder) ReNick(arg0, arg1 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "ReNick", arg0, arg1)
 }
 
-func (_m *MockTracker) DelNick(nick string) {
-	_m.ctrl.Call(_m, "DelNick", nick)
+func (_m *MockTracker) DelNick(nick string) *Nick {
+	ret := _m.ctrl.Call(_m, "DelNick", nick)
+	ret0, _ := ret[0].(*Nick)
+	return ret0
 }
 
 func (_mr *_MockTrackerRecorder) DelNick(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "DelNick", arg0)
+}
+
+func (_m *MockTracker) NickInfo(nick string, ident string, host string, name string) *Nick {
+	ret := _m.ctrl.Call(_m, "NickInfo", nick, ident, host, name)
+	ret0, _ := ret[0].(*Nick)
+	return ret0
+}
+
+func (_mr *_MockTrackerRecorder) NickInfo(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "NickInfo", arg0, arg1, arg2, arg3)
+}
+
+func (_m *MockTracker) NickModes(nick string, modestr string) *Nick {
+	ret := _m.ctrl.Call(_m, "NickModes", nick, modestr)
+	ret0, _ := ret[0].(*Nick)
+	return ret0
+}
+
+func (_mr *_MockTrackerRecorder) NickModes(arg0, arg1 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "NickModes", arg0, arg1)
 }
 
 func (_m *MockTracker) NewChannel(channel string) *Channel {
@@ -84,12 +108,39 @@ func (_mr *_MockTrackerRecorder) GetChannel(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetChannel", arg0)
 }
 
-func (_m *MockTracker) DelChannel(channel string) {
-	_m.ctrl.Call(_m, "DelChannel", channel)
+func (_m *MockTracker) DelChannel(channel string) *Channel {
+	ret := _m.ctrl.Call(_m, "DelChannel", channel)
+	ret0, _ := ret[0].(*Channel)
+	return ret0
 }
 
 func (_mr *_MockTrackerRecorder) DelChannel(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "DelChannel", arg0)
+}
+
+func (_m *MockTracker) Topic(channel string, topic string) *Channel {
+	ret := _m.ctrl.Call(_m, "Topic", channel, topic)
+	ret0, _ := ret[0].(*Channel)
+	return ret0
+}
+
+func (_mr *_MockTrackerRecorder) Topic(arg0, arg1 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Topic", arg0, arg1)
+}
+
+func (_m *MockTracker) ChannelModes(channel string, modestr string, modeargs ...string) *Channel {
+	_s := []interface{}{channel, modestr}
+	for _, _x := range modeargs {
+		_s = append(_s, _x)
+	}
+	ret := _m.ctrl.Call(_m, "ChannelModes", _s...)
+	ret0, _ := ret[0].(*Channel)
+	return ret0
+}
+
+func (_mr *_MockTrackerRecorder) ChannelModes(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+	_s := append([]interface{}{arg0, arg1}, arg2...)
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "ChannelModes", _s...)
 }
 
 func (_m *MockTracker) Me() *Nick {
@@ -113,7 +164,7 @@ func (_mr *_MockTrackerRecorder) IsOn(arg0, arg1 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "IsOn", arg0, arg1)
 }
 
-func (_m *MockTracker) Associate(channel *Channel, nick *Nick) *ChanPrivs {
+func (_m *MockTracker) Associate(channel string, nick string) *ChanPrivs {
 	ret := _m.ctrl.Call(_m, "Associate", channel, nick)
 	ret0, _ := ret[0].(*ChanPrivs)
 	return ret0
@@ -123,7 +174,7 @@ func (_mr *_MockTrackerRecorder) Associate(arg0, arg1 interface{}) *gomock.Call 
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Associate", arg0, arg1)
 }
 
-func (_m *MockTracker) Dissociate(channel *Channel, nick *Nick) {
+func (_m *MockTracker) Dissociate(channel string, nick string) {
 	_m.ctrl.Call(_m, "Dissociate", channel, nick)
 }
 

@@ -49,7 +49,12 @@ func (conn *Conn) h_001(line *Line) {
 	if idx := strings.LastIndex(t, " "); idx != -1 {
 		t = t[idx+1:]
 		if idx = strings.Index(t, "@"); idx != -1 {
-			conn.cfg.Me.Host = t[idx+1:]
+			if conn.st != nil {
+				me := conn.Me()
+				conn.st.NickInfo(me.Nick, me.Ident, t[idx+1:], me.Name)
+			} else {
+				conn.cfg.Me.Host = t[idx+1:]
+			}
 		}
 	}
 }
@@ -65,14 +70,15 @@ func (conn *Conn) h_001(line *Line) {
 // Handler to deal with "433 :Nickname already in use"
 func (conn *Conn) h_433(line *Line) {
 	// Args[1] is the new nick we were attempting to acquire
+	me := conn.Me()
 	neu := conn.cfg.NewNick(line.Args[1])
 	conn.Nick(neu)
 	// if this is happening before we're properly connected (i.e. the nick
 	// we sent in the initial NICK command is in use) we will not receive
 	// a NICK message to confirm our change of nick, so ReNick here...
-	if line.Args[1] == conn.cfg.Me.Nick {
+	if line.Args[1] == me.Nick {
 		if conn.st != nil {
-			conn.st.ReNick(conn.cfg.Me.Nick, neu)
+			conn.cfg.Me = conn.st.ReNick(me.Nick, neu)
 		} else {
 			conn.cfg.Me.Nick = neu
 		}

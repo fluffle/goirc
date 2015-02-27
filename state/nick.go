@@ -4,15 +4,22 @@ import (
 	"github.com/fluffle/goirc/logging"
 
 	"reflect"
-	"sort"
 )
 
-// A struct representing an IRC nick
+// A Nick is returned from the state tracker and contains
+// a copy of the nick state at a particular time.
 type Nick struct {
 	Nick, Ident, Host, Name string
 	Modes                   *NickMode
-	lookup                  map[string]*Channel
-	chans                   map[*Channel]*ChanPrivs
+	Channels                map[string]*ChanPrivs
+}
+
+// Internal bookkeeping struct for nicks.
+type nick struct {
+	nick, ident, host, name string
+	modes                   *NickMode
+	lookup                  map[string]*channel
+	chans                   map[*channel]*ChanPrivs
 }
 
 // A struct representing the modes of an IRC Nick (User Modes)
@@ -43,51 +50,62 @@ func init() {
 }
 
 /******************************************************************************\
- * Nick methods for state management
+ * nick methods for state management
 \******************************************************************************/
 
-func NewNick(n string) *Nick {
-	return &Nick{
-		Nick:   n,
-		Modes:  new(NickMode),
-		chans:  make(map[*Channel]*ChanPrivs),
-		lookup: make(map[string]*Channel),
+func newNick(n string) *nick {
+	return &nick{
+		nick:   n,
+		modes:  new(NickMode),
+		chans:  make(map[*channel]*ChanPrivs),
+		lookup: make(map[string]*channel),
 	}
 }
 
-// Returns true if the Nick is associated with the Channel.
-func (nk *Nick) IsOn(ch *Channel) (*ChanPrivs, bool) {
-	cp, ok := nk.chans[ch]
-	return cp, ok
+// Returns a copy of the internal tracker nick state at this time.
+// Relies on tracker-level locking for concurrent access.
+func (nk *nick) Nick() *Nick {
+	n := &Nick{
+		Nick:     nk.nick,
+		Ident:    nk.ident,
+		Host:     nk.host,
+		Name:     nk.name,
+		Modes:    nk.modes.Copy(),
+		Channels: make(map[string]*ChanPrivs),
+	}
+	for c, cp := range nk.chans {
+		n.Channels[c.name] = cp.Copy()
+	}
+	return n
 }
 
-func (nk *Nick) IsOnStr(c string) (*Channel, bool) {
-	ch, ok := nk.lookup[c]
-	return ch, ok
+func (nk *nick) isOn(ch *channel) (*ChanPrivs, bool) {
+	cp, ok := nk.chans[ch]
+	return cp.Copy(), ok
 }
 
 // Associates a Channel with a Nick.
-func (nk *Nick) addChannel(ch *Channel, cp *ChanPrivs) {
+func (nk *nick) addChannel(ch *channel, cp *ChanPrivs) {
 	if _, ok := nk.chans[ch]; !ok {
 		nk.chans[ch] = cp
-		nk.lookup[ch.Name] = ch
+		nk.lookup[ch.name] = ch
 	} else {
-		logging.Warn("Nick.addChannel(): %s already on %s.", nk.Nick, ch.Name)
+		logging.Warn("Nick.addChannel(): %s already on %s.", nk.nick, ch.name)
 	}
 }
 
 // Disassociates a Channel from a Nick.
-func (nk *Nick) delChannel(ch *Channel) {
+func (nk *nick) delChannel(ch *channel) {
 	if _, ok := nk.chans[ch]; ok {
 		delete(nk.chans, ch)
-		delete(nk.lookup, ch.Name)
+		delete(nk.lookup, ch.name)
 	} else {
-		logging.Warn("Nick.delChannel(): %s not on %s.", nk.Nick, ch.Name)
+		logging.Warn("Nick.delChannel(): %s not on %s.", nk.nick, ch.name)
 	}
 }
 
 // Parse mode strings for a Nick.
-func (nk *Nick) ParseModes(modes string) {
+func (nk *nick) parseModes(modes string) {
 	var modeop bool // true => add mode, false => remove mode
 	for i := 0; i < len(modes); i++ {
 		switch m := modes[i]; m {
@@ -96,46 +114,44 @@ func (nk *Nick) ParseModes(modes string) {
 		case '-':
 			modeop = false
 		case 'B':
-			nk.Modes.Bot = modeop
+			nk.modes.Bot = modeop
 		case 'i':
-			nk.Modes.Invisible = modeop
+			nk.modes.Invisible = modeop
 		case 'o':
-			nk.Modes.Oper = modeop
+			nk.modes.Oper = modeop
 		case 'w':
-			nk.Modes.WallOps = modeop
+			nk.modes.WallOps = modeop
 		case 'x':
-			nk.Modes.HiddenHost = modeop
+			nk.modes.HiddenHost = modeop
 		case 'z':
-			nk.Modes.SSL = modeop
+			nk.modes.SSL = modeop
 		default:
 			logging.Info("Nick.ParseModes(): unknown mode char %c", m)
 		}
 	}
 }
 
-type byName []*Channel
-
-func (b byName) Len() int           { return len(b) }
-func (b byName) Less(i, j int) bool { return b[i].Name < b[j].Name }
-func (b byName) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
-
-// Channels returns a list of *Channel the nick is on, sorted by name.
-func (nk *Nick) Channels() []*Channel {
-	channels := make([]*Channel, 0, len(nk.lookup))
-	for _, channel := range nk.lookup {
-		channels = append(channels, channel)
-	}
-	sort.Sort(byName(channels))
-	return channels
+// Returns true if the Nick is associated with the Channel.
+func (nk *Nick) IsOn(ch string) (*ChanPrivs, bool) {
+	cp, ok := nk.Channels[ch]
+	return cp, ok
 }
 
-// ChannelsStr returns a list of channel strings the nick is on, sorted by name.
-func (nk *Nick) ChannelsStr() []string {
-	var names []string
-	for _, channel := range nk.Channels() {
-		names = append(names, channel.Name)
-	}
-	return names
+// Tests Nick equality.
+func (nk *Nick) Equals(other *Nick) bool {
+	return reflect.DeepEqual(nk, other)
+}
+
+// Duplicates a NickMode struct.
+func (nm *NickMode) Copy() *NickMode {
+	if nm == nil { return nil }
+	n := *nm
+	return &n
+}
+
+// Tests NickMode equality.
+func (nm *NickMode) Equals(other *NickMode) bool {
+	return reflect.DeepEqual(nm, other)
 }
 
 // Returns a string representing the nick. Looks like:
@@ -152,10 +168,14 @@ func (nk *Nick) String() string {
 	str += "Real Name: " + nk.Name + "\n\t"
 	str += "Modes: " + nk.Modes.String() + "\n\t"
 	str += "Channels: \n"
-	for ch, cp := range nk.chans {
-		str += "\t\t" + ch.Name + ": " + cp.String() + "\n"
+	for ch, cp := range nk.Channels {
+		str += "\t\t" + ch + ": " + cp.String() + "\n"
 	}
 	return str
+}
+
+func (nk *nick) String() string {
+	return nk.Nick().String()
 }
 
 // Returns a string representing the nick modes. Looks like:
