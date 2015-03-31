@@ -4,13 +4,14 @@ import (
 	"bufio"
 	"crypto/tls"
 	"fmt"
-	"github.com/fluffle/goirc/logging"
-	"github.com/fluffle/goirc/state"
 	"io"
 	"net"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/fluffle/goirc/logging"
+	"github.com/fluffle/goirc/state"
 )
 
 // An IRC connection is represented by this struct.
@@ -404,7 +405,6 @@ func (conn *Conn) shutdown() {
 	// Guard against double-call of shutdown() if we get an error in send()
 	// as calling sock.Close() will cause recv() to receive EOF in readstring()
 	conn.mu.Lock()
-	defer conn.mu.Unlock()
 	if !conn.connected {
 		return
 	}
@@ -412,6 +412,8 @@ func (conn *Conn) shutdown() {
 	conn.connected = false
 	conn.sock.Close()
 	close(conn.die)
+	// Unlock before waiting, https://github.com/StalkR/goircbot/issues/11
+	conn.mu.Unlock()
 	conn.wg.Wait()
 	// Dispatch after closing connection but before reinit
 	// so event handlers can still access state information.
