@@ -172,7 +172,7 @@ func (conn *Conn) Me() *state.Nick {
 	conn.mu.RLock()
 	defer conn.mu.RUnlock()
 	if conn.st != nil {
-		conn.cfg.Me = conn.st.Me()
+		return conn.st.Me()
 	}
 	return conn.cfg.Me
 }
