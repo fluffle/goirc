@@ -104,7 +104,8 @@ func TestClientAndStateTracking(t *testing.T) {
 	c := SimpleClient("test", "test", "Testing IRC")
 
 	// Assert some basic things about the initial state of the Conn struct
-	if me := c.cfg.Me; me.Nick != "test" || me.Ident != "test" ||
+	me := c.cfg.Me
+	if me.Nick != "test" || me.Ident != "test" ||
 		me.Name != "Testing IRC" || me.Host != "" {
 		t.Errorf("Conn.cfg.Me not correctly initialised.")
 	}
@@ -126,18 +127,21 @@ func TestClientAndStateTracking(t *testing.T) {
 		t.Errorf("Incorrect number of Removers (%d != %d) when adding state handlers.",
 			len(c.stRemovers), len(stHandlers))
 	}
+	if neu := c.Me(); neu.Nick != me.Nick || neu.Ident != me.Ident ||
+		neu.Name != me.Name || neu.Host != me.Host {
+		t.Errorf("Enabling state tracking erased information about me!")
+	}
 
 	// We're expecting the untracked me to be replaced by a tracked one
 	if c.st == nil {
 		t.Errorf("State tracker not enabled correctly.")
 	}
-	if me := c.cfg.Me; me.Nick != "test" || me.Ident != "test" ||
+	if me = c.cfg.Me; me.Nick != "test" || me.Ident != "test" ||
 		me.Name != "Testing IRC" || me.Host != "" {
 		t.Errorf("Enabling state tracking did not replace Me correctly.")
 	}
 
 	// Now, shim in the mock state tracker and test disabling state tracking
-	me := c.cfg.Me
 	c.st = st
 	gomock.InOrder(
 		st.EXPECT().Me().Return(me),

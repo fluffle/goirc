@@ -187,9 +187,8 @@ func (conn *Conn) EnableStateTracking() {
 	if conn.st == nil {
 		n := conn.cfg.Me
 		conn.st = state.NewTracker(n.Nick)
+		conn.st.NickInfo(n.Nick, n.Ident, n.Host, n.Name)
 		conn.cfg.Me = conn.st.Me()
-		conn.cfg.Me.Ident = n.Ident
-		conn.cfg.Me.Name = n.Name
 		conn.addSTHandlers()
 	}
 }
