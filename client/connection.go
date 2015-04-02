@@ -288,13 +288,19 @@ func hasPort(s string) bool {
 
 // goroutine to pass data from output channel to write()
 func (conn *Conn) send() {
-	defer conn.wg.Done()
 	for {
 		select {
 		case line := <-conn.out:
-			conn.write(line)
+			if err := conn.write(line); err != nil {
+				logging.Error("irc.send(): %s", err.Error())
+				// We can't defer this, because shutdown() waits for it.
+				conn.wg.Done()
+				conn.shutdown()
+				return
+			}
 		case <-conn.die:
 			// control channel closed, bail out
+			conn.wg.Done()
 			return
 		}
 	}
@@ -357,7 +363,7 @@ func (conn *Conn) runLoop() {
 
 // Write a \r\n terminated line of output to the connected server,
 // using Hybrid's algorithm to rate limit if conn.cfg.Flood is false.
-func (conn *Conn) write(line string) {
+func (conn *Conn) write(line string) error {
 	if !conn.cfg.Flood {
 		if t := conn.rateLimit(len(line)); t != 0 {
 			// sleep for the current line's time value before sending it
@@ -368,16 +374,13 @@ func (conn *Conn) write(line string) {
 	}
 
 	if _, err := conn.io.WriteString(line + "\r\n"); err != nil {
-		logging.Error("irc.send(): %s", err.Error())
-		conn.shutdown()
-		return
+		return err
 	}
 	if err := conn.io.Flush(); err != nil {
-		logging.Error("irc.send(): %s", err.Error())
-		conn.shutdown()
-		return
+		return err
 	}
 	logging.Debug("-> %s", line)
+	return nil
 }
 
 // Implement Hybrid's flood control algorithm to rate-limit outgoing lines.
