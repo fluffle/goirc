@@ -165,7 +165,7 @@ func TestClientAndStateTracking(t *testing.T) {
 	ctrl.Finish()
 }
 
-func TestSend(t *testing.T) {
+func TestSendExitsOnDie(t *testing.T) {
 	// Passing a second value to setUp stops goroutines from starting
 	c, s := setUp(t, false)
 	defer s.tearDown()
@@ -205,6 +205,38 @@ func TestSend(t *testing.T) {
 
 	// Sending more on c.out shouldn't reach the network.
 	c.out <- "SENT AFTER END"
+	s.nc.ExpectNothing()
+}
+
+func TestSendExitsOnWriteError(t *testing.T) {
+	// Passing a second value to setUp stops goroutines from starting
+	c, s := setUp(t, false)
+	// We can't use tearDown here because we're testing shutdown conditions
+	// (and so need to EXPECT() a call to st.Wipe() in the right place)
+	defer s.ctrl.Finish()
+
+	// We want to test that the a goroutine calling send will exit correctly.
+	exited := callCheck(t)
+	// send() will decrement the WaitGroup, so we must increment it.
+	c.wg.Add(1)
+	go func() {
+		c.send()
+		exited.call()
+	}()
+
+	// Send a line to be sure things are good.
+	c.out <- "SENT AFTER START"
+	s.nc.Expect("SENT AFTER START")
+
+	// Now, close the underlying socket to cause write() to return an error.
+	// This will call shutdown() => a call to st.Wipe() will happen.
+	exited.assertNotCalled("Exited before signal sent.")
+	s.st.EXPECT().Wipe()
+	s.nc.Close()
+	// Sending more on c.out shouldn't reach the network, but we need to send
+	// *something* to trigger a call to write() that will fail.
+	c.out <- "SENT AFTER END"
+	exited.assertWasCalled("Didn't exit after signal.")
 	s.nc.ExpectNothing()
 }
 
@@ -398,7 +430,9 @@ func TestWrite(t *testing.T) {
 	defer s.ctrl.Finish()
 
 	// Write should just write a line to the socket.
-	c.write("yo momma")
+	if err := c.write("yo momma"); err != nil {
+		t.Errorf("Write returned unexpected error %v", err)
+	}
 	s.nc.Expect("yo momma")
 
 	// Flood control is disabled -- setUp sets c.cfg.Flood = true -- so we should
@@ -408,7 +442,9 @@ func TestWrite(t *testing.T) {
 	}
 
 	c.cfg.Flood = false
-	c.write("she so useless")
+	if err := c.write("she so useless"); err != nil {
+		t.Errorf("Write returned unexpected error %v", err)
+	}
 	s.nc.Expect("she so useless")
 
 	// The lastsent time should have been updated very recently...
@@ -417,9 +453,10 @@ func TestWrite(t *testing.T) {
 	}
 
 	// Finally, test the error state by closing the socket then writing.
-	s.st.EXPECT().Wipe()
 	s.nc.Close()
-	c.write("she can't pass unit tests")
+	if err := c.write("she can't pass unit tests"); err == nil {
+		t.Errorf("Expected write to return error after socket close.")
+	}
 }
 
 func TestRateLimit(t *testing.T) {
