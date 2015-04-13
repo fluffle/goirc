@@ -154,7 +154,6 @@ func Client(cfg *Config) *Conn {
 		lastsent:    time.Now(),
 	}
 	conn.addIntHandlers()
-	conn.initialise()
 	return conn
 }
 
@@ -169,8 +168,6 @@ func (conn *Conn) Config() *Config {
 }
 
 func (conn *Conn) Me() *state.Nick {
-	conn.mu.RLock()
-	defer conn.mu.RUnlock()
 	if conn.st != nil {
 		conn.cfg.Me = conn.st.Me()
 	}
@@ -230,6 +227,7 @@ func (conn *Conn) ConnectTo(host string, pass ...string) error {
 func (conn *Conn) Connect() error {
 	conn.mu.Lock()
 	defer conn.mu.Unlock()
+	conn.initialise()
 
 	if conn.cfg.Server == "" {
 		return fmt.Errorf("irc.Connect(): cfg.Server must be non-empty")
@@ -403,6 +401,9 @@ func (conn *Conn) rateLimit(chars int) time.Duration {
 }
 
 func (conn *Conn) shutdown() {
+	// Dispatch after closing connection but before reinit
+	// so event handlers can still access state information.
+	defer conn.dispatch(&Line{Cmd: DISCONNECTED, Time: time.Now()})
 	// Guard against double-call of shutdown() if we get an error in send()
 	// as calling sock.Close() will cause recv() to receive EOF in readstring()
 	conn.mu.Lock()
@@ -415,11 +416,6 @@ func (conn *Conn) shutdown() {
 	conn.sock.Close()
 	close(conn.die)
 	conn.wg.Wait()
-	// Dispatch after closing connection but before reinit
-	// so event handlers can still access state information.
-	conn.dispatch(&Line{Cmd: DISCONNECTED, Time: time.Now()})
-	// reinit datastructures ready for next connection
-	conn.initialise()
 }
 
 // Dumps a load of information about the current state of the connection to a

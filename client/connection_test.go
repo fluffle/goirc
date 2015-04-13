@@ -51,6 +51,7 @@ func setUp(t *testing.T, start ...bool) (*Conn, *testState) {
 	st := state.NewMockTracker(ctrl)
 	nc := MockNetConn(t)
 	c := SimpleClient("test", "test", "Testing IRC")
+	c.initialise()
 
 	c.st = st
 	c.sock = nc
@@ -66,7 +67,6 @@ func setUp(t *testing.T, start ...bool) (*Conn, *testState) {
 }
 
 func (s *testState) tearDown() {
-	s.st.EXPECT().Wipe()
 	s.nc.ExpectNothing()
 	s.c.shutdown()
 	s.ctrl.Finish()
@@ -86,7 +86,6 @@ func TestEOF(t *testing.T) {
 	})
 
 	// Simulate EOF from server
-	s.st.EXPECT().Wipe()
 	s.nc.Close()
 
 	// Verify that disconnected handler was called
@@ -231,7 +230,6 @@ func TestSendExitsOnWriteError(t *testing.T) {
 	// Now, close the underlying socket to cause write() to return an error.
 	// This will call shutdown() => a call to st.Wipe() will happen.
 	exited.assertNotCalled("Exited before signal sent.")
-	s.st.EXPECT().Wipe()
 	s.nc.Close()
 	// Sending more on c.out shouldn't reach the network, but we need to send
 	// *something* to trigger a call to write() that will fail.
@@ -292,7 +290,6 @@ func TestRecv(t *testing.T) {
 
 	// The only way recv() exits is when the socket closes.
 	exited.assertNotCalled("Exited before socket close.")
-	s.st.EXPECT().Wipe()
 	s.nc.Close()
 	exited.assertWasCalled("Didn't exit on socket close.")
 
