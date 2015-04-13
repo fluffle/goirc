@@ -206,6 +206,8 @@ func (conn *Conn) DisableStateTracking() {
 
 // Per-connection state initialisation.
 func (conn *Conn) initialise() {
+	conn.mu.Lock()
+	defer conn.mu.Unlock()
 	conn.io = nil
 	conn.sock = nil
 	conn.die = make(chan struct{})
@@ -406,8 +408,8 @@ func (conn *Conn) shutdown() {
 	// Guard against double-call of shutdown() if we get an error in send()
 	// as calling sock.Close() will cause recv() to receive EOF in readstring()
 	conn.mu.Lock()
-	defer conn.mu.Unlock()
 	if !conn.connected {
+		conn.mu.Unlock()
 		return
 	}
 	logging.Info("irc.shutdown(): Disconnected from server.")
@@ -417,6 +419,8 @@ func (conn *Conn) shutdown() {
 	conn.wg.Wait()
 	// Dispatch after closing connection but before reinit
 	// so event handlers can still access state information.
+	// Release lock before dispatch or we block handlers from accessing Me()
+	conn.mu.Unlock()
 	conn.dispatch(&Line{Cmd: DISCONNECTED, Time: time.Now()})
 	// reinit datastructures ready for next connection
 	conn.initialise()
