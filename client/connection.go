@@ -401,14 +401,11 @@ func (conn *Conn) rateLimit(chars int) time.Duration {
 }
 
 func (conn *Conn) shutdown() {
-	// Dispatch after closing connection but before reinit
-	// so event handlers can still access state information.
-	defer conn.dispatch(&Line{Cmd: DISCONNECTED, Time: time.Now()})
 	// Guard against double-call of shutdown() if we get an error in send()
 	// as calling sock.Close() will cause recv() to receive EOF in readstring()
 	conn.mu.Lock()
-	defer conn.mu.Unlock()
 	if !conn.connected {
+		conn.mu.Unlock()
 		return
 	}
 	logging.Info("irc.shutdown(): Disconnected from server.")
@@ -416,6 +413,10 @@ func (conn *Conn) shutdown() {
 	conn.sock.Close()
 	close(conn.die)
 	conn.wg.Wait()
+	conn.mu.Unlock()
+	// Dispatch after closing connection but before reinit
+	// so event handlers can still access state information.
+	defer conn.dispatch(&Line{Cmd: DISCONNECTED, Time: time.Now()})
 }
 
 // Dumps a load of information about the current state of the connection to a
