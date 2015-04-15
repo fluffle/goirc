@@ -29,9 +29,10 @@ const (
 	VHOST        = "VHOST"
 	WHO          = "WHO"
 	WHOIS        = "WHOIS"
+	defaultSplit = 450
 )
 
-// cutNewLines() pares down a string to the part before the first "\r" or "\n"
+// cutNewLines() pares down a string to the part before the first "\r" or "\n".
 func cutNewLines(s string) string {
 	r := strings.SplitN(s, "\r", 2)
 	r = strings.SplitN(r[0], "\n", 2)
@@ -65,7 +66,7 @@ func indexFragment(s string) int {
 func splitMessage(msg string, splitLen int) (msgs []string) {
 	// This is quite short ;-)
 	if splitLen < 10 {
-		splitLen = 10
+		splitLen = defaultSplit
 	}
 	for len(msg) > splitLen {
 		idx := indexFragment(msg[:splitLen])
@@ -78,25 +79,29 @@ func splitMessage(msg string, splitLen int) (msgs []string) {
 	return append(msgs, msg)
 }
 
-// Raw() sends a raw line to the server, should really only be used for
+// Raw sends a raw line to the server, should really only be used for
 // debugging purposes but may well come in handy.
 func (conn *Conn) Raw(rawline string) {
 	// Avoid command injection by enforcing one command per line.
 	conn.out <- cutNewLines(rawline)
 }
 
-// Pass() sends a PASS command to the server
+// Pass sends a PASS command to the server.
+//     PASS password
 func (conn *Conn) Pass(password string) { conn.Raw(PASS + " " + password) }
 
-// Nick() sends a NICK command to the server
+// Nick sends a NICK command to the server.
+//     NICK nick
 func (conn *Conn) Nick(nick string) { conn.Raw(NICK + " " + nick) }
 
-// User() sends a USER command to the server
+// User sends a USER command to the server.
+//     USER ident 12 * :name
 func (conn *Conn) User(ident, name string) {
 	conn.Raw(USER + " " + ident + " 12 * :" + name)
 }
 
-// Join() sends a JOIN command to the server with an optional key
+// Join sends a JOIN command to the server with an optional key.
+//     JOIN channel [key]
 func (conn *Conn) Join(channel string, key ...string) {
 	k := ""
 	if len(key) > 0 {
@@ -105,7 +110,8 @@ func (conn *Conn) Join(channel string, key ...string) {
 	conn.Raw(JOIN + " " + channel + k)
 }
 
-// Part() sends a PART command to the server with an optional part message
+// Part sends a PART command to the server with an optional part message.
+//     PART channel [:message]
 func (conn *Conn) Part(channel string, message ...string) {
 	msg := strings.Join(message, " ")
 	if msg != "" {
@@ -114,7 +120,8 @@ func (conn *Conn) Part(channel string, message ...string) {
 	conn.Raw(PART + " " + channel + msg)
 }
 
-// Kick() sends a KICK command to remove a nick from a channel
+// Kick sends a KICK command to remove a nick from a channel.
+//     KICK channel nick [:message]
 func (conn *Conn) Kick(channel, nick string, message ...string) {
 	msg := strings.Join(message, " ")
 	if msg != "" {
@@ -123,7 +130,8 @@ func (conn *Conn) Kick(channel, nick string, message ...string) {
 	conn.Raw(KICK + " " + channel + " " + nick + msg)
 }
 
-// Quit() sends a QUIT command to the server with an optional quit message
+// Quit sends a QUIT command to the server with an optional quit message.
+//     QUIT [:message]
 func (conn *Conn) Quit(message ...string) {
 	msg := strings.Join(message, " ")
 	if msg == "" {
@@ -132,28 +140,37 @@ func (conn *Conn) Quit(message ...string) {
 	conn.Raw(QUIT + " :" + msg)
 }
 
-// Whois() sends a WHOIS command to the server
+// Whois sends a WHOIS command to the server.
+//     WHOIS nick
 func (conn *Conn) Whois(nick string) { conn.Raw(WHOIS + " " + nick) }
 
-//Who() sends a WHO command to the server
+// Who sends a WHO command to the server.
+//     WHO nick
 func (conn *Conn) Who(nick string) { conn.Raw(WHO + " " + nick) }
 
-// Privmsg() sends a PRIVMSG to the target t
+// Privmsg sends a PRIVMSG to the target nick or channel t.
+// If msg is longer than Config.SplitLen characters, multiple PRIVMSGs
+// will be sent to the target containing sequential parts of msg.
+//     PRIVMSG t :msg
 func (conn *Conn) Privmsg(t, msg string) {
 	for _, s := range splitMessage(msg, conn.cfg.SplitLen) {
 		conn.Raw(PRIVMSG + " " + t + " :" + s)
 	}
 }
 
-// Notice() sends a NOTICE to the target t
+// Notice sends a NOTICE to the target nick or channel t.
+// If msg is longer than Config.SplitLen characters, multiple NOTICEs
+// will be sent to the target containing sequential parts of msg.
+//     NOTICE t :msg
 func (conn *Conn) Notice(t, msg string) {
 	for _, s := range splitMessage(msg, conn.cfg.SplitLen) {
 		conn.Raw(NOTICE + " " + t + " :" + s)
 	}
 }
 
-// Ctcp() sends a (generic) CTCP message to the target t
-// with an optional argument
+// Ctcp sends a (generic) CTCP message to the target nick
+// or channel t, with an optional argument.
+//     PRIVMSG t :\001CTCP arg\001
 func (conn *Conn) Ctcp(t, ctcp string, arg ...string) {
 	// We need to split again here to ensure
 	for _, s := range splitMessage(strings.Join(arg, " "), conn.cfg.SplitLen) {
@@ -165,8 +182,9 @@ func (conn *Conn) Ctcp(t, ctcp string, arg ...string) {
 	}
 }
 
-// CtcpReply() sends a generic CTCP reply to the target t
-// with an optional argument
+// CtcpReply sends a (generic) CTCP reply to the target nick
+// or channel t, with an optional argument.
+//     NOTICE t :\001CTCP arg\001
 func (conn *Conn) CtcpReply(t, ctcp string, arg ...string) {
 	for _, s := range splitMessage(strings.Join(arg, " "), conn.cfg.SplitLen) {
 		if s != "" {
@@ -177,15 +195,18 @@ func (conn *Conn) CtcpReply(t, ctcp string, arg ...string) {
 	}
 }
 
-// Version() sends a CTCP "VERSION" to the target t
+// Version sends a CTCP "VERSION" to the target nick or channel t.
 func (conn *Conn) Version(t string) { conn.Ctcp(t, VERSION) }
 
-// Action() sends a CTCP "ACTION" to the target t
+// Action sends a CTCP "ACTION" to the target nick or channel t.
 func (conn *Conn) Action(t, msg string) { conn.Ctcp(t, ACTION, msg) }
 
-// Topic() sends a TOPIC command to the channel
-//   Topic(channel) retrieves the current channel topic (see "332" handler)
-//   Topic(channel, topic) sets the topic for the channel
+// Topic() sends a TOPIC command for a channel.
+// If no topic is provided this requests that a 332 response is sent by the
+// server for that channel, which can then be handled to retrieve the current
+// channel topic. If a topic is provided the channel's topic will be set.
+//     TOPIC channel
+//     TOPIC channel :topic
 func (conn *Conn) Topic(channel string, topic ...string) {
 	t := strings.Join(topic, " ")
 	if t != "" {
@@ -194,13 +215,14 @@ func (conn *Conn) Topic(channel string, topic ...string) {
 	conn.Raw(TOPIC + " " + channel + t)
 }
 
-// Mode() sends a MODE command to the server. This one can get complicated if
-// we try to be too clever, so it's deliberately simple:
-//   Mode(t) retrieves the user or channel modes for target t
-//   Mode(t, "modestring") sets user or channel modes for target t, where...
-//     modestring == e.g. "+o <nick>" or "+ntk <key>" or "-is"
-// This means you'll need to do your own mode work. It may be linked in with
-// the state tracking and ChanMode/NickMode/ChanPrivs objects later...
+// Mode sends a MODE command for a target nick or channel t.
+// If no mode strings are provided this requests that a 324 response is sent
+// by the server for the target. Otherwise the mode strings are concatenated
+// with spaces and sent to the server. This allows e.g.
+//     conn.Mode("#channel", "+nsk", "mykey")
+//
+//     MODE t
+//     MODE t modestring
 func (conn *Conn) Mode(t string, modestring ...string) {
 	mode := strings.Join(modestring, " ")
 	if mode != "" {
@@ -209,9 +231,11 @@ func (conn *Conn) Mode(t string, modestring ...string) {
 	conn.Raw(MODE + " " + t + mode)
 }
 
-// Away() sends an AWAY command to the server
-//   Away() resets away status
-//   Away(message) sets away with the given message
+// Away sends an AWAY command to the server.
+// If a message is provided it sets the client's away status with that message,
+// otherwise it resets the client's away status.
+//     AWAY
+//     AWAY :message
 func (conn *Conn) Away(message ...string) {
 	msg := strings.Join(message, " ")
 	if msg != "" {
@@ -220,20 +244,24 @@ func (conn *Conn) Away(message ...string) {
 	conn.Raw(AWAY + msg)
 }
 
-// Invite() sends an INVITE command to the server
+// Invite sends an INVITE command to the server.
+//     INVITE nick channel
 func (conn *Conn) Invite(nick, channel string) {
 	conn.Raw(INVITE + " " + nick + " " + channel)
 }
 
-// Oper() sends an OPER command to the server
+// Oper sends an OPER command to the server.
+//     OPER user pass
 func (conn *Conn) Oper(user, pass string) { conn.Raw(OPER + " " + user + " " + pass) }
 
-// VHost() sends a VHOST command to the server
+// VHost sends a VHOST command to the server.
+//     VHOST user pass
 func (conn *Conn) VHost(user, pass string) { conn.Raw(VHOST + " " + user + " " + pass) }
 
-// Ping() sends a PING command to the server
-// A PONG response is to be expected afterwards
+// Ping sends a PING command to the server, which should PONG.
+//     PING :message
 func (conn *Conn) Ping(message string) { conn.Raw(PING + " :" + message) }
 
-// Pong() sends a PONG command to the server
+// Pong sends a PONG command to the server.
+//     PONG :message
 func (conn *Conn) Pong(message string) { conn.Raw(PONG + " :" + message) }

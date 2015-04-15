@@ -6,7 +6,8 @@ import (
 )
 
 // We parse an incoming line into this struct. Line.Cmd is used as the trigger
-// name for incoming event handlers, see *Conn.recv() for details.
+// name for incoming event handlers and is the IRC verb, the first sequence
+// of non-whitespace characters after ":nick!user@host", e.g. PRIVMSG.
 //   Raw =~ ":nick!user@host cmd args[] :text"
 //   Src == "nick!user@host"
 //   Cmd == e.g. PRIVMSG, 332
@@ -17,7 +18,7 @@ type Line struct {
 	Time                   time.Time
 }
 
-// Copy() returns a deep copy of the Line.
+// Copy returns a deep copy of the Line.
 func (l *Line) Copy() *Line {
 	nl := *l
 	nl.Args = make([]string, len(l.Args))
@@ -25,7 +26,7 @@ func (l *Line) Copy() *Line {
 	return &nl
 }
 
-// Return the contents of the text portion of a line.  This only really
+// Text returns the contents of the text portion of a line. This only really
 // makes sense for lines with a :text part, but there are a lot of them.
 func (line *Line) Text() string {
 	if len(line.Args) > 0 {
@@ -34,11 +35,12 @@ func (line *Line) Text() string {
 	return ""
 }
 
-// Return the target of the line, usually the first Arg for the IRC verb.
-// If the line was broadcast from a channel, the target will be that channel.
-// If the line was broadcast by a user, the target will be that user.
-// TODO(fluffle): Add 005 CHANTYPES parsing for this?
+// Target returns the contextual target of the line, usually the first Arg 
+// for the IRC verb. If the line was broadcast from a channel, the target
+// will be that channel. If the line was sent directly by a user, the target
+// will be that user.
 func (line *Line) Target() string {
+	// TODO(fluffle): Add 005 CHANTYPES parsing for this?
 	switch line.Cmd {
 	case PRIVMSG, NOTICE, ACTION:
 		if !line.Public() {
@@ -56,7 +58,11 @@ func (line *Line) Target() string {
 	return ""
 }
 
-// NOTE: Makes the assumption that all channels start with #.
+// Public returns true if the line is the result of an IRC user sending
+// a message to a channel the client has joined instead of directly
+// to the client.
+//
+// NOTE: This makes the (poor) assumption that all channels start with #.
 func (line *Line) Public() bool {
 	switch line.Cmd {
 	case PRIVMSG, NOTICE, ACTION:
@@ -78,7 +84,13 @@ func (line *Line) Public() bool {
 }
 
 
-// ParseLine() creates a Line from an incoming message from the IRC server.
+// ParseLine creates a Line from an incoming message from the IRC server.
+//
+// It contains special casing for CTCP messages, most notably CTCP ACTION.
+// All CTCP messages have the \001 bytes stripped from the message and the
+// CTCP command separated from any subsequent text. Then, CTCP ACTIONs are
+// rewritten such that Line.Cmd == ACTION. Other CTCP messages have Cmd
+// set to CTCP or CTCPREPLY, and the CTCP command prepended to line.Args.
 func ParseLine(s string) *Line {
 	line := &Line{Raw: s}
 	if s[0] == ':' {

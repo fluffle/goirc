@@ -7,17 +7,32 @@ import (
 	"sync"
 )
 
-// An IRC Handler looks like this:
+// Handlers are triggered on incoming Lines from the server, with the handler
+// "name" being equivalent to Line.Cmd. Read the RFCs for details on what
+// replies could come from the server. They'll generally be things like
+// "PRIVMSG", "JOIN", etc. but all the numeric replies are left as ascii
+// strings of digits like "332" (mainly because I really didn't feel like
+// putting massive constant tables in).
+//
+// Foreground handlers have a guarantee of protocol consistency: all the
+// handlers for one event will have finished before the handlers for the
+// next start processing. They are run in parallel but block the event
+// loop, so care should be taken to ensure these handlers are quick :-)
+//
+// Background handlers are run in parallel and do not block the event loop.
+// This is useful for things that may need to do significant work.
 type Handler interface {
 	Handle(*Conn, *Line)
 }
 
-// And when they've been added to the client they are removable.
+// Removers allow for a handler that has been previously added to the client
+// to be removed. 
 type Remover interface {
 	Remove()
 }
 
-// A HandlerFunc implements Handler.
+// HandlerFunc allows a bare function with this signature to implement the
+// Handler interface. It is used by Conn.HandleFunc.
 type HandlerFunc func(*Conn, *Line)
 
 func (hf HandlerFunc) Handle(conn *Conn, line *Line) {
@@ -132,16 +147,15 @@ func (hs *hSet) dispatch(conn *Conn, line *Line) {
 	wg.Wait()
 }
 
-// Handlers are triggered on incoming Lines from the server, with the handler
-// "name" being equivalent to Line.Cmd. Read the RFCs for details on what
-// replies could come from the server. They'll generally be things like
-// "PRIVMSG", "JOIN", etc. but all the numeric replies are left as ascii
-// strings of digits like "332" (mainly because I really didn't feel like
-// putting massive constant tables in).
+// Handle adds the provided handler to the foreground set for the named event.
+// It will return a Remover that allows that handler to be removed again.
 func (conn *Conn) Handle(name string, h Handler) Remover {
 	return conn.fgHandlers.add(name, h)
 }
 
+// HandleBG adds the provided handler to the background set for the named
+// event. It may go away in the future.
+// It will return a Remover that allows that handler to be removed again.
 func (conn *Conn) HandleBG(name string, h Handler) Remover {
 	return conn.bgHandlers.add(name, h)
 }
@@ -150,6 +164,9 @@ func (conn *Conn) handle(name string, h Handler) Remover {
 	return conn.intHandlers.add(name, h)
 }
 
+// HandleFunc adds the provided function as a handler in the foreground set
+// for the named event.
+// It will return a Remover that allows that handler to be removed again.
 func (conn *Conn) HandleFunc(name string, hf HandlerFunc) Remover {
 	return conn.Handle(name, hf)
 }
@@ -159,16 +176,14 @@ func (conn *Conn) dispatch(line *Line) {
 	// This ensures that user-supplied handlers that use the tracker have a
 	// consistent view of the connection state in handlers that mutate it.
 	conn.intHandlers.dispatch(conn, line)
-	// Background handlers are run in parallel and do not block the event loop.
-	// This is useful for things that may need to do significant work.
 	go conn.bgHandlers.dispatch(conn, line)
-	// Foreground handlers have a guarantee of protocol consistency: all the
-	// handlers for one event will have finished before the handlers for the
-	// next start processing. They are run in parallel but block the event
-	// loop, so care should be taken to ensure these handlers are quick :-)
 	conn.fgHandlers.dispatch(conn, line)
 }
 
+// LogPanic is used as the default panic catcher for the client. If, like me,
+// you are not good with computer, and you'd prefer your bot not to vanish into
+// the ether whenever you make unfortunate programming mistakes, you may find
+// this useful: it will recover panics from handler code and log the errors.
 func (conn *Conn) LogPanic(line *Line) {
 	if err := recover(); err != nil {
 		_, f, l, _ := runtime.Caller(2)
