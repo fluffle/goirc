@@ -60,12 +60,12 @@ func TestSplitMessage(t *testing.T) {
 		{"", 0, []string{""}},
 		{"foo", 0, []string{"foo"}},
 		{"foo bar baz beep", 0, []string{"foo bar ...", "baz beep"}},
-		{"foo bar baz beep", 13, []string{"foo bar baz ...", "beep"}},
-		{"foo. bar baz beep", 0, []string{"foo. ...", "bar baz ...", "beep"}},
-		{"foo bar, baz beep", 13, []string{"foo bar, ...", "baz beep"}},
+		{"foo bar baz beep", 15, []string{"foo bar baz ...", "beep"}},
+		{"foo. bar baz, beep.", 0, []string{"foo. ...", "bar baz, ...", "beep."}},
+		{"foo bar, baz beep", 15, []string{"foo bar, ...", "baz beep"}},
 		{"0123456789012345", 0, []string{"0123456789...", "012345"}},
-		{"0123456789012345", 13, []string{"0123456789012...", "345"}},
-		{"0123456789012345", 20, []string{"0123456789012345"}},
+		{"0123456789012345", 15, []string{"012345678901...", "2345"}},
+		{"0123456789012345", 16, []string{"0123456789012345"}},
 	}
 	for i, test := range tests {
 		out := splitMessage(test.in, test.sp)
@@ -81,7 +81,7 @@ func TestClientCommands(t *testing.T) {
 
 	// Avoid having to type ridiculously long lines to test that
 	// messages longer than SplitLen are correctly sent to the server.
-	c.cfg.SplitLen = 20
+	c.cfg.SplitLen = 23
 
 	c.Pass("password")
 	s.nc.Expect("PASS password")

@@ -65,13 +65,13 @@ func indexFragment(s string) int {
 //   3. splitLen itself
 func splitMessage(msg string, splitLen int) (msgs []string) {
 	// This is quite short ;-)
-	if splitLen < 10 {
+	if splitLen < 13 {
 		splitLen = defaultSplit
 	}
 	for len(msg) > splitLen {
-		idx := indexFragment(msg[:splitLen])
+		idx := indexFragment(msg[:splitLen-3])
 		if idx < 0 {
-			idx = splitLen
+			idx = splitLen - 3
 		}
 		msgs = append(msgs, msg[:idx] + "...")
 		msg = msg[idx:]
