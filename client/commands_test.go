@@ -59,11 +59,10 @@ func TestSplitMessage(t *testing.T) {
 	}{
 		{"", 0, []string{""}},
 		{"foo", 0, []string{"foo"}},
-		{"foo bar baz beep", 0, []string{"foo bar ...", "baz beep"}},
+		{"foo bar baz beep", 0, []string{"foo bar baz beep"}},
 		{"foo bar baz beep", 15, []string{"foo bar baz ...", "beep"}},
-		{"foo. bar baz, beep.", 0, []string{"foo. ...", "bar baz, ...", "beep."}},
 		{"foo bar, baz beep", 15, []string{"foo bar, ...", "baz beep"}},
-		{"0123456789012345", 0, []string{"0123456789...", "012345"}},
+		{"0123456789012345", 0, []string{"0123456789012345"}},
 		{"0123456789012345", 15, []string{"012345678901...", "2345"}},
 		{"0123456789012345", 16, []string{"0123456789012345"}},
 	}
