@@ -1,8 +1,8 @@
 package client
 
 import (
-	"code.google.com/p/gomock/gomock"
 	"github.com/fluffle/goirc/state"
+	"github.com/golang/mock/gomock"
 	"strings"
 	"testing"
 	"time"
