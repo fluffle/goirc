@@ -62,13 +62,14 @@ func (line *Line) Target() string {
 // a message to a channel the client has joined instead of directly
 // to the client.
 //
-// NOTE: This makes the (poor) assumption that all channels start with #.
+// NOTE: This is very permissive, allowing all 4 RFC channel types even if
+// your server doesn't technically support them.
 func (line *Line) Public() bool {
 	switch line.Cmd {
 	case PRIVMSG, NOTICE, ACTION:
-		if strings.HasPrefix(line.Args[0], "#") {
-			return true
-		}
+		switch line.Args[0][0] {
+		case '#', '&', '+', '!': return true
+	    }
 	case CTCP, CTCPREPLY:
 		// CTCP prepends the CTCP verb to line.Args, thus for the message
 		//   :nick!user@host PRIVMSG #foo :\001BAR baz\001
@@ -76,9 +77,9 @@ func (line *Line) Public() bool {
 		// TODO(fluffle): Arguably this is broken, and we should have
 		// line.Args containing: []string{"#foo", "BAR", "baz"}
 		// ... OR change conn.Ctcp()'s argument order to be consistent.
-		if strings.HasPrefix(line.Args[1], "#") {
-			return true
-		}
+		switch line.Args[1][0] {
+		case '#', '&', '+', '!': return true
+	    }
 	}
 	return false
 }

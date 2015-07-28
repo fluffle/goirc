@@ -69,8 +69,8 @@ func TestLineTarget(t *testing.T) {
 		{&Line{Cmd: CTCP, Args: []string{"PING", "Me", "1"}, Nick: "Them"}, "Them"},
 		{&Line{Cmd: CTCPREPLY, Args: []string{"PONG", "Me", "2"}, Nick: "Them"}, "Them"},
 		{&Line{Cmd: PRIVMSG, Args: []string{"#foo", "la"}, Nick: "Them"}, "#foo"},
-		{&Line{Cmd: NOTICE, Args: []string{"#foo", "la"}, Nick: "Them"}, "#foo"},
-		{&Line{Cmd: ACTION, Args: []string{"#foo", "la"}, Nick: "Them"}, "#foo"},
+		{&Line{Cmd: NOTICE, Args: []string{"&foo", "la"}, Nick: "Them"}, "&foo"},
+		{&Line{Cmd: ACTION, Args: []string{"!foo", "la"}, Nick: "Them"}, "!foo"},
 		{&Line{Cmd: CTCP, Args: []string{"PING", "#foo", "1"}, Nick: "Them"}, "#foo"},
 		{&Line{Cmd: CTCPREPLY, Args: []string{"PONG", "#foo", "2"}, Nick: "Them"}, "#foo"},
 	}
