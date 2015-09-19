@@ -16,7 +16,13 @@ old `go1` API.
 
 Synopsis:
 
-	import irc "github.com/fluffle/goirc/client"
+	package main
+
+	import (
+		"fmt"
+
+		irc "github.com/fluffle/goirc/client"
+	)
 
 	func main() {
 		// Creating a simple IRC client is simple.
@@ -27,20 +33,20 @@ Synopsis:
 		cfg.SSL = true
 		cfg.Server = "irc.freenode.net:7000"
 		cfg.NewNick = func(n string) string { return n + "^" }
-		c := irc.Client(cfg)
+		c = irc.Client(cfg)
 
 		// Add handlers to do things here!
 		// e.g. join a channel on connect.
-		c.HandleFunc("connected",
+		c.HandleFunc(irc.CONNECTED,
 			func(conn *irc.Conn, line *irc.Line) { conn.Join("#channel") })
 		// And a signal on disconnect
 		quit := make(chan bool)
-		c.HandleFunc("disconnected",
+		c.HandleFunc(irc.DISCONNECTED,
 			func(conn *irc.Conn, line *irc.Line) { quit <- true })
 
 		// Tell client to connect.
 		if err := c.Connect(); err != nil {
-			fmt.Printf("Connection error: %s\n", err.String())
+			fmt.Printf("Connection error: %s\n", err.Error())
 		}
 
 		// With a "simple" client, set Server before calling Connect...
@@ -48,7 +54,7 @@ Synopsis:
 
 		// ... or, use ConnectTo instead.
 		if err := c.ConnectTo("irc.freenode.net"); err != nil {
-			fmt.Printf("Connection error: %s\n", err.String())
+			fmt.Printf("Connection error: %s\n", err.Error())
 		}
 
 		// Wait for disconnect
@@ -94,4 +100,3 @@ Contributions gratefully received from:
   - [StalkR](https://github.com/StalkR)
   - [sztanpet](https://github.com/sztanpet)
   - [wathiede](https://github.com/wathiede)
-
