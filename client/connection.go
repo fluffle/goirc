@@ -4,13 +4,16 @@ import (
 	"bufio"
 	"crypto/tls"
 	"fmt"
-	"github.com/fluffle/goirc/logging"
-	"github.com/fluffle/goirc/state"
 	"io"
 	"net"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/fluffle/goirc/logging"
+	"github.com/fluffle/goirc/state"
+	"golang.org/x/net/proxy"
 )
 
 // Conn encapsulates a connection to a single IRC server. Create
@@ -32,12 +35,13 @@ type Conn struct {
 	stRemovers []Remover
 
 	// I/O stuff to server
-	dialer    *net.Dialer
-	sock      net.Conn
-	io        *bufio.ReadWriter
-	in        chan *Line
-	out       chan string
-	connected bool
+	dialer      *net.Dialer
+	proxyDialer proxy.Dialer
+	sock        net.Conn
+	io          *bufio.ReadWriter
+	in          chan *Line
+	out         chan string
+	connected   bool
 
 	// Control channel and WaitGroup for goroutines
 	die chan struct{}
@@ -70,6 +74,11 @@ type Config struct {
 	SSL       bool
 	SSLConfig *tls.Config
 
+	// To connect via proxy set the proxy url here.
+	// Changing these after connection will have no effect until the
+	// client reconnects.
+	Proxy string
+
 	// Local address to bind to when connecting to the server.
 	LocalAddr string
 
@@ -101,7 +110,6 @@ type Config struct {
 	// Split PRIVMSGs, NOTICEs and CTCPs longer than SplitLen characters
 	// over multiple lines. Default to 450 if not set.
 	SplitLen int
-
 }
 
 // NewConfig creates a Config struct containing sensible defaults.
@@ -279,6 +287,8 @@ func (conn *Conn) ConnectTo(host string, pass ...string) error {
 // To enable explicit SSL on the connection to the IRC server, set Config.SSL
 // to true before calling Connect(). The port will default to 6697 if SSL is
 // enabled, and 6667 otherwise.
+// To enable connecting via a proxy server, set Config.Proxy to the proxy URL
+// (example socks5://localhost:9000) before calling Connect().
 //
 // Upon successful connection, Connected will return true and a REGISTER event
 // will be fired. This is mostly for internal use; it is suggested that a
@@ -295,27 +305,45 @@ func (conn *Conn) Connect() error {
 	if conn.connected {
 		return fmt.Errorf("irc.Connect(): Cannot connect to %s, already connected.", conn.cfg.Server)
 	}
-	if conn.cfg.SSL {
-		if !hasPort(conn.cfg.Server) {
+
+	if !hasPort(conn.cfg.Server) {
+		if conn.cfg.SSL {
 			conn.cfg.Server = net.JoinHostPort(conn.cfg.Server, "6697")
+		} else {
+			conn.cfg.Server = net.JoinHostPort(conn.cfg.Server, "6667")
 		}
-		logging.Info("irc.Connect(): Connecting to %s with SSL.", conn.cfg.Server)
-		if s, err := tls.DialWithDialer(conn.dialer, "tcp", conn.cfg.Server, conn.cfg.SSLConfig); err == nil {
+	}
+
+	if conn.cfg.Proxy != "" {
+		proxyURL, err := url.Parse(conn.cfg.Proxy)
+		if err != nil {
+			return err
+		}
+		conn.proxyDialer, err = proxy.FromURL(proxyURL, conn.dialer)
+		if err != nil {
+			return err
+		}
+
+		logging.Info("irc.Connect(): Connecting to %s.", conn.cfg.Server)
+		if s, err := conn.proxyDialer.Dial("tcp", conn.cfg.Server); err == nil {
 			conn.sock = s
 		} else {
 			return err
 		}
 	} else {
-		if !hasPort(conn.cfg.Server) {
-			conn.cfg.Server = net.JoinHostPort(conn.cfg.Server, "6667")
-		}
-		logging.Info("irc.Connect(): Connecting to %s without SSL.", conn.cfg.Server)
+		logging.Info("irc.Connect(): Connecting to %s.", conn.cfg.Server)
 		if s, err := conn.dialer.Dial("tcp", conn.cfg.Server); err == nil {
 			conn.sock = s
 		} else {
 			return err
 		}
 	}
+
+	if conn.cfg.SSL {
+		logging.Info("irc.Connect(): Performing SSL handshake.")
+		conn.sock = tls.Client(conn.sock, conn.cfg.SSLConfig)
+	}
+
 	conn.postConnect(true)
 	conn.connected = true
 	conn.dispatch(&Line{Cmd: REGISTER, Time: time.Now()})
