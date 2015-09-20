@@ -100,3 +100,11 @@ Contributions gratefully received from:
   - [StalkR](https://github.com/StalkR)
   - [sztanpet](https://github.com/sztanpet)
   - [wathiede](https://github.com/wathiede)
+  - [scrapbird](https://github.com/scrapbird)
+
+And thanks to the following for minor doc/fix PRs:
+
+  - [tmcarr](https://github.com/tmcarr)
+  - [Gentux](https://github.com/Gentux)
+  - [kidanger](https://github.com/kidanger)
+  - [ripcurld00d](https://github.com/ripcurld00d)
