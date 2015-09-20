@@ -4,15 +4,16 @@ import (
 	"bufio"
 	"crypto/tls"
 	"fmt"
-	"github.com/fluffle/goirc/logging"
-	"github.com/fluffle/goirc/state"
 	"io"
 	"net"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/fluffle/goirc/logging"
+	"github.com/fluffle/goirc/state"
 	"golang.org/x/net/proxy"
-	"net/url"
 )
 
 // Conn encapsulates a connection to a single IRC server. Create
@@ -34,13 +35,13 @@ type Conn struct {
 	stRemovers []Remover
 
 	// I/O stuff to server
-	dialer    *net.Dialer
+	dialer      *net.Dialer
 	proxyDialer proxy.Dialer
-	sock      net.Conn
-	io        *bufio.ReadWriter
-	in        chan *Line
-	out       chan string
-	connected bool
+	sock        net.Conn
+	io          *bufio.ReadWriter
+	in          chan *Line
+	out         chan string
+	connected   bool
 
 	// Control channel and WaitGroup for goroutines
 	die chan struct{}
@@ -73,12 +74,10 @@ type Config struct {
 	SSL       bool
 	SSLConfig *tls.Config
 
-	// Are we connecting via proxy? Set this to true to connect via
-	// the proxy server provided.
+	// To connect via proxy set the proxy url here.
 	// Changing these after connection will have no effect until the
 	// client reconnects.
-	Proxy     bool
-	ProxyServer string
+	Proxy string
 
 	// Local address to bind to when connecting to the server.
 	LocalAddr string
@@ -111,7 +110,6 @@ type Config struct {
 	// Split PRIVMSGs, NOTICEs and CTCPs longer than SplitLen characters
 	// over multiple lines. Default to 450 if not set.
 	SplitLen int
-
 }
 
 // NewConfig creates a Config struct containing sensible defaults.
@@ -289,9 +287,8 @@ func (conn *Conn) ConnectTo(host string, pass ...string) error {
 // To enable explicit SSL on the connection to the IRC server, set Config.SSL
 // to true before calling Connect(). The port will default to 6697 if SSL is
 // enabled, and 6667 otherwise.
-// To enable connecting via a proxy server, set Config.Proxy to true and
-// Config.ProxyServer to the proxy URL (example socks5://localhost:9000) before
-// before calling Connect().
+// To enable connecting via a proxy server, set Config.Proxy to the proxy URL
+// (example socks5://localhost:9000) before calling Connect().
 //
 // Upon successful connection, Connected will return true and a REGISTER event
 // will be fired. This is mostly for internal use; it is suggested that a
@@ -317,8 +314,8 @@ func (conn *Conn) Connect() error {
 		}
 	}
 
-	if conn.cfg.Proxy {
-		proxyURL, err := url.Parse(conn.cfg.ProxyServer)
+	if conn.cfg.Proxy != "" {
+		proxyURL, err := url.Parse(conn.cfg.Proxy)
 		if err != nil {
 			return err
 		}
