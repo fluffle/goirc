@@ -118,10 +118,38 @@ func TestClientCommands(t *testing.T) {
 	c.Privmsg("#foo", "bar")
 	s.nc.Expect("PRIVMSG #foo :bar")
 
+	c.Privmsgln("#foo", "bar")
+	s.nc.Expect("PRIVMSG #foo :bar")
+
+	c.Privmsgf("#foo", "say %s", "foo")
+	s.nc.Expect("PRIVMSG #foo :say foo")
+
+	c.Privmsgln("#foo", "bar", 1, 3.54, []int{24, 36})
+	s.nc.Expect("PRIVMSG #foo :bar 1 3.54 [24 36]")
+
+	c.Privmsgf("#foo", "user %d is at %s", 2, "home")
+	s.nc.Expect("PRIVMSG #foo :user 2 is at home")
+
 	//                 0123456789012345678901234567890123
 	c.Privmsg("#foo", "foo bar baz blorp. woo woobly woo.")
 	s.nc.Expect("PRIVMSG #foo :foo bar baz blorp. ...")
 	s.nc.Expect("PRIVMSG #foo :woo woobly woo.")
+
+	c.Privmsgln("#foo", "foo bar baz blorp. woo woobly woo.")
+	s.nc.Expect("PRIVMSG #foo :foo bar baz blorp. ...")
+	s.nc.Expect("PRIVMSG #foo :woo woobly woo.")
+
+	c.Privmsgf("#foo", "%s %s", "foo bar baz blorp.", "woo woobly woo.")
+	s.nc.Expect("PRIVMSG #foo :foo bar baz blorp. ...")
+	s.nc.Expect("PRIVMSG #foo :woo woobly woo.")
+
+	c.Privmsgln("#foo", "foo bar", 3.54, "blorp.", "woo", "woobly", []int{1, 2})
+	s.nc.Expect("PRIVMSG #foo :foo bar 3.54 blorp. ...")
+	s.nc.Expect("PRIVMSG #foo :woo woobly [1 2]")
+
+	c.Privmsgf("#foo", "%s %.2f %s %s %s %v", "foo bar", 3.54, "blorp.", "woo", "woobly", []int{1, 2})
+	s.nc.Expect("PRIVMSG #foo :foo bar 3.54 blorp. ...")
+	s.nc.Expect("PRIVMSG #foo :woo woobly [1 2]")
 
 	c.Notice("somebody", "something")
 	s.nc.Expect("NOTICE somebody :something")
