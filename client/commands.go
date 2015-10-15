@@ -1,6 +1,9 @@
 package client
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 const (
 	REGISTER     = "REGISTER"
@@ -73,7 +76,7 @@ func splitMessage(msg string, splitLen int) (msgs []string) {
 		if idx < 0 {
 			idx = splitLen - 3
 		}
-		msgs = append(msgs, msg[:idx] + "...")
+		msgs = append(msgs, msg[:idx]+"...")
 		msg = msg[idx:]
 	}
 	return append(msgs, msg)
@@ -151,11 +154,32 @@ func (conn *Conn) Who(nick string) { conn.Raw(WHO + " " + nick) }
 // Privmsg sends a PRIVMSG to the target nick or channel t.
 // If msg is longer than Config.SplitLen characters, multiple PRIVMSGs
 // will be sent to the target containing sequential parts of msg.
-//     PRIVMSG t :msg
+// PRIVMSG t :msg
 func (conn *Conn) Privmsg(t, msg string) {
+	prefix := PRIVMSG + " " + t + " :"
 	for _, s := range splitMessage(msg, conn.cfg.SplitLen) {
-		conn.Raw(PRIVMSG + " " + t + " :" + s)
+		conn.Raw(prefix + s)
 	}
+}
+
+// Privmsgln is the variadic version of Privmsg that formats the message
+// that is sent to the target nick or channel t using the
+// fmt.Sprintln function.
+// Note: Privmsgln doesn't add the '\n' character at the end of the message.
+func (conn *Conn) Privmsgln(t string, a ...interface{}) {
+	msg := fmt.Sprintln(a...)
+	// trimming the new-line character added by the fmt.Sprintln function,
+	// since it's irrelevant.
+	msg = msg[:len(msg)-1]
+	conn.Privmsg(t, msg)
+}
+
+// Privmsgf is the variadic version of Privmsg that formats the message
+// that is sent to the target nick or channel t using the
+// fmt.Sprintf function.
+func (conn *Conn) Privmsgf(t, format string, a ...interface{}) {
+	msg := fmt.Sprintf(format, a...)
+	conn.Privmsg(t, msg)
 }
 
 // Notice sends a NOTICE to the target nick or channel t.
