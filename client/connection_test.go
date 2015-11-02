@@ -238,6 +238,79 @@ func TestSendExitsOnWriteError(t *testing.T) {
 	s.nc.ExpectNothing()
 }
 
+func TestSendDeadlockOnFullBuffer(t *testing.T) {
+	// Passing a second value to setUp stops goroutines from starting
+	c, s := setUp(t, false)
+	// We can't use tearDown here because we're testing a deadlock condition
+	// and if tearDown tries to call shutdown() it will deadlock some more
+	// because send() is holding the conn mutex via shutdown() already.
+	defer s.ctrl.Finish()
+
+	// We want to test that the a goroutine calling send will exit correctly.
+	loopExit := callCheck(t)
+	sendExit := callCheck(t)
+	// send() and runLoop() will decrement the WaitGroup, so we must increment it.
+	c.wg.Add(2)
+
+	// The deadlock arises when a handler being called from conn.dispatch() in
+	// runLoop() tries to write to conn.out to send a message back to the IRC
+	// server, but the buffer is full. If at the same time send() is
+	// calling conn.shutdown() and waiting in there for runLoop() to call
+	// conn.wg.Done(), it will not empty the buffer of conn.out => deadlock.
+	//
+	// We simulate this by artifically filling conn.out. We must use a
+	// goroutine to put in one more line than the buffer can hold, because
+	// send() will read a line from conn.out on its first loop iteration:
+	go func() {
+		for i := 0; i < 33; i++ {
+			c.out <- "FILL BUFFER WITH CRAP"
+		}
+	}()
+	// Then we add a handler that tries to write a line to conn.out:
+	c.HandleFunc(PRIVMSG, func(conn *Conn, line *Line) {
+		conn.Raw(line.Raw)
+	})
+	// And trigger it by starting runLoop and inserting a line into conn.in:
+	go func() {
+		c.runLoop()
+		loopExit.call()
+	}()
+	c.in <- &Line{Cmd: PRIVMSG, Raw: "WRITE THAT CAUSES DEADLOCK"}
+
+	// At this point the handler should be blocked on a write to conn.out,
+	// preventing runLoop from looping and thus noticing conn.die is closed.
+	//
+	// The next part is to force send() to call conn.shutdown(), which can
+	// be done by closing the fake net.Conn so that it returns an error on
+	// calls to Write():
+	s.nc.ExpectNothing()
+	s.nc.Close()
+
+	// Now when send is started it will read one line from conn.out and try
+	// to write it to the socket. It should immediately receive an error and
+	// call conn.shutdown(), triggering the deadlock as it waits forever for
+	// runLoop to call conn.wg.Done.
+	go func() {
+		c.send()
+		sendExit.call()
+	}()
+
+	// Make sure that things are definitely deadlocked.
+	<-time.After(time.Millisecond)
+
+	// Verify that the connection no longer thinks it's connected, i.e.
+	// conn.shutdown() has definitely been called. We can't call
+	// conn.Connected() here because conn.shutdown() holds the mutex.
+	if c.connected {
+		t.Errorf("Conn still thinks it's connected to the server.")
+	}
+
+	// We expect both loops to terminate cleanly. If either of them don't
+	// then we have successfully deadlocked :-(
+	loopExit.assertWasCalled("runLoop did not exit cleanly.")
+	sendExit.assertWasCalled("send did not exit cleanly.")
+}
+
 func TestRecv(t *testing.T) {
 	// Passing a second value to setUp stops goroutines from starting
 	c, s := setUp(t, false)
