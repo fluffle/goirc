@@ -15,7 +15,7 @@
 //
 //     // Create a new client, which will connect with the nick "myNick"
 //     irc := client.SimpleClient("myNick")
-//     
+//
 //     // Add a handler that waits for the "disconnected" event and
 //     // closes a channel to signal everything is done.
 //     disconnected := make(chan struct{})

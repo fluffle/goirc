@@ -44,7 +44,10 @@ func TestLineCopy(t *testing.T) {
 }
 
 func TestLineText(t *testing.T) {
-	tests := []struct{in *Line; out string}{
+	tests := []struct {
+		in  *Line
+		out string
+	}{
 		{&Line{}, ""},
 		{&Line{Args: []string{"one thing"}}, "one thing"},
 		{&Line{Args: []string{"one", "two"}}, "two"},
@@ -59,7 +62,10 @@ func TestLineText(t *testing.T) {
 }
 
 func TestLineTarget(t *testing.T) {
-	tests := []struct{in *Line; out string}{
+	tests := []struct {
+		in  *Line
+		out string
+	}{
 		{&Line{}, ""},
 		{&Line{Cmd: JOIN, Args: []string{"#foo"}}, "#foo"},
 		{&Line{Cmd: PART, Args: []string{"#foo", "bye"}}, "#foo"},

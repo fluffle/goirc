@@ -35,7 +35,7 @@ func (line *Line) Text() string {
 	return ""
 }
 
-// Target returns the contextual target of the line, usually the first Arg 
+// Target returns the contextual target of the line, usually the first Arg
 // for the IRC verb. If the line was broadcast from a channel, the target
 // will be that channel. If the line was sent directly by a user, the target
 // will be that user.
@@ -68,8 +68,9 @@ func (line *Line) Public() bool {
 	switch line.Cmd {
 	case PRIVMSG, NOTICE, ACTION:
 		switch line.Args[0][0] {
-		case '#', '&', '+', '!': return true
-	    }
+		case '#', '&', '+', '!':
+			return true
+		}
 	case CTCP, CTCPREPLY:
 		// CTCP prepends the CTCP verb to line.Args, thus for the message
 		//   :nick!user@host PRIVMSG #foo :\001BAR baz\001
@@ -78,12 +79,12 @@ func (line *Line) Public() bool {
 		// line.Args containing: []string{"#foo", "BAR", "baz"}
 		// ... OR change conn.Ctcp()'s argument order to be consistent.
 		switch line.Args[1][0] {
-		case '#', '&', '+', '!': return true
-	    }
+		case '#', '&', '+', '!':
+			return true
+		}
 	}
 	return false
 }
-
 
 // ParseLine creates a Line from an incoming message from the IRC server.
 //

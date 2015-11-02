@@ -26,7 +26,7 @@ type Handler interface {
 }
 
 // Removers allow for a handler that has been previously added to the client
-// to be removed. 
+// to be removed.
 type Remover interface {
 	Remove()
 }

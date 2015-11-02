@@ -405,12 +405,12 @@ func Test353(t *testing.T) {
 		s.st.EXPECT().ChannelModes("#test1", "+o", "user1"),
 	)
 	for n, m := range map[string]string{
-		"user2": "",
-		"voice": "+v",
+		"user2":  "",
+		"voice":  "+v",
 		"halfop": "+h",
-		"op": "+o",
-		"admin": "+a",
-		"owner": "+q",
+		"op":     "+o",
+		"admin":  "+a",
+		"owner":  "+q",
 	} {
 		calls := []*gomock.Call{
 			s.st.EXPECT().GetNick(n).Return(nil),
