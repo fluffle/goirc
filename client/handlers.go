@@ -73,6 +73,9 @@ func (conn *Conn) h_433(line *Line) {
 	me := conn.Me()
 	neu := conn.cfg.NewNick(line.Args[1])
 	conn.Nick(neu)
+	if !line.argslen(1) {
+		return
+	}
 	// if this is happening before we're properly connected (i.e. the nick
 	// we sent in the initial NICK command is in use) we will not receive
 	// a NICK message to confirm our change of nick, so ReNick here...
@@ -89,7 +92,7 @@ func (conn *Conn) h_433(line *Line) {
 func (conn *Conn) h_CTCP(line *Line) {
 	if line.Args[0] == VERSION {
 		conn.CtcpReply(line.Nick, VERSION, conn.cfg.Version)
-	} else if line.Args[0] == PING {
+	} else if line.Args[0] == PING && line.argslen(2) {
 		conn.CtcpReply(line.Nick, PING, line.Args[2])
 	}
 }

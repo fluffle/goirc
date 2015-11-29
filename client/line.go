@@ -3,6 +3,8 @@ package client
 import (
 	"strings"
 	"time"
+	"runtime"
+	"github.com/fluffle/goirc/logging"
 )
 
 // We parse an incoming line into this struct. Line.Cmd is used as the trigger
@@ -155,4 +157,15 @@ func ParseLine(s string) *Line {
 		}
 	}
 	return line
+}
+
+
+func (line *Line) argslen(minlen int) bool {
+	pc, _, _, _ := runtime.Caller(1)
+	fn := runtime.FuncForPC(pc)
+	if len(line.Args) <= minlen {
+		logging.Warn("%s: too few arguments: %s", fn.Name(), strings.Join(line.Args, " "))
+		return false
+	}
+	return true
 }
