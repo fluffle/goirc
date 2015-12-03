@@ -83,6 +83,9 @@ func (conn *Conn) h_PART(line *Line) {
 
 // Handle KICKs from channels to maintain state
 func (conn *Conn) h_KICK(line *Line) {
+	if !line.argslen(1) {
+		return
+	}
 	// XXX: this won't handle autorejoining channels on KICK
 	// it's trivial to do this in a seperate handler...
 	conn.st.Dissociate(line.Args[0], line.Args[1])
@@ -95,6 +98,9 @@ func (conn *Conn) h_QUIT(line *Line) {
 
 // Handle MODE changes for channels we know about (and our nick personally)
 func (conn *Conn) h_MODE(line *Line) {
+	if !line.argslen(1) {
+		return
+	}
 	if ch := conn.st.GetChannel(line.Args[0]); ch != nil {
 		// channel modes first
 		conn.st.ChannelModes(line.Args[0], line.Args[1], line.Args[2:]...)
@@ -114,6 +120,9 @@ func (conn *Conn) h_MODE(line *Line) {
 
 // Handle TOPIC changes for channels
 func (conn *Conn) h_TOPIC(line *Line) {
+	if !line.argslen(1) {
+		return
+	}
 	if ch := conn.st.GetChannel(line.Args[0]); ch != nil {
 		conn.st.Topic(line.Args[0], line.Args[1])
 	} else {
@@ -124,7 +133,10 @@ func (conn *Conn) h_TOPIC(line *Line) {
 
 // Handle 311 whois reply
 func (conn *Conn) h_311(line *Line) {
-	if nk := conn.st.GetNick(line.Args[1]); nk != nil && !conn.Me().Equals(nk) {
+	if !line.argslen(5) {
+		return
+	}
+	if nk := conn.st.GetNick(line.Args[1]); (nk != nil) && !conn.Me().Equals(nk) {
 		conn.st.NickInfo(line.Args[1], line.Args[2], line.Args[3], line.Args[5])
 	} else {
 		logging.Warn("irc.311(): received WHOIS info for unknown nick %s",
@@ -134,6 +146,9 @@ func (conn *Conn) h_311(line *Line) {
 
 // Handle 324 mode reply
 func (conn *Conn) h_324(line *Line) {
+	if !line.argslen(2) {
+		return
+	}
 	if ch := conn.st.GetChannel(line.Args[1]); ch != nil {
 		conn.st.ChannelModes(line.Args[1], line.Args[2], line.Args[3:]...)
 	} else {
@@ -144,6 +159,9 @@ func (conn *Conn) h_324(line *Line) {
 
 // Handle 332 topic reply on join to channel
 func (conn *Conn) h_332(line *Line) {
+	if !line.argslen(2) {
+		return
+	}
 	if ch := conn.st.GetChannel(line.Args[1]); ch != nil {
 		conn.st.Topic(line.Args[1], line.Args[2])
 	} else {
@@ -154,6 +172,9 @@ func (conn *Conn) h_332(line *Line) {
 
 // Handle 352 who reply
 func (conn *Conn) h_352(line *Line) {
+	if !line.argslen(5) {
+		return
+	}
 	nk := conn.st.GetNick(line.Args[5])
 	if nk == nil {
 		logging.Warn("irc.352(): received WHO reply for unknown nick %s",
@@ -168,6 +189,9 @@ func (conn *Conn) h_352(line *Line) {
 	// last arg contains "<hop count> <real name>"
 	a := strings.SplitN(line.Args[len(line.Args)-1], " ", 2)
 	conn.st.NickInfo(nk.Nick, line.Args[2], line.Args[3], a[1])
+	if !line.argslen(6) {
+		return
+	}
 	if idx := strings.Index(line.Args[6], "*"); idx != -1 {
 		conn.st.NickModes(nk.Nick, "+o")
 	}
@@ -181,6 +205,9 @@ func (conn *Conn) h_352(line *Line) {
 
 // Handle 353 names reply
 func (conn *Conn) h_353(line *Line) {
+	if !line.argslen(2) {
+		return
+	}
 	if ch := conn.st.GetChannel(line.Args[2]); ch != nil {
 		nicks := strings.Split(line.Args[len(line.Args)-1], " ")
 		for _, nick := range nicks {
@@ -223,6 +250,9 @@ func (conn *Conn) h_353(line *Line) {
 
 // Handle 671 whois reply (nick connected via SSL)
 func (conn *Conn) h_671(line *Line) {
+	if !line.argslen(1) {
+		return
+	}
 	if nk := conn.st.GetNick(line.Args[1]); nk != nil {
 		conn.st.NickModes(nk.Nick, "+z")
 	} else {
