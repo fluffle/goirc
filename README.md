@@ -101,6 +101,7 @@ Contributions gratefully received from:
   - [sztanpet](https://github.com/sztanpet)
   - [wathiede](https://github.com/wathiede)
   - [scrapbird](https://github.com/scrapbird)
+  - [soul9](https://github.com/soul9)
 
 And thanks to the following for minor doc/fix PRs:
 
