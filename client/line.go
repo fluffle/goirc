@@ -1,11 +1,14 @@
 package client
 
 import (
+	"runtime"
 	"strings"
 	"time"
-	"runtime"
+
 	"github.com/fluffle/goirc/logging"
 )
+
+var tagsReplacer = strings.NewReplacer("\\:", ";", "\\s", " ", "\\r", "\r", "\\n", "\n")
 
 // We parse an incoming line into this struct. Line.Cmd is used as the trigger
 // name for incoming event handlers and is the IRC verb, the first sequence
@@ -14,6 +17,7 @@ import (
 //   Src == "nick!user@host"
 //   Cmd == e.g. PRIVMSG, 332
 type Line struct {
+	Tags                   map[string]string
 	Nick, Ident, Host, Src string
 	Cmd, Raw               string
 	Args                   []string
@@ -25,6 +29,12 @@ func (l *Line) Copy() *Line {
 	nl := *l
 	nl.Args = make([]string, len(l.Args))
 	copy(nl.Args, l.Args)
+	if l.Tags != nil {
+		nl.Tags = make(map[string]string)
+		for k, v := range l.Tags {
+			nl.Tags[k] = v
+		}
+	}
 	return &nl
 }
 
@@ -97,6 +107,27 @@ func (line *Line) Public() bool {
 // set to CTCP or CTCPREPLY, and the CTCP command prepended to line.Args.
 func ParseLine(s string) *Line {
 	line := &Line{Raw: s}
+
+	if s[0] == '@' {
+		var rawTags string
+		line.Tags = make(map[string]string)
+		if idx := strings.Index(s, " "); idx != -1 {
+			rawTags, s = s[1:idx], s[idx+1:]
+		} else {
+			return nil
+		}
+
+		// all tags are escaped, so splitting on ; is right by design
+		for _, tag := range strings.Split(rawTags, ";") {
+			pair := strings.Split(tagsReplacer.Replace(tag), "=")
+			if len(pair) > 1 {
+				line.Tags[pair[0]] = pair[1]
+			} else {
+				line.Tags[tag] = ""
+			}
+		}
+	}
+
 	if s[0] == ':' {
 		// remove a source and parse it
 		if idx := strings.Index(s, " "); idx != -1 {
@@ -158,7 +189,6 @@ func ParseLine(s string) *Line {
 	}
 	return line
 }
-
 
 func (line *Line) argslen(minlen int) bool {
 	pc, _, _, _ := runtime.Caller(1)
