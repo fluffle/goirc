@@ -119,11 +119,17 @@ func ParseLine(s string) *Line {
 
 		// all tags are escaped, so splitting on ; is right by design
 		for _, tag := range strings.Split(rawTags, ";") {
+			if tag == "" {
+				return nil
+			}
+
 			pair := strings.Split(tagsReplacer.Replace(tag), "=")
-			if len(pair) > 1 {
+			if len(pair) < 2 {
+				line.Tags[tag] = ""
+			} else if len(pair) == 2 {
 				line.Tags[pair[0]] = pair[1]
 			} else {
-				line.Tags[tag] = ""
+				return nil
 			}
 		}
 	}

@@ -137,6 +137,8 @@ func TestLineTags(t *testing.T) {
 				Args:  []string{"me", "Hello"},
 			},
 		},
+		{"@a=a; :nick!ident@host.com PRIVMSG me :Hello", nil}, // Bad inputs
+		{"@a=a=a :nick!ident@host.com PRIVMSG me :Hello", nil},
 	}
 
 	for i, test := range tests {
