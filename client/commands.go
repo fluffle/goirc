@@ -292,7 +292,8 @@ func (conn *Conn) Ping(message string) { conn.Raw(PING + " :" + message) }
 func (conn *Conn) Pong(message string) { conn.Raw(PONG + " :" + message) }
 
 // Cap sends a CAP command to the server.
-//     CAP capability
+//     CAP subcommand
+//     CAP subcommand :message
 func (conn *Conn) Cap(subcommmand string, message ...string) {
 	if len(message) == 0 {
 		conn.Raw(CAP + " " + subcommmand)
