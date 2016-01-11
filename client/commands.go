@@ -294,10 +294,10 @@ func (conn *Conn) Pong(message string) { conn.Raw(PONG + " :" + message) }
 // Cap sends a CAP command to the server.
 //     CAP subcommand
 //     CAP subcommand :message
-func (conn *Conn) Cap(subcommmand string, message ...string) {
-	if len(message) == 0 {
+func (conn *Conn) Cap(subcommmand string, capabilities ...string) {
+	if len(capabilities) == 0 {
 		conn.Raw(CAP + " " + subcommmand)
 	} else {
-		conn.Raw(CAP + " " + subcommmand + " :" + message[0])
+		conn.Raw(CAP + " " + subcommmand + " :" + strings.Join(capabilities, " "))
 	}
 }
