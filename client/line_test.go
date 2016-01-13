@@ -137,8 +137,32 @@ func TestLineTags(t *testing.T) {
 				Args:  []string{"me", "Hello"},
 			},
 		},
-		{"@a=a; :nick!ident@host.com PRIVMSG me :Hello", nil}, // Bad inputs
-		{"@a=a=a :nick!ident@host.com PRIVMSG me :Hello", nil},
+		{ // Skip empty tag
+			"@a=a; :nick!ident@host.com PRIVMSG me :Hello",
+			&Line{
+				Tags:  map[string]string{"a": "a"},
+				Nick:  "nick",
+				Ident: "ident",
+				Host:  "host.com",
+				Src:   "nick!ident@host.com",
+				Cmd:   PRIVMSG,
+				Raw:   "@a=a; :nick!ident@host.com PRIVMSG me :Hello",
+				Args:  []string{"me", "Hello"},
+			},
+		},
+		{ // = in tag
+			"@a=a=a; :nick!ident@host.com PRIVMSG me :Hello",
+			&Line{
+				Tags:  map[string]string{"a": "a=a"},
+				Nick:  "nick",
+				Ident: "ident",
+				Host:  "host.com",
+				Src:   "nick!ident@host.com",
+				Cmd:   PRIVMSG,
+				Raw:   "@a=a=a; :nick!ident@host.com PRIVMSG me :Hello",
+				Args:  []string{"me", "Hello"},
+			},
+		},
 	}
 
 	for i, test := range tests {

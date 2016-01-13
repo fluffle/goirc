@@ -105,6 +105,9 @@ func (line *Line) Public() bool {
 // CTCP command separated from any subsequent text. Then, CTCP ACTIONs are
 // rewritten such that Line.Cmd == ACTION. Other CTCP messages have Cmd
 // set to CTCP or CTCPREPLY, and the CTCP command prepended to line.Args.
+//
+// ParseLine also parses IRCv3 tags, if received. If a line does not have
+// the tags section, Line.Tags will be nil.
 func ParseLine(s string) *Line {
 	line := &Line{Raw: s}
 
@@ -117,19 +120,17 @@ func ParseLine(s string) *Line {
 			return nil
 		}
 
-		// all tags are escaped, so splitting on ; is right by design
+		// ; is represented as \: in a tag, so it's safe to split on ;
 		for _, tag := range strings.Split(rawTags, ";") {
 			if tag == "" {
-				return nil
+				continue
 			}
 
-			pair := strings.Split(tagsReplacer.Replace(tag), "=")
+			pair := strings.SplitN(tagsReplacer.Replace(tag), "=", 2)
 			if len(pair) < 2 {
 				line.Tags[tag] = ""
-			} else if len(pair) == 2 {
-				line.Tags[pair[0]] = pair[1]
 			} else {
-				return nil
+				line.Tags[pair[0]] = pair[1]
 			}
 		}
 	}
