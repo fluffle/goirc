@@ -107,7 +107,11 @@ func (line *Line) Public() bool {
 // set to CTCP or CTCPREPLY, and the CTCP command prepended to line.Args.
 //
 // ParseLine also parses IRCv3 tags, if received. If a line does not have
-// the tags section, Line.Tags will be nil.
+// the tags section, Line.Tags will be nil. Tags are optional, and will
+// only be included after the correct CAP command.
+//
+// http://ircv3.net/specs/core/capability-negotiation-3.1.html
+// http://ircv3.net/specs/core/message-tags-3.2.html
 func ParseLine(s string) *Line {
 	line := &Line{Raw: s}
 
