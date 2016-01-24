@@ -11,6 +11,7 @@ const (
 	DISCONNECTED = "DISCONNECTED"
 	ACTION       = "ACTION"
 	AWAY         = "AWAY"
+	CAP          = "CAP"
 	CTCP         = "CTCP"
 	CTCPREPLY    = "CTCPREPLY"
 	INVITE       = "INVITE"
@@ -289,3 +290,14 @@ func (conn *Conn) Ping(message string) { conn.Raw(PING + " :" + message) }
 // Pong sends a PONG command to the server.
 //     PONG :message
 func (conn *Conn) Pong(message string) { conn.Raw(PONG + " :" + message) }
+
+// Cap sends a CAP command to the server.
+//     CAP subcommand
+//     CAP subcommand :message
+func (conn *Conn) Cap(subcommmand string, capabilities ...string) {
+	if len(capabilities) == 0 {
+		conn.Raw(CAP + " " + subcommmand)
+	} else {
+		conn.Raw(CAP + " " + subcommmand + " :" + strings.Join(capabilities, " "))
+	}
+}

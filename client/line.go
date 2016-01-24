@@ -1,11 +1,14 @@
 package client
 
 import (
+	"runtime"
 	"strings"
 	"time"
-	"runtime"
+
 	"github.com/fluffle/goirc/logging"
 )
+
+var tagsReplacer = strings.NewReplacer("\\:", ";", "\\s", " ", "\\r", "\r", "\\n", "\n")
 
 // We parse an incoming line into this struct. Line.Cmd is used as the trigger
 // name for incoming event handlers and is the IRC verb, the first sequence
@@ -14,6 +17,7 @@ import (
 //   Src == "nick!user@host"
 //   Cmd == e.g. PRIVMSG, 332
 type Line struct {
+	Tags                   map[string]string
 	Nick, Ident, Host, Src string
 	Cmd, Raw               string
 	Args                   []string
@@ -25,6 +29,12 @@ func (l *Line) Copy() *Line {
 	nl := *l
 	nl.Args = make([]string, len(l.Args))
 	copy(nl.Args, l.Args)
+	if l.Tags != nil {
+		nl.Tags = make(map[string]string)
+		for k, v := range l.Tags {
+			nl.Tags[k] = v
+		}
+	}
 	return &nl
 }
 
@@ -95,8 +105,40 @@ func (line *Line) Public() bool {
 // CTCP command separated from any subsequent text. Then, CTCP ACTIONs are
 // rewritten such that Line.Cmd == ACTION. Other CTCP messages have Cmd
 // set to CTCP or CTCPREPLY, and the CTCP command prepended to line.Args.
+//
+// ParseLine also parses IRCv3 tags, if received. If a line does not have
+// the tags section, Line.Tags will be nil. Tags are optional, and will
+// only be included after the correct CAP command.
+//
+// http://ircv3.net/specs/core/capability-negotiation-3.1.html
+// http://ircv3.net/specs/core/message-tags-3.2.html
 func ParseLine(s string) *Line {
 	line := &Line{Raw: s}
+
+	if s[0] == '@' {
+		var rawTags string
+		line.Tags = make(map[string]string)
+		if idx := strings.Index(s, " "); idx != -1 {
+			rawTags, s = s[1:idx], s[idx+1:]
+		} else {
+			return nil
+		}
+
+		// ; is represented as \: in a tag, so it's safe to split on ;
+		for _, tag := range strings.Split(rawTags, ";") {
+			if tag == "" {
+				continue
+			}
+
+			pair := strings.SplitN(tagsReplacer.Replace(tag), "=", 2)
+			if len(pair) < 2 {
+				line.Tags[tag] = ""
+			} else {
+				line.Tags[pair[0]] = pair[1]
+			}
+		}
+	}
+
 	if s[0] == ':' {
 		// remove a source and parse it
 		if idx := strings.Index(s, " "); idx != -1 {
@@ -158,7 +200,6 @@ func ParseLine(s string) *Line {
 	}
 	return line
 }
-
 
 func (line *Line) argslen(minlen int) bool {
 	pc, _, _, _ := runtime.Caller(1)
