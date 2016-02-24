@@ -1,0 +1,19 @@
+---
+language: go
+
+go:
+  - 1.5
+  - 1.5.3
+  - 1.6
+
+sudo : false
+
+notifications:
+  irc:
+    channels:
+      - "irc.pl0rt.org#sp0rklf"
+    skip_join: true
+
+script:
+  - if [ "$TRAVIS_REPO_SLUG" != "fluffle/goirc" ] ; then ln -s "$HOME/gopath/src/github.com/$TRAVIS_REPO_SLUG" /home/travis/gopath/src/github.com/fluffle/goirc ; fi
+  - go test -v ./...
