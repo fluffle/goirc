@@ -115,6 +115,10 @@ func (line *Line) Public() bool {
 func ParseLine(s string) *Line {
 	line := &Line{Raw: s}
 
+	if s == "" {
+		return nil
+	}
+
 	if s[0] == '@' {
 		var rawTags string
 		line.Tags = make(map[string]string)
