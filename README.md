@@ -19,6 +19,7 @@ Synopsis:
 	package main
 
 	import (
+		"crypto/tls"
 		"fmt"
 
 		irc "github.com/fluffle/goirc/client"
@@ -31,6 +32,7 @@ Synopsis:
 		// Or, create a config and fiddle with it first:
 		cfg := irc.NewConfig("nick")
 		cfg.SSL = true
+		cfg.SSLConfig = &tls.Config{ServerName: "irc.freenode.net"}
 		cfg.Server = "irc.freenode.net:7000"
 		cfg.NewNick = func(n string) string { return n + "^" }
 		c = irc.Client(cfg)
