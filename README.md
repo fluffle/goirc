@@ -105,6 +105,8 @@ Contributions gratefully received from:
   - [wathiede](https://github.com/wathiede)
   - [scrapbird](https://github.com/scrapbird)
   - [soul9](https://github.com/soul9)
+  - [jakebailey](https://github.com/jakebailey)
+  - [stapelberg](https://github.com/stapelberg)
 
 And thanks to the following for minor doc/fix PRs:
 
@@ -112,3 +114,4 @@ And thanks to the following for minor doc/fix PRs:
   - [Gentux](https://github.com/Gentux)
   - [kidanger](https://github.com/kidanger)
   - [ripcurld00d](https://github.com/ripcurld00d)
+  - [bob-smith](https://github.com/bob-smith)
