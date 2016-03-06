@@ -1,3 +1,5 @@
+[![Build Status](https://api.travis-ci.org/fluffle/goirc.svg)](https://travis-ci.org/fluffle/goirc)
+
 GoIRC Client Framework
 ======================
 
