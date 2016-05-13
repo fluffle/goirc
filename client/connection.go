@@ -473,6 +473,9 @@ func (conn *Conn) write(line string) error {
 	if err := conn.io.Flush(); err != nil {
 		return err
 	}
+	if strings.HasPrefix(line, "PASS") {
+		line = "PASS **************"
+	}
 	logging.Debug("-> %s", line)
 	return nil
 }
