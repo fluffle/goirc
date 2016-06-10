@@ -1,11 +1,13 @@
 package client
 
 import (
-	"github.com/fluffle/goirc/state"
-	"github.com/golang/mock/gomock"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/fluffle/goirc/state"
+	"github.com/golang/mock/gomock"
 )
 
 type checker struct {
@@ -377,13 +379,23 @@ func TestPing(t *testing.T) {
 	c, s := setUp(t, false)
 	defer s.tearDown()
 
+	res := time.Millisecond
+
+	// Windows has a timer resolution of 15.625ms by default.
+	// This means the test will be slower on windows, but
+	// should at least stop most of the flakiness...
+	// https://github.com/fluffle/goirc/issues/88
+	if runtime.GOOS == "windows" {
+		res = 15625 * time.Microsecond
+	}
+
 	// Set a low ping frequency for testing.
-	c.cfg.PingFreq = 50 * time.Millisecond
+	c.cfg.PingFreq = 10 * res
 
 	// reader is a helper to do a "non-blocking" read of c.out
 	reader := func() string {
 		select {
-		case <-time.After(time.Millisecond):
+		case <-time.After(res):
 		case s := <-c.out:
 			return s
 		}
@@ -402,28 +414,28 @@ func TestPing(t *testing.T) {
 		exited.call()
 	}()
 
-	// The first ping should be after 50ms,
+	// The first ping should be after 10*res ms,
 	// so we don't expect anything now on c.in
 	if s := reader(); s != "" {
 		t.Errorf("Line output directly after ping started.")
 	}
 
-	<-time.After(50 * time.Millisecond)
+	<-time.After(c.cfg.PingFreq)
 	if s := reader(); s == "" || !strings.HasPrefix(s, "PING :") {
-		t.Errorf("Line not output after 50ms.")
+		t.Errorf("Line not output after %s.", c.cfg.PingFreq)
 	}
 
-	// Reader waits for 1ms and we call it a few times above.
-	<-time.After(45 * time.Millisecond)
+	// Reader waits for res ms and we call it a few times above.
+	<-time.After(7 * res)
 	if s := reader(); s != "" {
-		t.Errorf("Line output under 50ms after last ping.")
+		t.Errorf("Line output <%s after last ping.", 7*res)
 	}
 
-	// This is a short window (49-51ms) in which the ping should happen
+	// This is a short window in which the ping should happen
 	// This may result in flaky tests; sorry (and file a bug) if so.
-	<-time.After(2 * time.Millisecond)
+	<-time.After(2 * res)
 	if s := reader(); s == "" || !strings.HasPrefix(s, "PING :") {
-		t.Errorf("Line not output after another 2ms.")
+		t.Errorf("Line not output after another %s.", 2*res)
 	}
 
 	// Now kill the ping loop.
@@ -434,8 +446,8 @@ func TestPing(t *testing.T) {
 	exited.assertNotCalled("Exited before signal sent.")
 	c.die <- struct{}{}
 	exited.assertWasCalled("Didn't exit after signal.")
-	// Make sure we're no longer pinging by waiting ~2x PingFreq
-	<-time.After(105 * time.Millisecond)
+	// Make sure we're no longer pinging by waiting >2x PingFreq
+	<-time.After(2*c.cfg.PingFreq + res)
 	if s := reader(); s != "" {
 		t.Errorf("Line output after ping stopped.")
 	}
