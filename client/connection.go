@@ -341,7 +341,11 @@ func (conn *Conn) Connect() error {
 
 	if conn.cfg.SSL {
 		logging.Info("irc.Connect(): Performing SSL handshake.")
-		conn.sock = tls.Client(conn.sock, conn.cfg.SSLConfig)
+		s := tls.Client(conn.sock, conn.cfg.SSLConfig)
+		if err := s.Handshake(); err != nil {
+			return err
+		}
+		conn.sock = s
 	}
 
 	conn.postConnect(true)
