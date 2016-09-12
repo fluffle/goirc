@@ -386,9 +386,9 @@ func (conn *Conn) send() {
 		case line := <-conn.out:
 			if err := conn.write(line); err != nil {
 				logging.Error("irc.send(): %s", err.Error())
-				// We can't defer this, because shutdown() waits for it.
+				// We can't defer this, because Shutdown() waits for it.
 				conn.wg.Done()
-				conn.shutdown()
+				conn.Shutdown()
 				return
 			}
 		case <-conn.die:
@@ -409,9 +409,9 @@ func (conn *Conn) recv() {
 			if err != io.EOF {
 				logging.Error("irc.recv(): %s", err.Error())
 			}
-			// We can't defer this, because shutdown() waits for it.
+			// We can't defer this, because Shutdown() waits for it.
 			conn.wg.Done()
-			conn.shutdown()
+			conn.Shutdown()
 			return
 		}
 		s = strings.Trim(s, "\r\n")
@@ -503,17 +503,18 @@ func (conn *Conn) rateLimit(chars int) time.Duration {
 	return 0
 }
 
-// shutdown tears down all connection-related state. It is called when either
+// Shutdown tears down all connection-related state. It is called when either
 // the sending or receiving goroutines encounter an error.
-func (conn *Conn) shutdown() {
-	// Guard against double-call of shutdown() if we get an error in send()
+// It may also be used to forcibly shut down the connection to the server.
+func (conn *Conn) Shutdown() {
+	// Guard against double-call of Shutdown() if we get an error in send()
 	// as calling sock.Close() will cause recv() to receive EOF in readstring()
 	conn.mu.Lock()
 	if !conn.connected {
 		conn.mu.Unlock()
 		return
 	}
-	logging.Info("irc.shutdown(): Disconnected from server.")
+	logging.Info("irc.Shutdown(): Disconnected from server.")
 	conn.connected = false
 	conn.sock.Close()
 	close(conn.die)

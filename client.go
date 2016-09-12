@@ -4,10 +4,11 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	irc "github.com/fluffle/goirc/client"
-	"github.com/fluffle/goirc/logging/glog"
 	"os"
 	"strings"
+
+	irc "github.com/fluffle/goirc/client"
+	"github.com/fluffle/goirc/logging/glog"
 )
 
 var host *string = flag.String("host", "irc.freenode.net", "IRC server")
@@ -70,6 +71,9 @@ func main() {
 				case cmd[1] == 'q':
 					reallyquit = true
 					c.Quit(cmd[idx+1 : len(cmd)])
+				case cmd[1] == 's':
+					reallyquit = true
+					c.Shutdown()
 				case cmd[1] == 'j':
 					c.Join(cmd[idx+1 : len(cmd)])
 				case cmd[1] == 'p':
