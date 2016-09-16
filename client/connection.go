@@ -386,9 +386,9 @@ func (conn *Conn) send() {
 		case line := <-conn.out:
 			if err := conn.write(line); err != nil {
 				logging.Error("irc.send(): %s", err.Error())
-				// We can't defer this, because Shutdown() waits for it.
+				// We can't defer this, because Close() waits for it.
 				conn.wg.Done()
-				conn.Shutdown()
+				conn.Close()
 				return
 			}
 		case <-conn.die:
@@ -409,9 +409,9 @@ func (conn *Conn) recv() {
 			if err != io.EOF {
 				logging.Error("irc.recv(): %s", err.Error())
 			}
-			// We can't defer this, because Shutdown() waits for it.
+			// We can't defer this, because Close() waits for it.
 			conn.wg.Done()
-			conn.Shutdown()
+			conn.Close()
 			return
 		}
 		s = strings.Trim(s, "\r\n")
@@ -503,20 +503,20 @@ func (conn *Conn) rateLimit(chars int) time.Duration {
 	return 0
 }
 
-// Shutdown tears down all connection-related state. It is called when either
+// Close tears down all connection-related state. It is called when either
 // the sending or receiving goroutines encounter an error.
 // It may also be used to forcibly shut down the connection to the server.
-func (conn *Conn) Shutdown() {
-	// Guard against double-call of Shutdown() if we get an error in send()
+func (conn *Conn) Close() error {
+	// Guard against double-call of Close() if we get an error in send()
 	// as calling sock.Close() will cause recv() to receive EOF in readstring()
 	conn.mu.Lock()
 	if !conn.connected {
 		conn.mu.Unlock()
-		return
+		return nil
 	}
-	logging.Info("irc.Shutdown(): Disconnected from server.")
+	logging.Info("irc.Close(): Disconnected from server.")
 	conn.connected = false
-	conn.sock.Close()
+	err := conn.sock.Close()
 	close(conn.die)
 	// Drain both in and out channels to avoid a deadlock if the buffers
 	// have filled. See TestSendDeadlockOnFullBuffer in connection_test.go.
@@ -527,6 +527,7 @@ func (conn *Conn) Shutdown() {
 	// Dispatch after closing connection but before reinit
 	// so event handlers can still access state information.
 	conn.dispatch(&Line{Cmd: DISCONNECTED, Time: time.Now()})
+	return err
 }
 
 // drainIn sends all data buffered in conn.in to /dev/null.

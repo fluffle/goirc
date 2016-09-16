@@ -70,11 +70,11 @@ func setUp(t *testing.T, start ...bool) (*Conn, *testState) {
 
 func (s *testState) tearDown() {
 	s.nc.ExpectNothing()
-	s.c.Shutdown()
+	s.c.Close()
 	s.ctrl.Finish()
 }
 
-// Practically the same as the above test, but Shutdown is called implicitly
+// Practically the same as the above test, but Close is called implicitly
 // by recv() getting an EOF from the mock connection.
 func TestEOF(t *testing.T) {
 	c, s := setUp(t)
@@ -197,7 +197,7 @@ func TestSendExitsOnDie(t *testing.T) {
 	// Now, use the control channel to exit send and kill the goroutine.
 	// This sneakily uses the fact that the other two goroutines that would
 	// normally be waiting for die to close are not running, so we only send
-	// to the goroutine started above. Normally Shutdown() closes c.die and
+	// to the goroutine started above. Normally Close() closes c.die and
 	// signals to all three goroutines (send, ping, runLoop) to exit.
 	exited.assertNotCalled("Exited before signal sent.")
 	c.die <- struct{}{}
@@ -230,7 +230,7 @@ func TestSendExitsOnWriteError(t *testing.T) {
 	s.nc.Expect("SENT AFTER START")
 
 	// Now, close the underlying socket to cause write() to return an error.
-	// This will call Shutdown() => a call to st.Wipe() will happen.
+	// This will call Close() => a call to st.Wipe() will happen.
 	exited.assertNotCalled("Exited before signal sent.")
 	s.nc.Close()
 	// Sending more on c.out shouldn't reach the network, but we need to send
@@ -244,8 +244,8 @@ func TestSendDeadlockOnFullBuffer(t *testing.T) {
 	// Passing a second value to setUp stops goroutines from starting
 	c, s := setUp(t, false)
 	// We can't use tearDown here because we're testing a deadlock condition
-	// and if tearDown tries to call Shutdown() it will deadlock some more
-	// because send() is holding the conn mutex via Shutdown() already.
+	// and if tearDown tries to call Close() it will deadlock some more
+	// because send() is holding the conn mutex via Close() already.
 	defer s.ctrl.Finish()
 
 	// We want to test that the a goroutine calling send will exit correctly.
@@ -257,7 +257,7 @@ func TestSendDeadlockOnFullBuffer(t *testing.T) {
 	// The deadlock arises when a handler being called from conn.dispatch() in
 	// runLoop() tries to write to conn.out to send a message back to the IRC
 	// server, but the buffer is full. If at the same time send() is
-	// calling conn.Shutdown() and waiting in there for runLoop() to call
+	// calling conn.Close() and waiting in there for runLoop() to call
 	// conn.wg.Done(), it will not empty the buffer of conn.out => deadlock.
 	//
 	// We simulate this by artifically filling conn.out. We must use a
@@ -282,7 +282,7 @@ func TestSendDeadlockOnFullBuffer(t *testing.T) {
 	// At this point the handler should be blocked on a write to conn.out,
 	// preventing runLoop from looping and thus noticing conn.die is closed.
 	//
-	// The next part is to force send() to call conn.Shutdown(), which can
+	// The next part is to force send() to call conn.Close(), which can
 	// be done by closing the fake net.Conn so that it returns an error on
 	// calls to Write():
 	s.nc.ExpectNothing()
@@ -290,7 +290,7 @@ func TestSendDeadlockOnFullBuffer(t *testing.T) {
 
 	// Now when send is started it will read one line from conn.out and try
 	// to write it to the socket. It should immediately receive an error and
-	// call conn.Shutdown(), triggering the deadlock as it waits forever for
+	// call conn.Close(), triggering the deadlock as it waits forever for
 	// runLoop to call conn.wg.Done.
 	go func() {
 		c.send()
@@ -301,8 +301,8 @@ func TestSendDeadlockOnFullBuffer(t *testing.T) {
 	<-time.After(time.Millisecond)
 
 	// Verify that the connection no longer thinks it's connected, i.e.
-	// conn.Shutdown() has definitely been called. We can't call
-	// conn.Connected() here because conn.Shutdown() holds the mutex.
+	// conn.Close() has definitely been called. We can't call
+	// conn.Connected() here because conn.Close() holds the mutex.
 	if c.connected {
 		t.Errorf("Conn still thinks it's connected to the server.")
 	}
@@ -441,7 +441,7 @@ func TestPing(t *testing.T) {
 	// Now kill the ping loop.
 	// This sneakily uses the fact that the other two goroutines that would
 	// normally be waiting for die to close are not running, so we only send
-	// to the goroutine started above. Normally Shutdown() closes c.die and
+	// to the goroutine started above. Normally Close() closes c.die and
 	// signals to all three goroutines (send, ping, runLoop) to exit.
 	exited.assertNotCalled("Exited before signal sent.")
 	c.die <- struct{}{}
@@ -493,7 +493,7 @@ func TestRunLoop(t *testing.T) {
 	// Now, use the control channel to exit send and kill the goroutine.
 	// This sneakily uses the fact that the other two goroutines that would
 	// normally be waiting for die to close are not running, so we only send
-	// to the goroutine started above. Normally Shutdown() closes c.die and
+	// to the goroutine started above. Normally Close() closes c.die and
 	// signals to all three goroutines (send, ping, runLoop) to exit.
 	exited.assertNotCalled("Exited before signal sent.")
 	c.die <- struct{}{}
