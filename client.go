@@ -73,7 +73,7 @@ func main() {
 					c.Quit(cmd[idx+1 : len(cmd)])
 				case cmd[1] == 's':
 					reallyquit = true
-					c.Shutdown()
+					c.Close()
 				case cmd[1] == 'j':
 					c.Join(cmd[idx+1 : len(cmd)])
 				case cmd[1] == 'p':
