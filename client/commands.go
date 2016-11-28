@@ -14,6 +14,7 @@ const (
 	CAP          = "CAP"
 	CTCP         = "CTCP"
 	CTCPREPLY    = "CTCPREPLY"
+	ERROR        = "ERROR"
 	INVITE       = "INVITE"
 	JOIN         = "JOIN"
 	KICK         = "KICK"

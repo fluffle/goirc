@@ -99,6 +99,18 @@ func TestLineTags(t *testing.T) {
 		in  string
 		out *Line
 	}{
+		{ // Make sure ERROR lines work
+			"ERROR :Closing Link: example.org (Too many user connections (global))",
+			&Line{
+				Nick:  "",
+				Ident: "",
+				Host:  "",
+				Src:   "",
+				Cmd:   ERROR,
+				Raw:   "ERROR :Closing Link: example.org (Too many user connections (global))",
+				Args:  []string{"Closing Link: example.org (Too many user connections (global))"},
+			},
+		},
 		{ // Make sure non-tagged lines work
 			":nick!ident@host.com PRIVMSG me :Hello",
 			&Line{
