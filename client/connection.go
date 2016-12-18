@@ -295,6 +295,18 @@ func (conn *Conn) ConnectTo(host string, pass ...string) error {
 // handler for the CONNECTED event is used to perform any initial client work
 // like joining channels and sending messages.
 func (conn *Conn) Connect() error {
+	// We don't want to hold conn.mu while firing the REGISTER event,
+	// and it's much easier and less error prone to defer the unlock,
+	// so the connect mechanics have been delegated to internalConnect.
+	err := conn.internalConnect()
+	if err == nil {
+		conn.dispatch(&Line{Cmd: REGISTER, Time: time.Now()})
+	}
+	return err
+}
+
+// internalConnect handles the work of actually connecting to the server.
+func (conn *Conn) internalConnect() error {
 	conn.mu.Lock()
 	defer conn.mu.Unlock()
 	conn.initialise()
@@ -350,7 +362,6 @@ func (conn *Conn) Connect() error {
 
 	conn.postConnect(true)
 	conn.connected = true
-	conn.dispatch(&Line{Cmd: REGISTER, Time: time.Now()})
 	return nil
 }
 
