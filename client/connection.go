@@ -213,7 +213,7 @@ func (conn *Conn) Config() *Config {
 // the tracker, otherwise it is equivalent to conn.cfg.Me.
 func (conn *Conn) Me() *state.Nick {
 	if conn.st != nil {
-		conn.cfg.Me = conn.st.Me()
+		return conn.st.Me()
 	}
 	return conn.cfg.Me
 }
