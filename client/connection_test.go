@@ -153,13 +153,6 @@ func TestClientAndStateTracking(t *testing.T) {
 		t.Errorf("State tracker not disabled correctly.")
 	}
 
-	// Finally, check state tracking handlers were all removed correctly
-	for k, _ := range stHandlers {
-		if _, ok := c.intHandlers.set[strings.ToLower(k)]; ok && k != "NICK" {
-			// A bit leaky, because intHandlers adds a NICK handler.
-			t.Errorf("State handler for '%s' not removed correctly.", k)
-		}
-	}
 	if len(c.stRemovers) != 0 {
 		t.Errorf("stRemovers not zeroed correctly when removing state handlers.")
 	}
