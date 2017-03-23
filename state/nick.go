@@ -196,9 +196,9 @@ func (nm *NickMode) String() string {
 				}
 			}
 		}
-		if str == "+" {
-			str = "No modes set"
-		}
+	}
+	if str == "+" {
+		str = "No modes set"
 	}
 	return str
 }
