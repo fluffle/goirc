@@ -12,7 +12,7 @@ import (
 )
 
 var host *string = flag.String("host", "irc.freenode.net", "IRC server")
-var channel *string = flag.String("channel", "#momotest", "IRC channel")
+var channel *string = flag.String("channel", "#go-nuts", "IRC channel")
 
 func main() {
 	flag.Parse()
@@ -55,12 +55,12 @@ func main() {
 				switch idx := strings.Index(cmd, " "); {
 				case cmd[1] == 'd':
 					fmt.Printf(c.String())
-					case cmd[1] == 'n':
-						parts := strings.Split(cmd," ")
-						username := strings.TrimSpace(parts[1])
-						channelname := strings.TrimSpace(parts[2])
-						_, userIsOn := c.StateTracker().IsOn(channelname,username)
-						fmt.Printf("Checking if %s is in %s Online: %t\n", username, channelname, userIsOn)
+				case cmd[1] == 'n':
+					parts := strings.Split(cmd, " ")
+					username := strings.TrimSpace(parts[1])
+					channelname := strings.TrimSpace(parts[2])
+					_, userIsOn := c.StateTracker().IsOn(channelname, username)
+					fmt.Printf("Checking if %s is in %s Online: %t\n", username, channelname, userIsOn)
 				case cmd[1] == 'f':
 					if len(cmd) > 2 && cmd[2] == 'e' {
 						// enable flooding
