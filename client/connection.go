@@ -50,6 +50,9 @@ type Conn struct {
 	// Internal counters for flood protection
 	badness  time.Duration
 	lastsent time.Time
+
+	// This is for communicating the pongs we get back from our pings.
+	pongResponses chan string
 }
 
 // Config contains options that can be passed to Client to change the
@@ -90,6 +93,10 @@ type Config struct {
 	// Set to 0 to disable client-side pings.
 	PingFreq time.Duration
 
+	// Number of failed pings that we will ignore before closing down the connection.
+	// Set to 0 to disable verifying pong responses.
+	FailedPings int
+
 	// The duration before a connection timeout is triggered. Defaults to 1m.
 	// Set to 0 to wait indefinitely.
 	Timeout time.Duration
@@ -118,12 +125,13 @@ type Config struct {
 // name, but these are optional.
 func NewConfig(nick string, args ...string) *Config {
 	cfg := &Config{
-		Me:       &state.Nick{Nick: nick},
-		PingFreq: 3 * time.Minute,
-		NewNick:  func(s string) string { return s + "_" },
-		Recover:  (*Conn).LogPanic, // in dispatch.go
-		SplitLen: defaultSplit,
-		Timeout:  60 * time.Second,
+		Me:          &state.Nick{Nick: nick},
+		PingFreq:    2 * time.Minute,
+		FailedPings: 3,
+		NewNick:     func(s string) string { return s + "_" },
+		Recover:     (*Conn).LogPanic, // in dispatch.go
+		SplitLen:    defaultSplit,
+		Timeout:     60 * time.Second,
 	}
 	cfg.Me.Ident = "goirc"
 	if len(args) > 0 && args[0] != "" {
@@ -266,6 +274,7 @@ func (conn *Conn) initialise() {
 	conn.in = make(chan *Line, 32)
 	conn.out = make(chan string, 32)
 	conn.die = make(chan struct{})
+	conn.pongResponses = make(chan string)
 	if conn.st != nil {
 		conn.st.Wipe()
 	}
@@ -440,14 +449,51 @@ func (conn *Conn) recv() {
 // ping is started as a goroutine after a connection is established, as
 // long as Config.PingFreq >0. It pings the server every PingFreq seconds.
 func (conn *Conn) ping() {
-	defer conn.wg.Done()
 	tick := time.NewTicker(conn.cfg.PingFreq)
+	var sentPings []string
+
 	for {
 		select {
 		case <-tick.C:
-			conn.Ping(fmt.Sprintf("%d", time.Now().UnixNano()))
+			logging.Debug("irc.ping(): Current outstanding pings: %d/%d",
+				len(sentPings), conn.cfg.FailedPings)
+			// If we haven't cleared this by now it's time to bail.
+			if conn.cfg.FailedPings > 0 && len(sentPings) >= conn.cfg.FailedPings {
+				logging.Error("irc.ping(): Failed to recieve %d pings, closing down the connection.",
+					conn.cfg.FailedPings)
+				tick.Stop()
+				conn.wg.Done()
+				conn.Close()
+				return
+			}
+
+			currentPing := fmt.Sprintf("%d", time.Now().UnixNano())
+			sentPings = append(sentPings, currentPing)
+
+			conn.Ping(currentPing)
+		case pong := <-conn.pongResponses:
+			// No need to waste the cycles if we aren't tracking the number of failed pings.
+			if conn.cfg.FailedPings == 0 {
+				continue
+			}
+
+			logging.Debug("irc.ping(): Processing Pong: %s", pong)
+
+			// See if ping matches
+			shouldClear := false
+			for _, sentPing := range sentPings {
+				if strings.Contains(pong, sentPing) {
+					shouldClear = true
+					break
+				}
+			}
+			// We found a matching ping, reset the count!
+			if shouldClear {
+				sentPings = sentPings[:0]
+			}
 		case <-conn.die:
 			// control channel closed, bail out
+			conn.wg.Done()
 			tick.Stop()
 			return
 		}
