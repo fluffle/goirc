@@ -110,6 +110,10 @@ type Config struct {
 	// Split PRIVMSGs, NOTICEs and CTCPs longer than SplitLen characters
 	// over multiple lines. Default to 450 if not set.
 	SplitLen int
+
+	// The duration before a handler timeout is triggered. Defaults to 1m.
+	// Set to 0 to wait indefinitely.
+	HandlerTimeout time.Duration
 }
 
 // NewConfig creates a Config struct containing sensible defaults.
@@ -118,12 +122,13 @@ type Config struct {
 // name, but these are optional.
 func NewConfig(nick string, args ...string) *Config {
 	cfg := &Config{
-		Me:       &state.Nick{Nick: nick},
-		PingFreq: 3 * time.Minute,
-		NewNick:  func(s string) string { return s + "_" },
-		Recover:  (*Conn).LogPanic, // in dispatch.go
-		SplitLen: defaultSplit,
-		Timeout:  60 * time.Second,
+		Me:             &state.Nick{Nick: nick},
+		PingFreq:       2 * time.Minute,
+		NewNick:        func(s string) string { return s + "_" },
+		Recover:        (*Conn).LogPanic, // in dispatch.go
+		SplitLen:       defaultSplit,
+		Timeout:        60 * time.Second,
+		HandlerTimeout: 60 * time.Second,
 	}
 	cfg.Me.Ident = "goirc"
 	if len(args) > 0 && args[0] != "" {
@@ -458,13 +463,19 @@ func (conn *Conn) ping() {
 // It pulls Lines from the input channel and dispatches them to any
 // handlers that have been registered for that IRC verb.
 func (conn *Conn) runLoop() {
-	defer conn.wg.Done()
 	for {
 		select {
 		case line := <-conn.in:
-			conn.dispatch(line)
+			err := conn.dispatch(line)
+			if err != nil {
+				// Close() will wait on this, can't defer it.
+				conn.wg.Done()
+				conn.Close()
+				return
+			}
 		case <-conn.die:
 			// control channel closed, bail out
+			conn.wg.Done()
 			return
 		}
 	}

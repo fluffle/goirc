@@ -1,10 +1,13 @@
 package client
 
 import (
+	"errors"
 	"github.com/fluffle/goirc/logging"
+	"reflect"
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Handlers are triggered on incoming Lines from the server, with the handler
@@ -59,6 +62,7 @@ type hNode struct {
 	set        *hSet
 	event      string
 	handler    Handler
+	name       string
 }
 
 // A hNode implements both Handler (with configurable panic recovery)...
@@ -90,6 +94,7 @@ func (hs *hSet) add(ev string, h Handler) Remover {
 		set:     hs,
 		event:   ev,
 		handler: h,
+		name:    runtime.FuncForPC(reflect.ValueOf(h).Pointer()).Name(),
 	}
 	if !ok {
 		l.start = hn
@@ -128,23 +133,45 @@ func (hs *hSet) remove(hn *hNode) {
 	}
 }
 
-func (hs *hSet) dispatch(conn *Conn, line *Line) {
+func (hs *hSet) dispatch(conn *Conn, line *Line) error {
 	hs.RLock()
 	defer hs.RUnlock()
 	ev := strings.ToLower(line.Cmd)
 	list, ok := hs.set[ev]
 	if !ok {
-		return
+		return nil
 	}
 	wg := &sync.WaitGroup{}
 	for hn := list.start; hn != nil; hn = hn.next {
 		wg.Add(1)
 		go func(hn *hNode) {
+			logging.Debug("Starting %s handler for event %s", hn.name, line.Cmd)
 			hn.Handle(conn, line.Copy())
+			logging.Debug("Finished %s handler for event %s", hn.name, line.Cmd)
 			wg.Done()
 		}(hn)
 	}
-	wg.Wait()
+
+	// If we don't care about how long handlers run, wait and bail out early
+	if conn.cfg.HandlerTimeout == 0 {
+		wg.Wait()
+		return nil
+	}
+
+	// Limit the amount of time we wait.
+	endChan := make(chan struct{})
+	go func() {
+		defer close(endChan)
+		wg.Wait()
+	}()
+	select {
+	case <-endChan:
+		return nil
+	case <-time.After(conn.cfg.HandlerTimeout):
+		msg := "Timeout waiting for handlers to complete"
+		logging.Error(msg)
+		return errors.New(msg)
+	}
 }
 
 // Handle adds the provided handler to the foreground set for the named event.
@@ -171,13 +198,20 @@ func (conn *Conn) HandleFunc(name string, hf HandlerFunc) Remover {
 	return conn.Handle(name, hf)
 }
 
-func (conn *Conn) dispatch(line *Line) {
+func (conn *Conn) dispatch(line *Line) error {
 	// We run the internal handlers first, including all state tracking ones.
 	// This ensures that user-supplied handlers that use the tracker have a
 	// consistent view of the connection state in handlers that mutate it.
-	conn.intHandlers.dispatch(conn, line)
+	err := conn.intHandlers.dispatch(conn, line)
+	if err != nil {
+		return err
+	}
 	go conn.bgHandlers.dispatch(conn, line)
-	conn.fgHandlers.dispatch(conn, line)
+	err = conn.fgHandlers.dispatch(conn, line)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // LogPanic is used as the default panic catcher for the client. If, like me,
