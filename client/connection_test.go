@@ -390,7 +390,7 @@ func TestPing(t *testing.T) {
 	}
 
 	// Set a low ping frequency for testing.
-	c.cfg.PingFreq = 10 * res
+	c.cfg.PingFreq = 30 * res
 
 	// reader is a helper to do a "non-blocking" read of c.out
 	reader := func() string {
@@ -433,7 +433,7 @@ func TestPing(t *testing.T) {
 
 	// This is a short window in which the ping should happen
 	// This may result in flaky tests; sorry (and file a bug) if so.
-	<-time.After(2 * res)
+	<-time.After(40 * res)
 	if s := reader(); s == "" || !strings.HasPrefix(s, "PING :") {
 		t.Errorf("Line not output after another %s.", 2*res)
 	}
@@ -451,6 +451,57 @@ func TestPing(t *testing.T) {
 	if s := reader(); s != "" {
 		t.Errorf("Line output after ping stopped.")
 	}
+}
+
+func TestPingPassFail(t *testing.T) {
+	// Passing a second value to setUp stops goroutines from starting
+	c, s := setUp(t, false)
+	defer s.tearDown()
+
+	res := time.Millisecond
+
+	// Windows has a timer resolution of 15.625ms by default.
+	// This means the test will be slower on windows, but
+	// should at least stop most of the flakiness...
+	// https://github.com/fluffle/goirc/issues/88
+	if runtime.GOOS == "windows" {
+		res = 15625 * time.Microsecond
+	}
+
+	// Set a low ping frequency for testing.
+	c.cfg.PingFreq = 10 * res
+
+	// reader is a helper to do a "non-blocking" read of c.out
+	reader := func() string {
+		select {
+		case <-time.After(res):
+		case s := <-c.out:
+			return s
+		}
+		return ""
+	}
+
+	// Start ping loop.
+	exited := callCheck(t)
+	// ping() will decrement the WaitGroup, so we must increment it.
+	c.wg.Add(1)
+	go func() {
+		c.ping()
+		exited.call()
+	}()
+
+	for i := 0; i <= 10; i++ {
+		<-time.After(c.cfg.PingFreq + 1)
+		s := reader()
+		if strings.HasPrefix(s, "PING :") {
+			c.pongResponses <- strings.TrimPrefix(s, "PING :")
+		}
+	}
+	exited.assertNotCalled("Exited before pongs stopped.")
+
+	<-time.After(c.cfg.PingFreq * 4)
+
+	exited.assertWasCalled("Didn't exit after pongs stopped.")
 }
 
 func TestRunLoop(t *testing.T) {

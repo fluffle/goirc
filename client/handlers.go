@@ -16,6 +16,7 @@ var intHandlers = map[string]HandlerFunc{
 	CTCP:     (*Conn).h_CTCP,
 	NICK:     (*Conn).h_NICK,
 	PING:     (*Conn).h_PING,
+	PONG:     (*Conn).h_PONG,
 }
 
 func (conn *Conn) addIntHandlers() {
@@ -29,6 +30,17 @@ func (conn *Conn) addIntHandlers() {
 // Basic ping/pong handler
 func (conn *Conn) h_PING(line *Line) {
 	conn.Pong(line.Args[0])
+}
+
+// Send all pongs to the internal tracker
+func (conn *Conn) h_PONG(line *Line) {
+	// Going by the RFC this makes zero sense, but every IRCd I can find implements
+	// it this way.
+	//
+	// PING :12345
+	// :dreamhack.se.quakenet.org PONG dreamhack.se.quakenet.org :12345
+
+	conn.pongResponses <- line.Text()
 }
 
 // Handler for initial registration with server once tcp connection is made.
