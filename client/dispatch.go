@@ -1,10 +1,11 @@
 package client
 
 import (
-	"github.com/fluffle/goirc/logging"
 	"runtime"
 	"strings"
 	"sync"
+
+	"github.com/fluffle/goirc/logging"
 )
 
 // Handlers are triggered on incoming Lines from the server, with the handler
@@ -128,16 +129,25 @@ func (hs *hSet) remove(hn *hNode) {
 	}
 }
 
-func (hs *hSet) dispatch(conn *Conn, line *Line) {
+func (hs *hSet) getHandlers(ev string) []*hNode {
 	hs.RLock()
 	defer hs.RUnlock()
-	ev := strings.ToLower(line.Cmd)
 	list, ok := hs.set[ev]
 	if !ok {
-		return
+		return nil
 	}
-	wg := &sync.WaitGroup{}
+	// Copy current list of handlers to a temporary slice under the lock.
+	handlers := make([]*hNode, 0)
 	for hn := list.start; hn != nil; hn = hn.next {
+		handlers = append(handlers, hn)
+	}
+	return handlers
+}
+
+func (hs *hSet) dispatch(conn *Conn, line *Line) {
+	ev := strings.ToLower(line.Cmd)
+	wg := &sync.WaitGroup{}
+	for _, hn := range hs.getHandlers(ev) {
 		wg.Add(1)
 		go func(hn *hNode) {
 			hn.Handle(conn, line.Copy())
