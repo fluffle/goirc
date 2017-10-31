@@ -266,7 +266,10 @@ func (st *stateTracker) ChannelModes(c, modes string, args ...string) *Channel {
 }
 
 // Returns the Nick the state tracker thinks is Me.
+// NOTE: Nick() requires the mutex to be held.
 func (st *stateTracker) Me() *Nick {
+	st.mu.Lock()
+	defer st.mu.Unlock()
 	return st.me.Nick()
 }
 
