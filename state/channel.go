@@ -248,7 +248,9 @@ func (ch *Channel) Equals(other *Channel) bool {
 
 // Duplicates a ChanMode struct.
 func (cm *ChanMode) Copy() *ChanMode {
-	if cm == nil { return nil }
+	if cm == nil {
+		return nil
+	}
 	c := *cm
 	return &c
 }
@@ -260,7 +262,9 @@ func (cm *ChanMode) Equals(other *ChanMode) bool {
 
 // Duplicates a ChanPrivs struct.
 func (cp *ChanPrivs) Copy() *ChanPrivs {
-	if cp == nil { return nil }
+	if cp == nil {
+		return nil
+	}
 	c := *cp
 	return &c
 }
