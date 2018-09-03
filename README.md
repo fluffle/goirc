@@ -116,4 +116,4 @@ And thanks to the following for minor doc/fix PRs:
   - [Gentux](https://github.com/Gentux)
   - [kidanger](https://github.com/kidanger)
   - [ripcurld00d](https://github.com/ripcurld00d)
-  - [bob-smith](https://github.com/bob-smith)
+  - [gundalow](https://github.com/gundalow)
