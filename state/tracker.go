@@ -1,6 +1,8 @@
 package state
 
 import (
+	"fmt"
+
 	"github.com/fluffle/goirc/logging"
 
 	"sync"
@@ -11,6 +13,7 @@ type Tracker interface {
 	// Nick methods
 	NewNick(nick string) *Nick
 	GetNick(nick string) *Nick
+	GetNickByHostmask(host string) *Nick
 	ReNick(old, neu string) *Nick
 	DelNick(nick string) *Nick
 	NickInfo(nick, ident, host, name string) *Nick
@@ -96,6 +99,18 @@ func (st *stateTracker) GetNick(n string) *Nick {
 	defer st.mu.Unlock()
 	if nk, ok := st.nicks[n]; ok {
 		return nk.Nick()
+	}
+	return nil
+}
+
+// Returns a nick for the hostmask h, if we're tracking it.
+func (st *stateTracker) GetNickByHostmask(h string) *Nick {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	for n := range st.nicks {
+		if fmt.Sprintf("%s@%s", st.nicks[n].ident, st.nicks[n].host) == h {
+			return st.nicks[n].Nick()
+		}
 	}
 	return nil
 }

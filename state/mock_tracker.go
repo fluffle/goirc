@@ -48,6 +48,16 @@ func (_mr *_MockTrackerRecorder) GetNick(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetNick", arg0)
 }
 
+func (_m *MockTracker) GetNickByHostmask(host string) *Nick {
+	ret := _m.ctrl.Call(_m, "GetNickByHostmask", host)
+	ret0, _ := ret[0].(*Nick)
+	return ret0
+}
+
+func (_mr *_MockTrackerRecorder) GetNickByHostmask(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetNickByHostmask", arg0)
+}
+
 func (_m *MockTracker) ReNick(old string, neu string) *Nick {
 	ret := _m.ctrl.Call(_m, "ReNick", old, neu)
 	ret0, _ := ret[0].(*Nick)

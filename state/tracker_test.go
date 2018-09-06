@@ -58,6 +58,22 @@ func TestSTGetNick(t *testing.T) {
 	}
 }
 
+func TestSTGetNickByHostmask(t *testing.T) {
+	st := NewTracker("mynick")
+	test1 := st.NewNick("test1")
+	test1 = st.NickInfo("test1", "test", "test", "test")
+
+	if n := st.GetNickByHostmask("test@test"); !test1.Equals(n) {
+		t.Errorf("Incorrect nick returned by GetNickByHostmask.")
+	}
+	if n := st.GetNickByHostmask("test2@test"); n != nil {
+		t.Errorf("Nick unexpectedly returned by GetNickByHostmask.")
+	}
+	if len(st.nicks) != 2 {
+		t.Errorf("Nick list changed size during GetNickByHostmask.")
+	}
+}
+
 func TestSTReNick(t *testing.T) {
 	st := NewTracker("mynick")
 	test1 := st.NewNick("test1")
