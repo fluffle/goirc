@@ -31,13 +31,14 @@ func SetLogger(l Logger) {
 
 // A nullLogger does nothing while fulfilling Logger.
 type nullLogger struct{}
+
 func (nl nullLogger) Debug(f string, a ...interface{}) {}
-func (nl nullLogger) Info(f string, a ...interface{}) {}
-func (nl nullLogger) Warn(f string, a ...interface{}) {}
+func (nl nullLogger) Info(f string, a ...interface{})  {}
+func (nl nullLogger) Warn(f string, a ...interface{})  {}
 func (nl nullLogger) Error(f string, a ...interface{}) {}
 
 // Shim functions so that the package can be used directly
 func Debug(f string, a ...interface{}) { logger.Debug(f, a...) }
-func Info(f string, a ...interface{}) { logger.Info(f, a...) }
-func Warn(f string, a ...interface{}) { logger.Warn(f, a...) }
+func Info(f string, a ...interface{})  { logger.Info(f, a...) }
+func Warn(f string, a ...interface{})  { logger.Warn(f, a...) }
 func Error(f string, a ...interface{}) { logger.Error(f, a...) }
