@@ -299,6 +299,9 @@ func (ch *channel) String() string {
 // Returns a string representing the channel modes. Looks like:
 //	+npk key
 func (cm *ChanMode) String() string {
+	if cm == nil {
+		return "No modes set"
+	}
 	str := "+"
 	a := make([]string, 0)
 	v := reflect.Indirect(reflect.ValueOf(cm))
@@ -335,6 +338,9 @@ func (cm *ChanMode) String() string {
 // Returns a string representing the channel privileges. Looks like:
 //	+o
 func (cp *ChanPrivs) String() string {
+	if cp == nil {
+		return "No modes set"
+	}
 	str := "+"
 	v := reflect.Indirect(reflect.ValueOf(cp))
 	t := v.Type()

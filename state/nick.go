@@ -183,6 +183,9 @@ func (nk *nick) String() string {
 // Returns a string representing the nick modes. Looks like:
 //	+iwx
 func (nm *NickMode) String() string {
+	if nm == nil {
+		return "No modes set"
+	}
 	str := "+"
 	v := reflect.Indirect(reflect.ValueOf(nm))
 	t := v.Type()
