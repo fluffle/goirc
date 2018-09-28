@@ -1,0 +1,10 @@
+github.com/fluffle/golog v1.0.2 h1:Ktg5k4A+KqWLKS8OlkSU46bZ6QjdDErYjMEd7Rn2uWY=
+github.com/fluffle/golog v1.0.2/go.mod h1:TKZoUh/MNb9worAhWP158Ol0TXc5EfhMJK/qB/7j+Ko=
+github.com/fluffle/golog/logging v0.0.0-20180928190033-7d99e85061cb h1:r//eMD/5sdzxVy34UP5fFvRWIL2L8QZtaDgVCKfVQLI=
+github.com/fluffle/golog/logging v0.0.0-20180928190033-7d99e85061cb/go.mod h1:w8+az2+kPHMcsaKnTnGapWTNToJK8BogkHiAncvqKsM=
+github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b h1:VKtxabqXZkF25pY9ekfRL6a582T4P37/31XEstQ5p58=
+github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b/go.mod h1:SBH7ygxi8pfUlaOkMMuAQtPIUF8ecWP5IEl/CR7VP2Q=
+github.com/golang/mock v1.1.1 h1:G5FRp8JnTd7RQH5kemVNlMeyXQAztQ3mOWV95KxsXH8=
+github.com/golang/mock v1.1.1/go.mod h1:oTYuIxOrZwtPieC+H1uAHpcLFnEyAGVDL/k47Jfbm0A=
+golang.org/x/net v0.0.0-20180926154720-4dfa2610cdf3 h1:dgd4x4kJt7G4k4m93AYLzM8Ni6h2qLTfh9n9vXJT3/0=
+golang.org/x/net v0.0.0-20180926154720-4dfa2610cdf3/go.mod h1:mL1N/T3taQHkDXs73rZJwtUhF3w3ftmwwsq0BUmARs4=
