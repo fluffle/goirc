@@ -1,10 +1,11 @@
 package client
 
 import (
-	"github.com/fluffle/goirc/state"
-	"github.com/golang/mock/gomock"
 	"testing"
 	"time"
+
+	"github.com/fluffle/goirc/state"
+	"github.com/golang/mock/gomock"
 )
 
 // This test performs a simple end-to-end verification of correct line parsing
@@ -80,25 +81,26 @@ func Test433(t *testing.T) {
 	// Call handler with a 433 line, not triggering c.cfg.Me.Renick()
 	s.st.EXPECT().Me().Return(c.cfg.Me)
 	c.h_433(ParseLine(":irc.server.org 433 test new :Nickname is already in use."))
-	s.nc.Expect("NICK new_")
+	s.nc.Expect("NICK " + DefaultNewNick("new"))
 
 	// Send a line that will trigger a renick. This happens when our wanted
 	// nick is unavailable during initial negotiation, so we must choose a
 	// different one before the connection can proceed. No NICK line will be
 	// sent by the server to confirm nick change in this case.
+	want := DefaultNewNick(c.cfg.Me.Nick)
 	gomock.InOrder(
 		s.st.EXPECT().Me().Return(c.cfg.Me),
-		s.st.EXPECT().ReNick("test", "test_").Return(c.cfg.Me),
+		s.st.EXPECT().ReNick("test", want).Return(c.cfg.Me),
 	)
 	c.h_433(ParseLine(":irc.server.org 433 test test :Nickname is already in use."))
-	s.nc.Expect("NICK test_")
+	s.nc.Expect("NICK " + want)
 
 	// Test the code path that *doesn't* involve state tracking.
 	c.st = nil
 	c.h_433(ParseLine(":irc.server.org 433 test test :Nickname is already in use."))
-	s.nc.Expect("NICK test_")
+	s.nc.Expect("NICK " + want)
 
-	if c.cfg.Me.Nick != "test_" {
+	if c.cfg.Me.Nick != want {
 		t.Errorf("My nick not updated from '%s'.", c.cfg.Me.Nick)
 	}
 	c.st = s.st

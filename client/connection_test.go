@@ -583,3 +583,24 @@ func TestRateLimit(t *testing.T) {
 		t.Errorf("l=%d, badness=%d", l, c.badness)
 	}
 }
+
+func TestDefaultNewNick(t *testing.T) {
+	tests := []struct{ in, want string }{
+		{"", "_"},
+		{"0", "1"},
+		{"9", "0"},
+		{"A", "B"},
+		{"Z", "["},
+		{"_", "`"},
+		{"`", "a"},
+		{"}", "A"},
+		{"-", "_"},
+		{"fluffle", "flufflf"},
+	}
+
+	for _, test := range tests {
+		if got := DefaultNewNick(test.in); got != test.want {
+			t.Errorf("DefaultNewNick(%q) = %q, want %q", test.in, got, test.want)
+		}
+	}
+}

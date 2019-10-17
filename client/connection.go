@@ -125,7 +125,7 @@ func NewConfig(nick string, args ...string) *Config {
 	cfg := &Config{
 		Me:       &state.Nick{Nick: nick},
 		PingFreq: 3 * time.Minute,
-		NewNick:  func(s string) string { return s + "_" },
+		NewNick:  DefaultNewNick,
 		Recover:  (*Conn).LogPanic, // in dispatch.go
 		SplitLen: defaultSplit,
 		Timeout:  60 * time.Second,
@@ -141,6 +141,28 @@ func NewConfig(nick string, args ...string) *Config {
 	cfg.Version = "Powered by GoIRC"
 	cfg.QuitMessage = "GoBye!"
 	return cfg
+}
+
+// Because networks limit nick lengths, the easy approach of appending
+// an '_' to a nick that is already in use can cause problems. When the
+// length limit is reached, the clients idea of what its nick is
+// ends up being different from the server. Hilarity ensues.
+// Thanks to github.com/purpleidea for the bug report!
+// Thanks to 'man ascii' for
+func DefaultNewNick(old string) string {
+	if len(old) == 0 {
+		return "_"
+	}
+	c := old[len(old)-1]
+	switch {
+	case c >= '0' && c <= '9':
+		c = '0' + (((c - '0') + 1) % 10)
+	case c >= 'A' && c <= '}':
+		c = 'A' + (((c - 'A') + 1) % 61)
+	default:
+		c = '_'
+	}
+	return old[:len(old)-1] + string(c)
 }
 
 // SimpleClient creates a new Conn, passing its arguments to NewConfig.
