@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	irc "github.com/fluffle/goirc/client"
-	"github.com/fluffle/goirc/logging/glog"
 )
 
 var host *string = flag.String("host", "irc.freenode.net", "IRC server")
@@ -16,7 +15,6 @@ var channel *string = flag.String("channel", "#go-nuts", "IRC channel")
 
 func main() {
 	flag.Parse()
-	glog.Init()
 
 	// create new IRC connection
 	c := irc.SimpleClient("GoTest", "gotest")
