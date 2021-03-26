@@ -24,6 +24,10 @@ func (c checker) call() {
 	c.c <- struct{}{}
 }
 
+func (c checker) Handle(_ *Conn, _ *Line) {
+	c.call()
+}
+
 func (c checker) assertNotCalled(fmt string, args ...interface{}) {
 	select {
 	case <-c.c:
@@ -85,9 +89,7 @@ func TestEOF(t *testing.T) {
 
 	// Set up a handler to detect whether disconnected handlers are called
 	dcon := callCheck(t)
-	c.HandleFunc(DISCONNECTED, func(conn *Conn, line *Line) {
-		dcon.call()
-	})
+	c.Handle(DISCONNECTED, dcon)
 
 	// Simulate EOF from server
 	s.nc.Close()
@@ -460,14 +462,10 @@ func TestRunLoop(t *testing.T) {
 	// Don't use 001 here, since there's already a handler for that
 	// and it hangs this test unless we mock the state tracker calls.
 	h002 := callCheck(t)
-	c.HandleFunc("002", func(conn *Conn, line *Line) {
-		h002.call()
-	})
+	c.Handle("002", h002)
 	h003 := callCheck(t)
 	// Set up a handler to detect whether 002 handler is called
-	c.HandleFunc("003", func(conn *Conn, line *Line) {
-		h003.call()
-	})
+	c.Handle("003", h003)
 
 	l2 := ParseLine(":irc.server.org 002 test :First test line.")
 	c.in <- l2
