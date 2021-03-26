@@ -44,7 +44,7 @@ func Test001(t *testing.T) {
 	c, s := setUp(t)
 	defer s.tearDown()
 
-	l := ParseLine(":irc.server.org 001 test :Welcome to IRC test!ident@somehost.com")
+	l := ParseLine(":irc.server.org 001 newnick :Welcome to IRC newnick!ident@somehost.com")
 	// Set up a handler to detect whether connected handler is called from 001
 	hcon := false
 	c.HandleFunc("connected", func(conn *Conn, line *Line) {
@@ -54,7 +54,12 @@ func Test001(t *testing.T) {
 	// Test state tracking first.
 	gomock.InOrder(
 		s.st.EXPECT().Me().Return(c.cfg.Me),
-		s.st.EXPECT().NickInfo("test", "test", "somehost.com", "Testing IRC"),
+		s.st.EXPECT().NickInfo("test", "ident", "somehost.com", "Testing IRC"),
+		s.st.EXPECT().ReNick("test", "newnick").Return(&state.Nick{
+			Nick:  "newnick",
+			Ident: c.cfg.Me.Ident,
+			Name:  c.cfg.Me.Name,
+		}),
 	)
 	// Call handler with a valid 001 line
 	c.h_001(l)

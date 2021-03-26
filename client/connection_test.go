@@ -458,20 +458,22 @@ func TestRunLoop(t *testing.T) {
 	c, s := setUp(t, false)
 	defer s.tearDown()
 
-	// Set up a handler to detect whether 001 handler is called
-	h001 := callCheck(t)
-	c.HandleFunc("001", func(conn *Conn, line *Line) {
-		h001.call()
-	})
+	// Set up a handler to detect whether 002 handler is called.
+	// Don't use 001 here, since there's already a handler for that
+	// and it hangs this test unless we mock the state tracker calls.
 	h002 := callCheck(t)
-	// Set up a handler to detect whether 002 handler is called
 	c.HandleFunc("002", func(conn *Conn, line *Line) {
 		h002.call()
 	})
+	h003 := callCheck(t)
+	// Set up a handler to detect whether 002 handler is called
+	c.HandleFunc("003", func(conn *Conn, line *Line) {
+		h003.call()
+	})
 
-	l1 := ParseLine(":irc.server.org 001 test :First test line.")
-	c.in <- l1
-	h001.assertNotCalled("001 handler called before runLoop started.")
+	l2 := ParseLine(":irc.server.org 002 test :First test line.")
+	c.in <- l2
+	h002.assertNotCalled("002 handler called before runLoop started.")
 
 	// We want to test that the a goroutine calling runLoop will exit correctly.
 	// Now, we can expect the call to Dispatch to take place as runLoop starts.
@@ -482,13 +484,13 @@ func TestRunLoop(t *testing.T) {
 		c.runLoop()
 		exited.call()
 	}()
-	h001.assertWasCalled("001 handler not called after runLoop started.")
+	h002.assertWasCalled("002 handler not called after runLoop started.")
 
 	// Send another line, just to be sure :-)
-	h002.assertNotCalled("002 handler called before expected.")
-	l2 := ParseLine(":irc.server.org 002 test :Second test line.")
-	c.in <- l2
-	h002.assertWasCalled("002 handler not called while runLoop started.")
+	h003.assertNotCalled("003 handler called before expected.")
+	l3 := ParseLine(":irc.server.org 003 test :Second test line.")
+	c.in <- l3
+	h003.assertWasCalled("003 handler not called while runLoop started.")
 
 	// Now, use the control channel to exit send and kill the goroutine.
 	// This sneakily uses the fact that the other two goroutines that would
@@ -500,8 +502,8 @@ func TestRunLoop(t *testing.T) {
 	exited.assertWasCalled("Didn't exit after signal.")
 
 	// Sending more on c.in shouldn't dispatch any further events
-	c.in <- l1
-	h001.assertNotCalled("001 handler called after runLoop ended.")
+	c.in <- l2
+	h002.assertNotCalled("002 handler called after runLoop ended.")
 }
 
 func TestWrite(t *testing.T) {

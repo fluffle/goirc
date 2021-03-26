@@ -6,6 +6,8 @@ package client
 import (
 	"strings"
 	"time"
+
+	"github.com/fluffle/goirc/logging"
 )
 
 // sets up the internal event handlers to do essential IRC protocol things
@@ -41,20 +43,32 @@ func (conn *Conn) h_REGISTER(line *Line) {
 }
 
 // Handler to trigger a CONNECTED event on receipt of numeric 001
+// :<server> 001 <nick> :Welcome message <nick>!<user>@<host>
 func (conn *Conn) h_001(line *Line) {
-	// we're connected!
-	conn.dispatch(&Line{Cmd: CONNECTED, Time: time.Now()})
-	// and we're being given our hostname (from the server's perspective)
-	t := line.Args[len(line.Args)-1]
+	// We're connected! Defer this for control flow reasons.
+	defer conn.dispatch(&Line{Cmd: CONNECTED, Time: time.Now()})
+
+	// Accept the server's opinion of what our nick actually is
+	// and record our ident and hostname (from the server's perspective)
+	me, nick, t := conn.Me(), line.Target(), line.Text()
 	if idx := strings.LastIndex(t, " "); idx != -1 {
 		t = t[idx+1:]
-		if idx = strings.Index(t, "@"); idx != -1 {
-			if conn.st != nil {
-				me := conn.Me()
-				conn.st.NickInfo(me.Nick, me.Ident, t[idx+1:], me.Name)
-			} else {
-				conn.cfg.Me.Host = t[idx+1:]
-			}
+	}
+	_, ident, host, ok := parseUserHost(t)
+
+	if me.Nick != nick {
+		logging.Warn("Server changed our nick on connect: old=%q new=%q", me.Nick, nick)
+	}
+	if conn.st != nil {
+		if ok {
+			conn.st.NickInfo(me.Nick, ident, host, me.Name)
+		}
+		conn.cfg.Me = conn.st.ReNick(me.Nick, nick)
+	} else {
+		conn.cfg.Me.Nick = nick
+		if ok {
+			conn.cfg.Me.Ident = ident
+			conn.cfg.Me.Host = host
 		}
 	}
 }

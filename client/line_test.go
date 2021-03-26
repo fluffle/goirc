@@ -184,3 +184,31 @@ func TestLineTags(t *testing.T) {
 		}
 	}
 }
+
+func TestParseUserHost(t *testing.T) {
+	tests := []struct {
+		in, nick, ident, host string
+		ok                    bool
+	}{
+		{"", "", "", "", false},
+		{"   ", "", "", "", false},
+		{"somestring", "", "", "", false},
+		{" s p ", "", "", "", false},
+		{"foo!bar", "", "", "", false},
+		{"foo@baz.com", "", "", "", false},
+		{"foo!bar@baz.com", "foo", "bar", "baz.com", true},
+		{"  foo!bar@baz.com", "foo", "bar", "baz.com", true},
+		{" foo!bar@baz.com  ", "foo", "bar", "baz.com", true},
+	}
+
+	for i, test := range tests {
+		nick, ident, host, ok := parseUserHost(test.in)
+		if test.nick != nick ||
+			test.ident != ident ||
+			test.host != host ||
+			test.ok != ok {
+			t.Errorf("%d: parseUserHost(%q) = %q, %q, %q, %t; want %q, %q, %q, %t",
+				i, test.in, nick, ident, host, ok, test.nick, test.ident, test.host, test.ok)
+		}
+	}
+}

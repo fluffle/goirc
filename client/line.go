@@ -154,11 +154,10 @@ func ParseLine(s string) *Line {
 
 		// src can be the hostname of the irc server or a nick!user@host
 		line.Host = line.Src
-		nidx, uidx := strings.Index(line.Src, "!"), strings.Index(line.Src, "@")
-		if uidx != -1 && nidx != -1 {
-			line.Nick = line.Src[:nidx]
-			line.Ident = line.Src[nidx+1 : uidx]
-			line.Host = line.Src[uidx+1:]
+		if n, i, h, ok := parseUserHost(line.Src); ok {
+			line.Nick = n
+			line.Ident = i
+			line.Host = h
 		}
 	}
 
@@ -203,6 +202,15 @@ func ParseLine(s string) *Line {
 		}
 	}
 	return line
+}
+
+func parseUserHost(uh string) (nick, ident, host string, ok bool) {
+	uh = strings.TrimSpace(uh)
+	nidx, uidx := strings.Index(uh, "!"), strings.Index(uh, "@")
+	if uidx == -1 || nidx == -1 {
+		return "", "", "", false
+	}
+	return uh[:nidx], uh[nidx+1 : uidx], uh[uidx+1:], true
 }
 
 func (line *Line) argslen(minlen int) bool {
