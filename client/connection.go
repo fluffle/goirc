@@ -45,8 +45,8 @@ type Conn struct {
 	out         chan string
 	connected   bool
 
-	// Control channel and WaitGroup for goroutines
-	die chan struct{}
+	// CancelFunc and WaitGroup for goroutines
+	die context.CancelFunc
 	wg  sync.WaitGroup
 
 	// Internal counters for flood protection
@@ -295,7 +295,7 @@ func (conn *Conn) initialise() {
 	conn.sock = nil
 	conn.in = make(chan *Line, 32)
 	conn.out = make(chan string, 32)
-	conn.die = make(chan struct{})
+	conn.die = nil
 	if conn.st != nil {
 		conn.st.Wipe()
 	}
@@ -404,24 +404,25 @@ func (conn *Conn) internalConnect(ctx context.Context) error {
 		conn.sock = s
 	}
 
-	conn.postConnect(true)
+	conn.postConnect(ctx, true)
 	conn.connected = true
 	return nil
 }
 
 // postConnect performs post-connection setup, for ease of testing.
-func (conn *Conn) postConnect(start bool) {
+func (conn *Conn) postConnect(ctx context.Context, start bool) {
 	conn.io = bufio.NewReadWriter(
 		bufio.NewReader(conn.sock),
 		bufio.NewWriter(conn.sock))
 	if start {
+		ctx, conn.die = context.WithCancel(ctx)
 		conn.wg.Add(3)
-		go conn.send()
+		go conn.send(ctx)
 		go conn.recv()
-		go conn.runLoop()
+		go conn.runLoop(ctx)
 		if conn.cfg.PingFreq > 0 {
 			conn.wg.Add(1)
-			go conn.ping()
+			go conn.ping(ctx)
 		}
 	}
 }
@@ -434,8 +435,8 @@ func hasPort(s string) bool {
 
 // send is started as a goroutine after a connection is established.
 // It shuttles data from the output channel to write(), and is killed
-// when Conn.die is closed.
-func (conn *Conn) send() {
+// when the context is cancelled.
+func (conn *Conn) send(ctx context.Context) {
 	for {
 		select {
 		case line := <-conn.out:
@@ -446,7 +447,7 @@ func (conn *Conn) send() {
 				conn.Close()
 				return
 			}
-		case <-conn.die:
+		case <-ctx.Done():
 			// control channel closed, bail out
 			conn.wg.Done()
 			return
@@ -483,14 +484,14 @@ func (conn *Conn) recv() {
 
 // ping is started as a goroutine after a connection is established, as
 // long as Config.PingFreq >0. It pings the server every PingFreq seconds.
-func (conn *Conn) ping() {
+func (conn *Conn) ping(ctx context.Context) {
 	defer conn.wg.Done()
 	tick := time.NewTicker(conn.cfg.PingFreq)
 	for {
 		select {
 		case <-tick.C:
 			conn.Ping(fmt.Sprintf("%d", time.Now().UnixNano()))
-		case <-conn.die:
+		case <-ctx.Done():
 			// control channel closed, bail out
 			tick.Stop()
 			return
@@ -501,13 +502,13 @@ func (conn *Conn) ping() {
 // runLoop is started as a goroutine after a connection is established.
 // It pulls Lines from the input channel and dispatches them to any
 // handlers that have been registered for that IRC verb.
-func (conn *Conn) runLoop() {
+func (conn *Conn) runLoop(ctx context.Context) {
 	defer conn.wg.Done()
 	for {
 		select {
 		case line := <-conn.in:
 			conn.dispatch(line)
-		case <-conn.die:
+		case <-ctx.Done():
 			// control channel closed, bail out
 			return
 		}
@@ -572,7 +573,9 @@ func (conn *Conn) Close() error {
 	logging.Info("irc.Close(): Disconnected from server.")
 	conn.connected = false
 	err := conn.sock.Close()
-	close(conn.die)
+	if conn.die != nil {
+		conn.die()
+	}
 	// Drain both in and out channels to avoid a deadlock if the buffers
 	// have filled. See TestSendDeadlockOnFullBuffer in connection_test.go.
 	conn.drainIn()
