@@ -109,6 +109,7 @@ Contributions gratefully received from:
   - [soul9](https://github.com/soul9)
   - [jakebailey](https://github.com/jakebailey)
   - [stapelberg](https://github.com/stapelberg)
+  - [shammash](https://github.com/shammash)
 
 And thanks to the following for minor doc/fix PRs:
 
