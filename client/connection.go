@@ -503,13 +503,17 @@ func (conn *Conn) ping(ctx context.Context) {
 // It pulls Lines from the input channel and dispatches them to any
 // handlers that have been registered for that IRC verb.
 func (conn *Conn) runLoop(ctx context.Context) {
-	defer conn.wg.Done()
 	for {
 		select {
 		case line := <-conn.in:
 			conn.dispatch(line)
 		case <-ctx.Done():
-			// control channel closed, bail out
+			// control channel closed, trigger Cancel() to clean
+			// things up properly and bail out
+
+			// We can't defer this, because Close() waits for it.
+			conn.wg.Done()
+			conn.Close()
 			return
 		}
 	}

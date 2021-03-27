@@ -103,6 +103,28 @@ func TestEOF(t *testing.T) {
 	}
 }
 
+func TestCleanupOnContextDone(t *testing.T) {
+	c, s := setUp(t)
+	// Since we're not using tearDown() here, manually call Finish()
+	defer s.ctrl.Finish()
+
+	// Close() triggers DISCONNECT handler after cleaning up the state
+	// use this as a proxy to check that Close() was indeed called
+	dcon := callCheck(t)
+	c.Handle(DISCONNECTED, dcon)
+
+	// Simulate context cancelation using our cancel func
+	c.die()
+
+	// Verify that disconnected handler was called
+	dcon.assertWasCalled("Conn did not call disconnected handlers.")
+
+	// Verify that the connection no longer thinks it's connected
+	if c.Connected() {
+		t.Errorf("Conn still thinks it's connected to the server.")
+	}
+}
+
 func TestClientAndStateTracking(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	st := state.NewMockTracker(ctrl)
