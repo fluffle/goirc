@@ -302,3 +302,4 @@ func (conn *Conn) Cap(subcommmand string, capabilities ...string) {
 		conn.Raw(CAP + " " + subcommmand + " :" + strings.Join(capabilities, " "))
 	}
 }
+//
