@@ -82,6 +82,11 @@ and `DisableStateTracking()` respectively. Doing this while connected to an IRC
 server will probably result in an inconsistent state and a lot of warnings to
 STDERR ;-)
 
+### Projects using GoIRC
+
+- [xdcc-cli](https://github.com/ostafen/xdcc-cli): A command line tool for searching and downloading files from the IRC network.
+
+
 ### Misc.
 
 Sorry the documentation is crap. Use the source, Luke.
