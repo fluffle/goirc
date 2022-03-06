@@ -2,6 +2,8 @@ package client
 
 import (
 	"reflect"
+	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -202,4 +204,21 @@ func TestClientCommands(t *testing.T) {
 
 	c.VHost("user", "pass")
 	s.nc.Expect("VHOST user pass")
+}
+
+func TestSplitCommand(t *testing.T) {
+	nArgs := 100
+
+	args := make([]string, 0)
+	for i := 0; i < nArgs; i++ {
+		args = append(args, "arg"+strconv.Itoa(i))
+	}
+
+	for maxLen := 1; maxLen <= defaultSplit; maxLen *= 2 {
+		for _, argStr := range splitArgs(args, maxLen) {
+			if len(argStr) > maxLen && len(strings.Split(argStr, " ")) > 1 {
+				t.Errorf("maxLen = %d, but len(cmd) = %d", maxLen, len(argStr))
+			}
+		}
+	}
 }

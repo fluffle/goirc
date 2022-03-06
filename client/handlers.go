@@ -4,7 +4,9 @@ package client
 // to manage tracking an irc connection etc.
 
 import (
+	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/fluffle/goirc/logging"
@@ -18,7 +20,12 @@ var intHandlers = map[string]HandlerFunc{
 	CTCP:     (*Conn).h_CTCP,
 	NICK:     (*Conn).h_NICK,
 	PING:     (*Conn).h_PING,
+	CAP:      (*Conn).h_CAP,
+	"410":    (*Conn).h_410,
 }
+
+// set up the ircv3 capabilities supported by this client which will be requested by default to the server.
+var defaultCaps = []string{}
 
 func (conn *Conn) addIntHandlers() {
 	for n, h := range intHandlers {
@@ -35,11 +42,143 @@ func (conn *Conn) h_PING(line *Line) {
 
 // Handler for initial registration with server once tcp connection is made.
 func (conn *Conn) h_REGISTER(line *Line) {
+	if conn.cfg.EnableCapabilityNegotiation {
+		conn.Cap(CAP_LS)
+	}
+
 	if conn.cfg.Pass != "" {
 		conn.Pass(conn.cfg.Pass)
 	}
 	conn.Nick(conn.cfg.Me.Nick)
 	conn.User(conn.cfg.Me.Ident, conn.cfg.Me.Name)
+}
+
+func (conn *Conn) getRequestCapabilities() *capSet {
+	s := capabilitySet()
+
+	// add capabilites supported by the client
+	s.Add(defaultCaps...)
+
+	// add capabilites requested by the user
+	s.Add(conn.cfg.Capabilites...)
+
+	return s
+}
+
+func (conn *Conn) negotiateCapabilities(supportedCaps []string) {
+	conn.supportedCaps.Add(supportedCaps...)
+
+	reqCaps := conn.getRequestCapabilities()
+	reqCaps.Intersect(conn.supportedCaps)
+
+	if reqCaps.Size() > 0 {
+		conn.Cap(CAP_REQ, reqCaps.Slice()...)
+	} else {
+		conn.Cap(CAP_END)
+	}
+}
+
+func (conn *Conn) handleCapAck(caps []string) {
+	for _, cap := range caps {
+		conn.currCaps.Add(cap)
+	}
+	conn.Cap(CAP_END)
+}
+
+func (conn *Conn) handleCapNak(caps []string) {
+	conn.Cap(CAP_END)
+}
+
+const (
+	CAP_LS  = "LS"
+	CAP_REQ = "REQ"
+	CAP_ACK = "ACK"
+	CAP_NAK = "NAK"
+	CAP_END = "END"
+)
+
+type capSet struct {
+	caps map[string]bool
+	mu   sync.RWMutex
+}
+
+func capabilitySet() *capSet {
+	return &capSet{
+		caps: make(map[string]bool),
+	}
+}
+
+func (c *capSet) Add(caps ...string) {
+	c.mu.Lock()
+	for _, cap := range caps {
+		if strings.HasPrefix(cap, "-") {
+			c.caps[cap[1:]] = false
+		} else {
+			c.caps[cap] = true
+		}
+	}
+	c.mu.Unlock()
+}
+
+func (c *capSet) Has(cap string) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.caps[cap]
+}
+
+// Intersect computes the intersection of two sets.
+func (c *capSet) Intersect(other *capSet) {
+	c.mu.Lock()
+
+	for cap := range c.caps {
+		if !other.Has(cap) {
+			delete(c.caps, cap)
+		}
+	}
+
+	c.mu.Unlock()
+}
+
+func (c *capSet) Slice() []string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	capSlice := make([]string, 0, len(c.caps))
+	for cap := range c.caps {
+		capSlice = append(capSlice, cap)
+	}
+
+	// make output predictable for testing
+	sort.Strings(capSlice)
+	return capSlice
+}
+
+func (c *capSet) Size() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return len(c.caps)
+}
+
+// This handler is triggered when an invalid cap command is received by the server.
+func (conn *Conn) h_410(line *Line) {
+	logging.Warn("Invalid cap subcommand: ", line.Args[1])
+}
+
+// Handler for capability negotiation commands.
+// Note that even if multiple CAP_END commands may be sent to the server during negotiation,
+// only the first will be considered.
+func (conn *Conn) h_CAP(line *Line) {
+	subcommand := line.Args[1]
+
+	caps := strings.Fields(line.Text())
+	switch subcommand {
+	case CAP_LS:
+		conn.negotiateCapabilities(caps)
+	case CAP_ACK:
+		conn.handleCapAck(caps)
+	case CAP_NAK:
+		conn.handleCapNak(caps)
+	}
 }
 
 // Handler to trigger a CONNECTED event on receipt of numeric 001

@@ -45,6 +45,12 @@ type Conn struct {
 	out         chan string
 	connected   bool
 
+	// Capabilities supported by the server
+	supportedCaps *capSet
+
+	// Capabilites currently enabled
+	currCaps *capSet
+
 	// CancelFunc and WaitGroup for goroutines
 	die context.CancelFunc
 	wg  sync.WaitGroup
@@ -89,6 +95,12 @@ type Config struct {
 	// Passed through to https://golang.org/pkg/net/#Dialer
 	DualStack bool
 
+	// Enable IRCv3 capability negotiation.
+	EnableCapabilityNegotiation bool
+
+	// A list of capabilities to request to the server during registration.
+	Capabilites []string
+
 	// Replaceable function to customise the 433 handler's new nick.
 	// By default an underscore "_" is appended to the current nick.
 	NewNick func(string) string
@@ -125,12 +137,13 @@ type Config struct {
 // name, but these are optional.
 func NewConfig(nick string, args ...string) *Config {
 	cfg := &Config{
-		Me:       &state.Nick{Nick: nick},
-		PingFreq: 3 * time.Minute,
-		NewNick:  DefaultNewNick,
-		Recover:  (*Conn).LogPanic, // in dispatch.go
-		SplitLen: defaultSplit,
-		Timeout:  60 * time.Second,
+		Me:                          &state.Nick{Nick: nick},
+		PingFreq:                    3 * time.Minute,
+		NewNick:                     DefaultNewNick,
+		Recover:                     (*Conn).LogPanic, // in dispatch.go
+		SplitLen:                    defaultSplit,
+		Timeout:                     60 * time.Second,
+		EnableCapabilityNegotiation: false,
 	}
 	cfg.Me.Ident = "goirc"
 	if len(args) > 0 && args[0] != "" {
@@ -204,13 +217,15 @@ func Client(cfg *Config) *Conn {
 	}
 
 	conn := &Conn{
-		cfg:         cfg,
-		dialer:      dialer,
-		intHandlers: handlerSet(),
-		fgHandlers:  handlerSet(),
-		bgHandlers:  handlerSet(),
-		stRemovers:  make([]Remover, 0, len(stHandlers)),
-		lastsent:    time.Now(),
+		cfg:           cfg,
+		dialer:        dialer,
+		intHandlers:   handlerSet(),
+		fgHandlers:    handlerSet(),
+		bgHandlers:    handlerSet(),
+		stRemovers:    make([]Remover, 0, len(stHandlers)),
+		lastsent:      time.Now(),
+		supportedCaps: capabilitySet(),
+		currCaps:      capabilitySet(),
 	}
 	conn.addIntHandlers()
 	return conn
@@ -287,6 +302,16 @@ func (conn *Conn) DisableStateTracking() {
 		conn.st.Wipe()
 		conn.st = nil
 	}
+}
+
+// SupportsCapability returns true if the server supports the given capability.
+func (conn *Conn) SupportsCapability(cap string) bool {
+	return conn.supportedCaps.Has(cap)
+}
+
+// HasCapability returns true if the given capability has been acked by the server during negotiation.
+func (conn *Conn) HasCapability(cap string) bool {
+	return conn.currCaps.Has(cap)
 }
 
 // Per-connection state initialisation.

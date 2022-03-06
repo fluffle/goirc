@@ -84,6 +84,23 @@ func splitMessage(msg string, splitLen int) (msgs []string) {
 	return append(msgs, msg)
 }
 
+func splitArgs(args []string, maxLen int) []string {
+	res := make([]string, 0)
+
+	i := 0
+	for i < len(args) {
+		currArg := args[i]
+		i++
+
+		for i < len(args) && len(currArg)+len(args[i])+1 < maxLen {
+			currArg += " " + args[i]
+			i++
+		}
+		res = append(res, currArg)
+	}
+	return res
+}
+
 // Raw sends a raw line to the server, should really only be used for
 // debugging purposes but may well come in handy.
 func (conn *Conn) Raw(rawline string) {
@@ -299,6 +316,9 @@ func (conn *Conn) Cap(subcommmand string, capabilities ...string) {
 	if len(capabilities) == 0 {
 		conn.Raw(CAP + " " + subcommmand)
 	} else {
-		conn.Raw(CAP + " " + subcommmand + " :" + strings.Join(capabilities, " "))
+		cmdPrefix := CAP + " " + subcommmand + " :"
+		for _, args := range splitArgs(capabilities, defaultSplit-len(cmdPrefix)) {
+			conn.Raw(cmdPrefix + args)
+		}
 	}
 }
