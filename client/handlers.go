@@ -5,6 +5,7 @@ package client
 
 import (
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/fluffle/goirc/logging"
@@ -18,6 +19,7 @@ var intHandlers = map[string]HandlerFunc{
 	CTCP:     (*Conn).h_CTCP,
 	NICK:     (*Conn).h_NICK,
 	PING:     (*Conn).h_PING,
+	CAP:      (*Conn).h_CAP,
 }
 
 func (conn *Conn) addIntHandlers() {
@@ -35,11 +37,87 @@ func (conn *Conn) h_PING(line *Line) {
 
 // Handler for initial registration with server once tcp connection is made.
 func (conn *Conn) h_REGISTER(line *Line) {
+	if conn.cfg.EnableCapabilityNegotiation {
+		conn.Cap(CAP_LS)
+	}
+
 	if conn.cfg.Pass != "" {
 		conn.Pass(conn.cfg.Pass)
 	}
 	conn.Nick(conn.cfg.Me.Nick)
 	conn.User(conn.cfg.Me.Ident, conn.cfg.Me.Name)
+}
+
+func (conn *Conn) negotiateCapabilities(supportedCaps []string) {
+	for _, cap := range supportedCaps {
+		conn.supportedCaps.Add(cap)
+	}
+
+	// intersect capabilities supported by server with those requested
+	reqCaps := make([]string, 0)
+	for _, cap := range conn.cfg.Capabilites {
+		if conn.supportedCaps.Has(cap) {
+			reqCaps = append(reqCaps, cap)
+		}
+	}
+
+	if len(reqCaps) > 0 {
+		conn.Cap(CAP_REQ, reqCaps...)
+	} else {
+		conn.Cap(CAP_END)
+	}
+}
+
+func (conn *Conn) handleCapAck(caps []string) {
+	for _, cap := range caps {
+		conn.currCaps.Add(cap)
+	}
+	conn.Cap(CAP_END)
+}
+
+const (
+	CAP_LS  = "LS"
+	CAP_REQ = "REQ"
+	CAP_ACK = "ACK"
+	CAP_NAK = "NAK"
+	CAP_END = "END"
+)
+
+type capSet struct {
+	caps map[string]struct{}
+	mu   sync.RWMutex
+}
+
+func capabilitySet() *capSet {
+	return &capSet{
+		caps: make(map[string]struct{}),
+	}
+}
+
+func (c *capSet) Add(cap string) {
+	c.mu.Lock()
+	c.caps[cap] = struct{}{}
+	c.mu.Unlock()
+}
+
+func (c *capSet) Has(cap string) bool {
+	c.mu.RLock()
+	_, ok := c.caps[cap]
+	c.mu.RUnlock()
+	return ok
+}
+
+// Handler for capability negotiation commands.
+func (conn *Conn) h_CAP(line *Line) {
+	subcommand := line.Args[1]
+
+	switch subcommand {
+	case CAP_LS:
+		conn.negotiateCapabilities(strings.Fields(line.Text()))
+	case CAP_ACK:
+		conn.handleCapAck(strings.Fields(line.Text()))
+	case CAP_NAK:
+	}
 }
 
 // Handler to trigger a CONNECTED event on receipt of numeric 001
