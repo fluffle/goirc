@@ -95,7 +95,7 @@ func splitCommand(cmdPrefix string, args []string) []string {
 		currCmd := cmdPrefix + args[i]
 		i++
 
-		for i < len(args) && len(currCmd) < 50 {
+		for i < len(args) && len(currCmd) < defaultSplit {
 			currCmd += " " + args[i]
 			i++
 		}
