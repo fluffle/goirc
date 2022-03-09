@@ -75,6 +75,10 @@ func (conn *Conn) handleCapAck(caps []string) {
 	conn.Cap(CAP_END)
 }
 
+func (conn *Conn) handleCapNak(caps []string) {
+	conn.Cap(CAP_END)
+}
+
 const (
 	CAP_LS  = "LS"
 	CAP_REQ = "REQ"
@@ -107,15 +111,19 @@ func (c *capSet) Has(cap string) bool {
 }
 
 // Handler for capability negotiation commands.
+// Note that even if multiple CAP_END commands may be sent to the server during negotiation,
+// only the first will be considered.
 func (conn *Conn) h_CAP(line *Line) {
 	subcommand := line.Args[1]
 
+	caps := strings.Fields(line.Text())
 	switch subcommand {
 	case CAP_LS:
-		conn.negotiateCapabilities(strings.Fields(line.Text()))
+		conn.negotiateCapabilities(caps)
 	case CAP_ACK:
-		conn.handleCapAck(strings.Fields(line.Text()))
+		conn.handleCapAck(caps)
 	case CAP_NAK:
+		conn.handleCapNak(caps)
 	}
 }
 
