@@ -84,6 +84,27 @@ func splitMessage(msg string, splitLen int) (msgs []string) {
 	return append(msgs, msg)
 }
 
+// splitCommand takes a command of the form <commandPrefix arg0, arg1, ...>
+// and returns a list of commands of the same form
+// where the len of each command doesn't exceed splitLen
+func splitCommand(cmdPrefix string, args []string) []string {
+	cmds := make([]string, 0)
+
+	i := 0
+	for i < len(args) {
+		currCmd := cmdPrefix + args[i]
+		i++
+
+		for i < len(args) && len(currCmd) < 50 {
+			currCmd += " " + args[i]
+			i++
+		}
+		cmds = append(cmds, currCmd)
+		currCmd = cmdPrefix
+	}
+	return cmds
+}
+
 // Raw sends a raw line to the server, should really only be used for
 // debugging purposes but may well come in handy.
 func (conn *Conn) Raw(rawline string) {
@@ -299,6 +320,8 @@ func (conn *Conn) Cap(subcommmand string, capabilities ...string) {
 	if len(capabilities) == 0 {
 		conn.Raw(CAP + " " + subcommmand)
 	} else {
-		conn.Raw(CAP + " " + subcommmand + " :" + strings.Join(capabilities, " "))
+		for _, cmd := range splitCommand(CAP+" "+subcommmand+" :", capabilities) {
+			conn.Raw(cmd)
+		}
 	}
 }
