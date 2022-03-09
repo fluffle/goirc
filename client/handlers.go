@@ -84,27 +84,26 @@ const (
 )
 
 type capSet struct {
-	caps map[string]struct{}
+	caps map[string]bool
 	mu   sync.RWMutex
 }
 
 func capabilitySet() *capSet {
 	return &capSet{
-		caps: make(map[string]struct{}),
+		caps: make(map[string]bool),
 	}
 }
 
 func (c *capSet) Add(cap string) {
 	c.mu.Lock()
-	c.caps[cap] = struct{}{}
+	c.caps[cap] = true
 	c.mu.Unlock()
 }
 
 func (c *capSet) Has(cap string) bool {
 	c.mu.RLock()
-	_, ok := c.caps[cap]
-	c.mu.RUnlock()
-	return ok
+	defer c.mu.RUnlock()
+	return c.caps[cap]
 }
 
 // Handler for capability negotiation commands.
