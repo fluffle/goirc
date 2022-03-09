@@ -143,7 +143,7 @@ func NewConfig(nick string, args ...string) *Config {
 		Recover:                     (*Conn).LogPanic, // in dispatch.go
 		SplitLen:                    defaultSplit,
 		Timeout:                     60 * time.Second,
-		EnableCapabilityNegotiation: true,
+		EnableCapabilityNegotiation: false,
 	}
 	cfg.Me.Ident = "goirc"
 	if len(args) > 0 && args[0] != "" {
@@ -306,7 +306,7 @@ func (conn *Conn) DisableStateTracking() {
 
 // SupportsCapability returns true if the server supports the given capability.
 func (conn *Conn) SupportsCapability(cap string) bool {
-	return conn.currCaps.Has(cap)
+	return conn.supportedCaps.Has(cap)
 }
 
 // HasCapability returns true if the given capability has been acked by the server during negotiation.
