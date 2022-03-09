@@ -22,6 +22,9 @@ var intHandlers = map[string]HandlerFunc{
 	CAP:      (*Conn).h_CAP,
 }
 
+// set up the ircv3 capabilities supported by this client which will be requested by default to the server.
+var defaultCaps = []string{}
+
 func (conn *Conn) addIntHandlers() {
 	for n, h := range intHandlers {
 		// internal handlers are essential for the IRC client
@@ -48,21 +51,26 @@ func (conn *Conn) h_REGISTER(line *Line) {
 	conn.User(conn.cfg.Me.Ident, conn.cfg.Me.Name)
 }
 
+func (conn *Conn) getRequestCapabilities() *capSet {
+	s := capabilitySet()
+
+	// add capabilites supported by the client
+	s.Add(defaultCaps...)
+
+	// add capabilites requested by the user
+	s.Add(conn.cfg.Capabilites...)
+
+	return s
+}
+
 func (conn *Conn) negotiateCapabilities(supportedCaps []string) {
-	for _, cap := range supportedCaps {
-		conn.supportedCaps.Add(cap)
-	}
+	conn.supportedCaps.Add(supportedCaps...)
 
-	// intersect capabilities supported by server with those requested
-	reqCaps := make([]string, 0)
-	for _, cap := range conn.cfg.Capabilites {
-		if conn.supportedCaps.Has(cap) {
-			reqCaps = append(reqCaps, cap)
-		}
-	}
+	reqCaps := conn.getRequestCapabilities()
+	reqCaps.Intersect(conn.supportedCaps)
 
-	if len(reqCaps) > 0 {
-		conn.Cap(CAP_REQ, reqCaps...)
+	if reqCaps.Size() > 0 {
+		conn.Cap(CAP_REQ, reqCaps.Slice()...)
 	} else {
 		conn.Cap(CAP_END)
 	}
@@ -98,9 +106,11 @@ func capabilitySet() *capSet {
 	}
 }
 
-func (c *capSet) Add(cap string) {
+func (c *capSet) Add(caps ...string) {
 	c.mu.Lock()
-	c.caps[cap] = true
+	for _, cap := range caps {
+		c.caps[cap] = true
+	}
 	c.mu.Unlock()
 }
 
@@ -108,6 +118,37 @@ func (c *capSet) Has(cap string) bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.caps[cap]
+}
+
+// Intersect computes the intersection of two sets.
+func (c *capSet) Intersect(other *capSet) {
+	c.mu.Lock()
+
+	for cap := range c.caps {
+		if !other.Has(cap) {
+			delete(c.caps, cap)
+		}
+	}
+
+	c.mu.Unlock()
+}
+
+func (c *capSet) Slice() []string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	capSlice := make([]string, 0, len(c.caps))
+	for cap := range c.caps {
+		capSlice = append(capSlice, cap)
+	}
+
+	return capSlice
+}
+
+func (c *capSet) Size() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return len(c.caps)
 }
 
 // Handler for capability negotiation commands.
