@@ -20,6 +20,7 @@ var intHandlers = map[string]HandlerFunc{
 	NICK:     (*Conn).h_NICK,
 	PING:     (*Conn).h_PING,
 	CAP:      (*Conn).h_CAP,
+	"410":    (*Conn).h_410,
 }
 
 // set up the ircv3 capabilities supported by this client which will be requested by default to the server.
@@ -149,6 +150,11 @@ func (c *capSet) Size() int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return len(c.caps)
+}
+
+// This handler is triggered when an invalid cap command is received by the server.
+func (conn *Conn) h_410(line *Line) {
+	logging.Warn("Invalid cap subcommand: ", line.Args[1])
 }
 
 // Handler for capability negotiation commands.
