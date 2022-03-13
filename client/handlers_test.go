@@ -456,3 +456,42 @@ func Test671(t *testing.T) {
 	s.st.EXPECT().GetNick("user2").Return(nil)
 	c.h_671(ParseLine(":irc.server.org 671 test user2 :some ignored text"))
 }
+
+func TestCap(t *testing.T) {
+	c, s := setUp(t)
+	defer s.tearDown()
+
+	c.Config().EnableCapabilityNegotiation = true
+	c.Config().Capabilites = []string{"cap1", "cap2", "cap3", "cap4"}
+
+	c.h_REGISTER(&Line{Cmd: REGISTER})
+	s.nc.Expect("CAP LS")
+	s.nc.Expect("NICK test")
+	s.nc.Expect("USER test 12 * :Testing IRC")
+
+	// Ensure that capabilities not supported by the server are not requested
+	s.nc.Send("CAP * LS :cap2 cap4")
+	s.nc.Expect("CAP REQ :cap2 cap4")
+
+	s.nc.Send("CAP * ACK cap2")
+	s.nc.Send("CAP * NAK cap4")
+
+	s.nc.Expect("CAP END")
+	s.nc.Expect("CAP END")
+
+	for _, cap := range []string{"cap2", "cap4"} {
+		if !c.SupportsCapability(cap) {
+			t.Fail()
+		}
+	}
+
+	for _, cap := range []string{"cap1", "cap3", "cap4"} {
+		if c.HasCapability(cap) {
+			t.Fail()
+		}
+	}
+
+	if !c.HasCapability("cap2") {
+		t.Fail()
+	}
+}
