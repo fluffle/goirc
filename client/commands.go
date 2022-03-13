@@ -87,7 +87,7 @@ func splitMessage(msg string, splitLen int) (msgs []string) {
 // splitCommand takes a command of the form <commandPrefix arg0, arg1, ...>
 // and returns a list of commands of the same form
 // where the len of each command doesn't exceed splitLen
-func splitCommand(cmdPrefix string, args []string) []string {
+func splitCommand(cmdPrefix string, args []string, maxLen int) []string {
 	cmds := make([]string, 0)
 
 	i := 0
@@ -95,7 +95,7 @@ func splitCommand(cmdPrefix string, args []string) []string {
 		currCmd := cmdPrefix + args[i]
 		i++
 
-		for i < len(args) && len(currCmd)+len(args[i])+1 < defaultSplit {
+		for i < len(args) && len(currCmd)+len(args[i])+1 < maxLen {
 			currCmd += " " + args[i]
 			i++
 		}
@@ -320,7 +320,7 @@ func (conn *Conn) Cap(subcommmand string, capabilities ...string) {
 	if len(capabilities) == 0 {
 		conn.Raw(CAP + " " + subcommmand)
 	} else {
-		for _, cmd := range splitCommand(CAP+" "+subcommmand+" :", capabilities) {
+		for _, cmd := range splitCommand(CAP+" "+subcommmand+" :", capabilities, defaultSplit) {
 			conn.Raw(cmd)
 		}
 	}
