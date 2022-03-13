@@ -2,6 +2,7 @@ package client
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -320,6 +321,9 @@ func (conn *Conn) Cap(subcommmand string, capabilities ...string) {
 	if len(capabilities) == 0 {
 		conn.Raw(CAP + " " + subcommmand)
 	} else {
+		// make output predictable for testing
+		sort.Strings(capabilities)
+
 		for _, cmd := range splitCommand(CAP+" "+subcommmand+" :", capabilities, defaultSplit) {
 			conn.Raw(cmd)
 		}
