@@ -3,6 +3,7 @@ package client
 import (
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -214,12 +215,9 @@ func TestSplitCommand(t *testing.T) {
 	}
 
 	for maxLen := 1; maxLen <= defaultSplit; maxLen *= 2 {
-		for _, cmd := range splitCommand("TEST :", args, maxLen) {
-			if len(cmd) > maxLen {
-				line := ParseLine(cmd)
-				if len(line.Args) > 1 { // len(cmd) can exceed maxLen only if cmd includes a single argument.
-					t.Fatalf("maxLen = %d, but len(cmd) = %d", maxLen, len(cmd))
-				}
+		for _, argStr := range splitArgs(args, maxLen) {
+			if len(argStr) > maxLen && len(strings.Split(argStr, " ")) > 1 {
+				t.Errorf("maxLen = %d, but len(cmd) = %d", maxLen, len(argStr))
 			}
 		}
 	}

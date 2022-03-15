@@ -85,25 +85,21 @@ func splitMessage(msg string, splitLen int) (msgs []string) {
 	return append(msgs, msg)
 }
 
-// splitCommand takes a command of the form <commandPrefix arg0, arg1, ...>
-// and returns a list of commands of the same form
-// where the len of each command doesn't exceed splitLen
-func splitCommand(cmdPrefix string, args []string, maxLen int) []string {
-	cmds := make([]string, 0)
+func splitArgs(args []string, maxLen int) []string {
+	res := make([]string, 0)
 
 	i := 0
 	for i < len(args) {
-		currCmd := cmdPrefix + args[i]
+		currArg := args[i]
 		i++
 
-		for i < len(args) && len(currCmd)+len(args[i])+1 < maxLen {
-			currCmd += " " + args[i]
+		for i < len(args) && len(currArg)+len(args[i])+1 < maxLen {
+			currArg += " " + args[i]
 			i++
 		}
-		cmds = append(cmds, currCmd)
-		currCmd = cmdPrefix
+		res = append(res, currArg)
 	}
-	return cmds
+	return res
 }
 
 // Raw sends a raw line to the server, should really only be used for
@@ -324,8 +320,9 @@ func (conn *Conn) Cap(subcommmand string, capabilities ...string) {
 		// make output predictable for testing
 		sort.Strings(capabilities)
 
-		for _, cmd := range splitCommand(CAP+" "+subcommmand+" :", capabilities, defaultSplit) {
-			conn.Raw(cmd)
+		cmdPrefix := CAP + " " + subcommmand + " :"
+		for _, args := range splitArgs(capabilities, defaultSplit-len(cmdPrefix)) {
+			conn.Raw(cmdPrefix + args)
 		}
 	}
 }
