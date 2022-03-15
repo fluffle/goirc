@@ -473,25 +473,37 @@ func TestCap(t *testing.T) {
 	s.nc.Send("CAP * LS :cap2 cap4")
 	s.nc.Expect("CAP REQ :cap2 cap4")
 
-	s.nc.Send("CAP * ACK cap2")
-	s.nc.Send("CAP * NAK cap4")
-
-	s.nc.Expect("CAP END")
+	s.nc.Send("CAP * ACK :cap2 cap4")
 	s.nc.Expect("CAP END")
 
 	for _, cap := range []string{"cap2", "cap4"} {
 		if !c.SupportsCapability(cap) {
 			t.Fail()
 		}
+
+		if !c.HasCapability(cap) {
+			t.Fail()
+		}
 	}
 
-	for _, cap := range []string{"cap1", "cap3", "cap4"} {
+	for _, cap := range []string{"cap1", "cap3"} {
 		if c.HasCapability(cap) {
 			t.Fail()
 		}
 	}
 
+	// test disable capability after registration
+	s.c.Cap("REQ", "-cap4")
+	s.nc.Expect("CAP REQ :-cap4")
+
+	s.nc.Send("CAP * ACK :-cap4")
+	s.nc.Expect("CAP END")
+
 	if !c.HasCapability("cap2") {
+		t.Fail()
+	}
+
+	if c.HasCapability("cap4") {
 		t.Fail()
 	}
 }
