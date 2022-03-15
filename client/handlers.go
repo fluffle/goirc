@@ -110,7 +110,11 @@ func capabilitySet() *capSet {
 func (c *capSet) Add(caps ...string) {
 	c.mu.Lock()
 	for _, cap := range caps {
-		c.caps[cap] = true
+		if strings.HasPrefix(cap, "-") {
+			c.caps[cap[1:]] = false
+		} else {
+			c.caps[cap] = true
+		}
 	}
 	c.mu.Unlock()
 }
