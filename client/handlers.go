@@ -4,6 +4,7 @@ package client
 // to manage tracking an irc connection etc.
 
 import (
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -147,6 +148,8 @@ func (c *capSet) Slice() []string {
 		capSlice = append(capSlice, cap)
 	}
 
+	// make output predictable for testing
+	sort.Strings(capSlice)
 	return capSlice
 }
 
