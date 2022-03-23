@@ -115,6 +115,7 @@ Contributions gratefully received from:
   - [jakebailey](https://github.com/jakebailey)
   - [stapelberg](https://github.com/stapelberg)
   - [shammash](https://github.com/shammash)
+  - [ostefan](https://github.com/ostafen)
 
 And thanks to the following for minor doc/fix PRs:
 
