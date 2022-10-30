@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/emersion/go-sasl"
 	"github.com/fluffle/goirc/logging"
 	"github.com/fluffle/goirc/state"
 	"golang.org/x/net/proxy"
@@ -50,6 +51,9 @@ type Conn struct {
 
 	// Capabilites currently enabled
 	currCaps *capSet
+
+	// SASL internals
+	saslRemainingData []byte
 
 	// CancelFunc and WaitGroup for goroutines
 	die context.CancelFunc
@@ -100,6 +104,9 @@ type Config struct {
 
 	// A list of capabilities to request to the server during registration.
 	Capabilites []string
+
+	// SASL configuration to use to authenticate the connection.
+	Sasl sasl.Client
 
 	// Replaceable function to customise the 433 handler's new nick.
 	// By default an underscore "_" is appended to the current nick.
@@ -216,16 +223,22 @@ func Client(cfg *Config) *Conn {
 		}
 	}
 
+	if cfg.Sasl != nil && !cfg.EnableCapabilityNegotiation {
+		logging.Warn("Enabling capability negotiation as it's required for SASL")
+		cfg.EnableCapabilityNegotiation = true
+	}
+
 	conn := &Conn{
-		cfg:           cfg,
-		dialer:        dialer,
-		intHandlers:   handlerSet(),
-		fgHandlers:    handlerSet(),
-		bgHandlers:    handlerSet(),
-		stRemovers:    make([]Remover, 0, len(stHandlers)),
-		lastsent:      time.Now(),
-		supportedCaps: capabilitySet(),
-		currCaps:      capabilitySet(),
+		cfg:               cfg,
+		dialer:            dialer,
+		intHandlers:       handlerSet(),
+		fgHandlers:        handlerSet(),
+		bgHandlers:        handlerSet(),
+		stRemovers:        make([]Remover, 0, len(stHandlers)),
+		lastsent:          time.Now(),
+		supportedCaps:     capabilitySet(),
+		currCaps:          capabilitySet(),
+		saslRemainingData: nil,
 	}
 	conn.addIntHandlers()
 	return conn
@@ -245,10 +258,9 @@ func (conn *Conn) Connected() bool {
 // affect client behaviour. To disable flood protection temporarily,
 // for example, a handler could do:
 //
-//     conn.Config().Flood = true
-//     // Send many lines to the IRC server, risking "excess flood"
-//     conn.Config().Flood = false
-//
+//	conn.Config().Flood = true
+//	// Send many lines to the IRC server, risking "excess flood"
+//	conn.Config().Flood = false
 func (conn *Conn) Config() *Config {
 	return conn.cfg
 }
