@@ -9,19 +9,26 @@ import (
 	"sync"
 	"time"
 
+	"encoding/base64"
 	"github.com/fluffle/goirc/logging"
 )
 
+// saslCap is the IRCv3 capability used for SASL authentication.
+const saslCap = "sasl"
+
 // sets up the internal event handlers to do essential IRC protocol things
 var intHandlers = map[string]HandlerFunc{
-	REGISTER: (*Conn).h_REGISTER,
-	"001":    (*Conn).h_001,
-	"433":    (*Conn).h_433,
-	CTCP:     (*Conn).h_CTCP,
-	NICK:     (*Conn).h_NICK,
-	PING:     (*Conn).h_PING,
-	CAP:      (*Conn).h_CAP,
-	"410":    (*Conn).h_410,
+	REGISTER:     (*Conn).h_REGISTER,
+	"001":        (*Conn).h_001,
+	"433":        (*Conn).h_433,
+	CTCP:         (*Conn).h_CTCP,
+	NICK:         (*Conn).h_NICK,
+	PING:         (*Conn).h_PING,
+	CAP:          (*Conn).h_CAP,
+	"410":        (*Conn).h_410,
+	AUTHENTICATE: (*Conn).h_AUTHENTICATE,
+	"903":        (*Conn).h_903,
+	"904":        (*Conn).h_904,
 }
 
 // set up the ircv3 capabilities supported by this client which will be requested by default to the server.
@@ -59,6 +66,11 @@ func (conn *Conn) getRequestCapabilities() *capSet {
 	// add capabilites supported by the client
 	s.Add(defaultCaps...)
 
+	if conn.cfg.Sasl != nil {
+		// add the SASL cap if enabled
+		s.Add(saslCap)
+	}
+
 	// add capabilites requested by the user
 	s.Add(conn.cfg.Capabilites...)
 
@@ -79,10 +91,27 @@ func (conn *Conn) negotiateCapabilities(supportedCaps []string) {
 }
 
 func (conn *Conn) handleCapAck(caps []string) {
+	gotSasl := false
 	for _, cap := range caps {
 		conn.currCaps.Add(cap)
+
+		if conn.cfg.Sasl != nil && cap == saslCap {
+			gotSasl = true
+
+			mech, ir, err := conn.cfg.Sasl.Start()
+			conn.saslRemainingData = ir
+
+			if err != nil {
+				logging.Warn("SASL authentication failed", err)
+			}
+
+			conn.Authenticate(mech)
+		}
 	}
-	conn.Cap(CAP_END)
+
+	if !gotSasl {
+		conn.Cap(CAP_END)
+	}
 }
 
 func (conn *Conn) handleCapNak(caps []string) {
@@ -179,6 +208,50 @@ func (conn *Conn) h_CAP(line *Line) {
 	case CAP_NAK:
 		conn.handleCapNak(caps)
 	}
+}
+
+// Handler for SASL authentication
+func (conn *Conn) h_AUTHENTICATE(line *Line) {
+	if conn.cfg.Sasl == nil {
+		return
+	}
+
+	if len(conn.saslRemainingData) > 0 {
+		data := base64.StdEncoding.EncodeToString(conn.saslRemainingData)
+
+		// TODO: batch data into chunks of 400 bytes per the spec
+
+		conn.Authenticate(data)
+		conn.saslRemainingData = nil
+		return
+	}
+
+	challenge, err := base64.StdEncoding.DecodeString(line.Args[0])
+	if err != nil {
+		// TODO: better error handling here and below
+		logging.Error("Failed to decode SASL challenge", err)
+	}
+
+	response, err := conn.cfg.Sasl.Next(challenge)
+	if err != nil {
+		logging.Error("Failed to generate response for SASL challenge", err)
+	}
+
+	// TODO: batch data into chunks of 400 bytes per the spec
+	data := base64.StdEncoding.EncodeToString(response)
+	conn.Authenticate(data)
+}
+
+// Handler for RPL_SASLSUCCESS.
+func (conn *Conn) h_903(line *Line) {
+	conn.Cap(CAP_END)
+}
+
+// Handler for RPL_SASLFAILURE.
+func (conn *Conn) h_904(line *Line) {
+	// TODO: do something about this?
+	logging.Warn("SASL authentication failed")
+	conn.Cap(CAP_END)
 }
 
 // Handler to trigger a CONNECTED event on receipt of numeric 001
