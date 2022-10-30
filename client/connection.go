@@ -101,6 +101,9 @@ type Config struct {
 	// A list of capabilities to request to the server during registration.
 	Capabilites []string
 
+	// SASL configuration to use to authenticate the connection.
+	Sasl *SaslAuthenticator
+
 	// Replaceable function to customise the 433 handler's new nick.
 	// By default an underscore "_" is appended to the current nick.
 	NewNick func(string) string
@@ -214,6 +217,11 @@ func Client(cfg *Config) *Conn {
 		} else {
 			logging.Error("irc.Client(): Cannot resolve local address %s: %s", cfg.LocalAddr, err)
 		}
+	}
+
+	if cfg.Sasl != nil && !cfg.EnableCapabilityNegotiation {
+		logging.Warn("Enabling capability negotiation as it's required for SASL")
+		cfg.EnableCapabilityNegotiation = true
 	}
 
 	conn := &Conn{

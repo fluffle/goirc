@@ -14,14 +14,17 @@ import (
 
 // sets up the internal event handlers to do essential IRC protocol things
 var intHandlers = map[string]HandlerFunc{
-	REGISTER: (*Conn).h_REGISTER,
-	"001":    (*Conn).h_001,
-	"433":    (*Conn).h_433,
-	CTCP:     (*Conn).h_CTCP,
-	NICK:     (*Conn).h_NICK,
-	PING:     (*Conn).h_PING,
-	CAP:      (*Conn).h_CAP,
-	"410":    (*Conn).h_410,
+	REGISTER:     (*Conn).h_REGISTER,
+	"001":        (*Conn).h_001,
+	"433":        (*Conn).h_433,
+	CTCP:         (*Conn).h_CTCP,
+	NICK:         (*Conn).h_NICK,
+	PING:         (*Conn).h_PING,
+	CAP:          (*Conn).h_CAP,
+	"410":        (*Conn).h_410,
+	AUTHENTICATE: (*Conn).h_AUTHENTICATE,
+	"903":        (*Conn).h_903,
+	"904":        (*Conn).h_904,
 }
 
 // set up the ircv3 capabilities supported by this client which will be requested by default to the server.
@@ -59,6 +62,11 @@ func (conn *Conn) getRequestCapabilities() *capSet {
 	// add capabilites supported by the client
 	s.Add(defaultCaps...)
 
+	if conn.cfg.Sasl != nil {
+		// add the SASL cap if enabled
+		s.Add(saslCap)
+	}
+
 	// add capabilites requested by the user
 	s.Add(conn.cfg.Capabilites...)
 
@@ -79,10 +87,19 @@ func (conn *Conn) negotiateCapabilities(supportedCaps []string) {
 }
 
 func (conn *Conn) handleCapAck(caps []string) {
+	gotSasl := false
 	for _, cap := range caps {
 		conn.currCaps.Add(cap)
+
+		if conn.cfg.Sasl != nil && cap == saslCap {
+			gotSasl = true
+			conn.Authenticate(string(conn.cfg.Sasl.mechanism))
+		}
 	}
-	conn.Cap(CAP_END)
+
+	if !gotSasl {
+		conn.Cap(CAP_END)
+	}
 }
 
 func (conn *Conn) handleCapNak(caps []string) {
@@ -179,6 +196,32 @@ func (conn *Conn) h_CAP(line *Line) {
 	case CAP_NAK:
 		conn.handleCapNak(caps)
 	}
+}
+
+// Handler for SASL authentication
+func (conn *Conn) h_AUTHENTICATE(line *Line) {
+	if conn.cfg.Sasl == nil {
+		return
+	}
+
+	if line.Args[0] != "+" {
+		return
+	}
+
+	// start authentication
+	conn.Authenticate(conn.cfg.Sasl.authenticationRequest())
+}
+
+// Handler for RPL_SASLSUCCESS.
+func (conn *Conn) h_903(line *Line) {
+	conn.Cap(CAP_END)
+}
+
+// Handler for RPL_SASLFAILURE.
+func (conn *Conn) h_904(line *Line) {
+	// TODO: do something about this?
+	logging.Warn("SASL authentication failed")
+	conn.Cap(CAP_END)
 }
 
 // Handler to trigger a CONNECTED event on receipt of numeric 001
