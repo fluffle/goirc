@@ -10,6 +10,7 @@ const (
 	CONNECTED    = "CONNECTED"
 	DISCONNECTED = "DISCONNECTED"
 	ACTION       = "ACTION"
+	AUTHENTICATE = "AUTHENTICATE"
 	AWAY         = "AWAY"
 	CAP          = "CAP"
 	CTCP         = "CTCP"
@@ -321,4 +322,9 @@ func (conn *Conn) Cap(subcommmand string, capabilities ...string) {
 			conn.Raw(cmdPrefix + args)
 		}
 	}
+}
+
+// Authenticate send an AUTHENTICATE command to the server.
+func (conn *Conn) Authenticate(message string) {
+	conn.Raw(AUTHENTICATE + " " + message)
 }
