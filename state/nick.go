@@ -71,7 +71,7 @@ func (nk *nick) Nick() *Nick {
 		Host:     nk.host,
 		Name:     nk.name,
 		Modes:    nk.modes.Copy(),
-		Channels: make(map[string]*ChanPrivs),
+		Channels: make(map[string]*ChanPrivs, len(nk.chans)),
 	}
 	for c, cp := range nk.chans {
 		n.Channels[c.name] = cp.Copy()
@@ -157,6 +157,7 @@ func (nm *NickMode) Equals(other *NickMode) bool {
 }
 
 // Returns a string representing the nick. Looks like:
+//
 //	Nick: <nick name> e.g. CowMaster
 //	Hostmask: <ident@host> e.g. moo@cows.org
 //	Real Name: <real name> e.g. Steve "CowMaster" Bush
@@ -181,6 +182,7 @@ func (nk *nick) String() string {
 }
 
 // Returns a string representing the nick modes. Looks like:
+//
 //	+iwx
 func (nm *NickMode) String() string {
 	if nm == nil {

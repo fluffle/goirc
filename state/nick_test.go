@@ -1,6 +1,9 @@
 package state
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func compareNick(t *testing.T, nk *nick) {
 	n := nk.Nick()
@@ -84,5 +87,32 @@ func TestNickParseModes(t *testing.T) {
 	compareNick(t, nk)
 	if !md.Invisible || md.Oper || !md.WallOps || md.HiddenHost || !md.SSL {
 		t.Errorf("Modes not flipped correctly by ParseModes.")
+	}
+}
+
+func BenchmarkNickSingleChan(b *testing.B) {
+	nk := newNick("test1")
+	ch := newChannel("#test1")
+	cp := new(ChanPrivs)
+	nk.addChannel(ch, cp)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		nk.Nick()
+	}
+}
+
+func BenchmarkNickManyChan(b *testing.B) {
+	const numChans = 1000
+	nk := newNick("test1")
+	for i := 0; i < numChans; i++ {
+		ch := newChannel(fmt.Sprintf("#test%d", i))
+		cp := new(ChanPrivs)
+		nk.addChannel(ch, cp)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		nk.Nick()
 	}
 }
