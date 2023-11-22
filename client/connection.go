@@ -413,15 +413,24 @@ func (conn *Conn) internalConnect(ctx context.Context) error {
 			return err
 		}
 		contextProxyDialer, ok := proxyDialer.(proxy.ContextDialer)
-		if !ok {
-			return errors.New("Dialer for proxy does not support context")
-		}
-		conn.proxyDialer = contextProxyDialer
-		logging.Info("irc.Connect(): Connecting to %s.", conn.cfg.Server)
-		if s, err := conn.proxyDialer.DialContext(ctx, "tcp", conn.cfg.Server); err == nil {
-			conn.sock = s
+		if ok {
+			conn.proxyDialer = contextProxyDialer
+			logging.Info("irc.Connect(): Connecting to %s.", conn.cfg.Server)
+			if s, err := conn.proxyDialer.DialContext(ctx, "tcp", conn.cfg.Server); err == nil {
+				conn.sock = s
+			} else {
+				return err
+			}
 		} else {
-			return err
+			logging.Warn("Dialer for proxy does not support context, please implement DialContext")
+
+			conn.proxyDialer = proxyDialer
+			logging.Info("irc.Connect(): Connecting to %s.", conn.cfg.Server)
+			if s, err := conn.proxyDialer.Dial("tcp", conn.cfg.Server); err == nil {
+				conn.sock = s
+			} else {
+				return err
+			}
 		}
 	} else {
 		logging.Info("irc.Connect(): Connecting to %s.", conn.cfg.Server)
