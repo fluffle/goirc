@@ -108,7 +108,8 @@ type Config struct {
 	Sasl sasl.Client
 
 	// Replaceable function to customise the 433 handler's new nick.
-	// By default an underscore "_" is appended to the current nick.
+	// By default the current nick's last character is "incremented".
+	// See DefaultNewNick implementation below for details.
 	NewNick func(string) string
 
 	// Client->server ping frequency, in seconds. Defaults to 3m.
