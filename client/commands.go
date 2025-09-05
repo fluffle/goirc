@@ -6,36 +6,37 @@ import (
 )
 
 const (
-	REGISTER     = "REGISTER"
-	CONNECTED    = "CONNECTED"
-	DISCONNECTED = "DISCONNECTED"
-	ACTION       = "ACTION"
-	AUTHENTICATE = "AUTHENTICATE"
-	AWAY         = "AWAY"
-	CAP          = "CAP"
-	CTCP         = "CTCP"
-	CTCPREPLY    = "CTCPREPLY"
-	ERROR        = "ERROR"
-	INVITE       = "INVITE"
-	JOIN         = "JOIN"
-	KICK         = "KICK"
-	MODE         = "MODE"
-	NICK         = "NICK"
-	NOTICE       = "NOTICE"
-	OPER         = "OPER"
-	PART         = "PART"
-	PASS         = "PASS"
-	PING         = "PING"
-	PONG         = "PONG"
-	PRIVMSG      = "PRIVMSG"
-	QUIT         = "QUIT"
-	TOPIC        = "TOPIC"
-	USER         = "USER"
-	VERSION      = "VERSION"
-	VHOST        = "VHOST"
-	WHO          = "WHO"
-	WHOIS        = "WHOIS"
-	defaultSplit = 450
+	REGISTER      = "REGISTER"
+	CONNECTED     = "CONNECTED"
+	DISCONNECTED  = "DISCONNECTED"
+	ACTION        = "ACTION"
+	AUTHENTICATE  = "AUTHENTICATE"
+	AWAY          = "AWAY"
+	CAP           = "CAP"
+	CTCP          = "CTCP"
+	CTCPREPLY     = "CTCPREPLY"
+	ERROR         = "ERROR"
+	INVITE        = "INVITE"
+	JOIN          = "JOIN"
+	KICK          = "KICK"
+	MODE          = "MODE"
+	NICK          = "NICK"
+	NOTICE        = "NOTICE"
+	OPER          = "OPER"
+	PART          = "PART"
+	PASS          = "PASS"
+	PING          = "PING"
+	PONG          = "PONG"
+	PRIVMSG       = "PRIVMSG"
+	QUIT          = "QUIT"
+	TOPIC         = "TOPIC"
+	USER          = "USER"
+	VERSION       = "VERSION"
+	VHOST         = "VHOST"
+	WHO           = "WHO"
+	WHOIS         = "WHOIS"
+	defaultSplit  = 450
+	defaultMarker = "..."
 )
 
 // cutNewLines() pares down a string to the part before the first "\r" or "\n".
@@ -65,21 +66,34 @@ func indexFragment(s string) int {
 	return -1
 }
 
+// SplitDefaults permits read-only access to goirc's default split params.
+func SplitDefaults() (int, string) {
+	return defaultSplit, defaultMarker
+}
+
 // splitMessage splits a message > splitLen chars at:
 //   1. the end of the last sentence fragment before splitLen
 //   2. the end of the last word before splitLen
 //   3. splitLen itself
-func splitMessage(msg string, splitLen int) (msgs []string) {
+func splitMessage(msg string, splitLen int, marker string) (msgs []string) {
 	// This is quite short ;-)
 	if splitLen < 13 {
 		splitLen = defaultSplit
 	}
+
+	markerLen := len(marker)
+	if markerLen >= splitLen {
+		// This will end badly otherwise :-)
+		markerLen = len(defaultMarker)
+		marker = defaultMarker
+	}
+
 	for len(msg) > splitLen {
-		idx := indexFragment(msg[:splitLen-3])
+		idx := indexFragment(msg[:splitLen-markerLen])
 		if idx < 0 {
-			idx = splitLen - 3
+			idx = splitLen - markerLen
 		}
-		msgs = append(msgs, msg[:idx]+"...")
+		msgs = append(msgs, msg[:idx]+marker)
 		msg = msg[idx:]
 	}
 	return append(msgs, msg)
@@ -177,7 +191,7 @@ func (conn *Conn) Who(nick string) { conn.Raw(WHO + " " + nick) }
 // PRIVMSG t :msg
 func (conn *Conn) Privmsg(t, msg string) {
 	prefix := PRIVMSG + " " + t + " :"
-	for _, s := range splitMessage(msg, conn.cfg.SplitLen) {
+	for _, s := range splitMessage(msg, conn.cfg.SplitLen, conn.cfg.SplitMarker) {
 		conn.Raw(prefix + s)
 	}
 }
@@ -207,7 +221,7 @@ func (conn *Conn) Privmsgf(t, format string, a ...interface{}) {
 // will be sent to the target containing sequential parts of msg.
 //     NOTICE t :msg
 func (conn *Conn) Notice(t, msg string) {
-	for _, s := range splitMessage(msg, conn.cfg.SplitLen) {
+	for _, s := range splitMessage(msg, conn.cfg.SplitLen, conn.cfg.SplitMarker) {
 		conn.Raw(NOTICE + " " + t + " :" + s)
 	}
 }
@@ -217,7 +231,7 @@ func (conn *Conn) Notice(t, msg string) {
 //     PRIVMSG t :\001CTCP arg\001
 func (conn *Conn) Ctcp(t, ctcp string, arg ...string) {
 	// We need to split again here to ensure
-	for _, s := range splitMessage(strings.Join(arg, " "), conn.cfg.SplitLen) {
+	for _, s := range splitMessage(strings.Join(arg, " "), conn.cfg.SplitLen, conn.cfg.SplitMarker) {
 		if s != "" {
 			s = " " + s
 		}
@@ -230,7 +244,7 @@ func (conn *Conn) Ctcp(t, ctcp string, arg ...string) {
 // or channel t, with an optional argument.
 //     NOTICE t :\001CTCP arg\001
 func (conn *Conn) CtcpReply(t, ctcp string, arg ...string) {
-	for _, s := range splitMessage(strings.Join(arg, " "), conn.cfg.SplitLen) {
+	for _, s := range splitMessage(strings.Join(arg, " "), conn.cfg.SplitLen, conn.cfg.SplitMarker) {
 		if s != "" {
 			s = " " + s
 		}

@@ -136,6 +136,8 @@ type Config struct {
 	// Split PRIVMSGs, NOTICEs and CTCPs longer than SplitLen characters
 	// over multiple lines. Default to 450 if not set.
 	SplitLen int
+	// Defaults to appending "..." to a split line to indicate a split.
+	SplitMarker string
 }
 
 // NewConfig creates a Config struct containing sensible defaults.
@@ -149,6 +151,7 @@ func NewConfig(nick string, args ...string) *Config {
 		NewNick:                     DefaultNewNick,
 		Recover:                     (*Conn).LogPanic, // in dispatch.go
 		SplitLen:                    defaultSplit,
+		SplitMarker:                 defaultMarker,
 		Timeout:                     60 * time.Second,
 		EnableCapabilityNegotiation: false,
 	}

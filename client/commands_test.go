@@ -62,26 +62,35 @@ func TestSplitMessage(t *testing.T) {
 	tests := []struct {
 		in  string
 		sp  int
+		mk  string
 		out []string
 	}{
-		{"", 0, []string{""}},
-		{"foo", 0, []string{"foo"}},
-		{"foo bar baz beep", 0, []string{"foo bar baz beep"}},
-		{"foo bar baz beep", 15, []string{"foo bar baz ...", "beep"}},
-		{"foo bar, baz beep", 15, []string{"foo bar, ...", "baz beep"}},
-		{"01234567890123456", 0, []string{"01234567890123456"}},
-		{"01234567890123456", 13, []string{"0123456789...", "0123456"}},
-		{"01234567890123456", 14, []string{"01234567890...", "123456"}},
-		{"01234567890123456", 15, []string{"012345678901...", "23456"}},
-		{"01234567890123456", 16, []string{"0123456789012...", "3456"}},
-		{"01234567890123456", 17, []string{"01234567890123456"}},
-		{longString, 0, []string{longString[:longIdx] + "...", longString[longIdx:]}},
-		{longString[:defaultSplit-1], 0, []string{longString[:defaultSplit-1]}},
-		{longString[:defaultSplit], 0, []string{longString[:defaultSplit]}},
-		{longString[:defaultSplit+1], 0, []string{longString[:longIdx] + "...", longString[longIdx : defaultSplit+1]}},
+		{"", 0, "...", []string{""}},
+		{"foo", 0, "...", []string{"foo"}},
+		{"foo bar baz beep", 0, "...", []string{"foo bar baz beep"}},
+		{"foo bar baz beep", 15, "...", []string{"foo bar baz ...", "beep"}},
+		{"foo bar, baz beep", 15, "...", []string{"foo bar, ...", "baz beep"}},
+		{"01234567890123456", 0, "...", []string{"01234567890123456"}},
+		{"01234567890123456", 13, "", []string{"0123456789012", "3456"}},
+		{"01234567890123456", 14, ".", []string{"0123456789012.", "3456"}},
+		{"01234567890123456", 15, "..", []string{"0123456789012..", "3456"}},
+		{"01234567890123456", 16, "...", []string{"0123456789012...", "3456"}},
+		{"01234567890123456", 17, "...", []string{"01234567890123456"}},
+		{"01234567890123456", 14, "abcdefg", []string{"0123456abcdefg", "7890123456"}},
+		{"01234567890123456", 14, "abcdefghijkl", []string{
+			"01abcdefghijkl",
+			"23abcdefghijkl",
+			"4567890123456",
+		}},
+		// splitlen = markerlen => reset to default marker
+		{"01234567890123456", 14, "abcdefghijklmn", []string{"01234567890...", "123456"}},
+		{longString, 0, "...", []string{longString[:longIdx] + "...", longString[longIdx:]}},
+		{longString[:defaultSplit-1], 0, "...", []string{longString[:defaultSplit-1]}},
+		{longString[:defaultSplit], 0, "...", []string{longString[:defaultSplit]}},
+		{longString[:defaultSplit+1], 0, "...", []string{longString[:longIdx] + "...", longString[longIdx : defaultSplit+1]}},
 	}
 	for i, test := range tests {
-		out := splitMessage(test.in, test.sp)
+		out := splitMessage(test.in, test.sp, test.mk)
 		if !reflect.DeepEqual(test.out, out) {
 			t.Errorf("test %d: expected %q, got %q", i, test.out, out)
 		}
