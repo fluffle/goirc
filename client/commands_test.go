@@ -53,6 +53,11 @@ func TestIndexFragment(t *testing.T) {
 	}
 }
 
+var (
+	longString = strings.Repeat("long ", 100)
+	longIdx    = indexFragment(longString[:defaultSplit-3])
+)
+
 func TestSplitMessage(t *testing.T) {
 	tests := []struct {
 		in  string
@@ -64,9 +69,16 @@ func TestSplitMessage(t *testing.T) {
 		{"foo bar baz beep", 0, []string{"foo bar baz beep"}},
 		{"foo bar baz beep", 15, []string{"foo bar baz ...", "beep"}},
 		{"foo bar, baz beep", 15, []string{"foo bar, ...", "baz beep"}},
-		{"0123456789012345", 0, []string{"0123456789012345"}},
-		{"0123456789012345", 15, []string{"012345678901...", "2345"}},
-		{"0123456789012345", 16, []string{"0123456789012345"}},
+		{"01234567890123456", 0, []string{"01234567890123456"}},
+		{"01234567890123456", 13, []string{"0123456789...", "0123456"}},
+		{"01234567890123456", 14, []string{"01234567890...", "123456"}},
+		{"01234567890123456", 15, []string{"012345678901...", "23456"}},
+		{"01234567890123456", 16, []string{"0123456789012...", "3456"}},
+		{"01234567890123456", 17, []string{"01234567890123456"}},
+		{longString, 0, []string{longString[:longIdx] + "...", longString[longIdx:]}},
+		{longString[:defaultSplit-1], 0, []string{longString[:defaultSplit-1]}},
+		{longString[:defaultSplit], 0, []string{longString[:defaultSplit]}},
+		{longString[:defaultSplit+1], 0, []string{longString[:longIdx] + "...", longString[longIdx : defaultSplit+1]}},
 	}
 	for i, test := range tests {
 		out := splitMessage(test.in, test.sp)
