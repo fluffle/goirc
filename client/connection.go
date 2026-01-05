@@ -112,6 +112,9 @@ type Config struct {
 	// See DefaultNewNick implementation below for details.
 	NewNick func(string) string
 
+	// A delay in NewNick before actually sending the new nick command. Default is not set, so it's 0.
+	ReNickDelay time.Duration
+
 	// Client->server ping frequency, in seconds. Defaults to 3m.
 	// Set to 0 to disable client-side pings.
 	PingFreq time.Duration

@@ -310,6 +310,9 @@ func (conn *Conn) h_001(line *Line) {
 
 // Handler to deal with "433 :Nickname already in use"
 func (conn *Conn) h_433(line *Line) {
+	// Delay trying again if a non-zero delay was set 
+	time.Sleep(conn.cfg.ReNickDelay)
+
 	// Args[1] is the new nick we were attempting to acquire
 	me := conn.Me()
 	neu := conn.cfg.NewNick(line.Args[1])
