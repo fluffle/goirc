@@ -97,7 +97,7 @@ indebted to Matt Gruen for his work on
 the re-organisation and channel-based communication structure of `*Conn.send()`
 and `*Conn.recv()`. I'm sure things could be more asynchronous, still.
 
-This code is (c) 2009-23 Alex Bramley, and released under the same licence terms
+This code is (c) 2009-26 Alex Bramley, and released under the same licence terms
 as Go itself.
 
 Contributions gratefully received from:
@@ -117,6 +117,7 @@ Contributions gratefully received from:
   - [shammash](https://github.com/shammash)
   - [ostafen](https://github.com/ostafen)
   - [supertassu](https://github.com/supertassu)
+  - [slymas](https://github.com/slymas)
 
 And thanks to the following for minor doc/fix PRs:
 
