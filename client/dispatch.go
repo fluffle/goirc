@@ -70,6 +70,10 @@ func (hn *hNode) Handle(conn *Conn, line *Line) {
 
 // ... and Remover.
 func (hn *hNode) Remove() {
+	if hn == nil || hn.set == nil {
+		// Already removed, don't remove again.
+		return
+	}
 	hn.set.remove(hn)
 }
 

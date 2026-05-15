@@ -119,6 +119,28 @@ func TestHandlerSet(t *testing.T) {
 		t.Errorf("Our handler wasn't called three times :-(")
 	}
 
+	// Remove node 3 again. Shouldn't panic now, oops.
+	hn3.Remove()
+	if len(hs.set) != 1 {
+		t.Errorf("Set list count changed after duplicate remove().")
+	}
+	if hn1.prev != nil || hn1.next != hn2 ||
+		hn2.prev != hn1 || hn2.next != hn4 ||
+		hn4.prev != hn2 || hn4.next != nil {
+		t.Errorf("Duplicate remove broke list linking.")
+	}
+	if hl.start != hn1 || hl.end != hn4 {
+		t.Errorf("Duplicate remove broke list head/tail.")
+	}
+
+	// Dispatch should result in 3 additions, again.
+	hs.dispatch(c, &Line{Cmd: "One"})
+	<-time.After(time.Millisecond)
+	if atomic.LoadInt32(callcount) != 10 {
+		t.Errorf("Our handler wasn't called three times :-(")
+	}
+
+
 	// Remove node 1.
 	hs.remove(hn1)
 	if len(hs.set) != 1 {
@@ -137,7 +159,7 @@ func TestHandlerSet(t *testing.T) {
 	// Dispatch should result in 2 additions.
 	hs.dispatch(c, &Line{Cmd: "One"})
 	<-time.After(time.Millisecond)
-	if atomic.LoadInt32(callcount) != 9 {
+	if atomic.LoadInt32(callcount) != 12 {
 		t.Errorf("Our handler wasn't called two times :-(")
 	}
 
@@ -159,7 +181,7 @@ func TestHandlerSet(t *testing.T) {
 	// Dispatch should result in 1 addition.
 	hs.dispatch(c, &Line{Cmd: "One"})
 	<-time.After(time.Millisecond)
-	if atomic.LoadInt32(callcount) != 10 {
+	if atomic.LoadInt32(callcount) != 13 {
 		t.Errorf("Our handler wasn't called once :-(")
 	}
 
@@ -178,7 +200,7 @@ func TestHandlerSet(t *testing.T) {
 	// Dispatch should result in NO additions.
 	hs.dispatch(c, &Line{Cmd: "One"})
 	<-time.After(time.Millisecond)
-	if atomic.LoadInt32(callcount) != 10 {
+	if atomic.LoadInt32(callcount) != 13 {
 		t.Errorf("Our handler was called?")
 	}
 }
